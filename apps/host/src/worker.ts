@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { createServer, type Socket } from "node:net";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -26,7 +26,7 @@ open(`channel-${id}`, { channel: id });
 const paths = catalog.paths(id);
 
 if (!catalog.lock(id)) {
-	log("info", "worker.redundant", { owner: Number(readFileSync(paths.pid, "utf8")) });
+	log("info", "worker.redundant");
 	process.exit(0);
 }
 // A delete removes the record while it holds the lock, so read it only once this worker does.

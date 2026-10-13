@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { resolve } from "node:path";
 
@@ -176,14 +176,14 @@ export async function remove(id: string): Promise<void> {
 			throw new Error(`The hosting service did not delete the channel: ${response.status}`);
 		}
 	} else await hold(id);
-	const { lanes, pid } = catalog.paths(id);
+	const { lanes } = catalog.paths(id);
 	try {
 		for (const lane of existsSync(lanes) ? readdirSync(lanes) : []) {
 			spawnSync("git", ["-C", project, "worktree", "remove", "--force", `${lanes}/${lane}`]);
 		}
 		catalog.remove(id);
 	} catch (error) {
-		if (!hosted) rmSync(pid, { force: true });
+		if (!hosted) catalog.unlock(id);
 		throw error;
 	}
 }

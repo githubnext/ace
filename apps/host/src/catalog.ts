@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { randomBytes } from "node:crypto";
 import {
 	existsSync,
@@ -66,6 +67,7 @@ export function paths(id: string) {
 		storage: join(base, "channel.sqlite"),
 		socket: join(base, "channel.sock"),
 		pid: join(base, "worker.pid"),
+		lock: join(base, "worker.lock"),
 		log: join(base, "worker.log"),
 		lanes: join(base, "lanes"),
 	};
@@ -203,35 +205,43 @@ export function find(ref: string): Listing {
 	return record;
 }
 
-function isAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
-}
+const held = new Map<string, Database>();
 
 /**
- * One process owns a channel's storage: its worker, or a delete removing it. A live owner's pid
- * file turns others away.
+ * One process owns a channel's storage: its worker, or a delete or move removing it. The owner
+ * holds an exclusive SQLite lock, which the kernel releases when the owner exits or crashes, so no
+ * contender ever reclaims a dead owner's claim by hand. The pid file only names the live owner.
  */
 export function lock(id: string): boolean {
-	const { pid } = paths(id);
+	const { lock, pid } = paths(id);
+	const db = new Database(lock);
 	try {
-		writeFileSync(pid, String(process.pid), { flag: "wx" });
-		return true;
+		db.run("BEGIN EXCLUSIVE");
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-		if (isAlive(Number(readFileSync(pid, "utf8")))) return false;
-		rmSync(pid, { force: true });
-		return lock(id);
+		db.close();
+		if ((error as { code?: string }).code === "SQLITE_BUSY") return false;
+		throw error;
 	}
+	held.set(id, db);
+	const temporary = `${pid}.${process.pid}.tmp`;
+	writeFileSync(temporary, String(process.pid));
+	renameSync(temporary, pid);
+	return true;
+}
+
+/** The pid file goes first: removed after the release, it could already be a new owner's. */
+export function unlock(id: string): void {
+	const db = held.get(id);
+	if (!db) return;
+	rmSync(paths(id).pid, { force: true });
+	db.close();
+	held.delete(id);
 }
 
 /** The caller holds the worker lock; a worker that takes it as the directory goes finds no record. */
 export function remove(id: string): void {
 	rmSync(paths(id).record, { force: true });
-	// A late worker's lock file can reappear until it sees the missing record and exits.
 	rmSync(dir(id), { recursive: true, force: true, maxRetries: 5 });
+	held.get(id)?.close();
+	held.delete(id);
 }
