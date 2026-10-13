@@ -29,13 +29,23 @@ function subscribe(listener: () => void) {
 	return () => void listeners.delete(listener);
 }
 
+/**
+ * Undefined fields keep their last known value, so a channel opened again shows what it showed
+ * before and its fresh reads replace that in place instead of the sidebar emptying and refilling.
+ */
 export function publish(channel: string, patch: Details) {
-	values.set(channel, { ...values.get(channel), ...patch });
+	const next = { ...values.get(channel) };
+	for (const [key, value] of Object.entries(patch)) {
+		if (value !== undefined) Object.assign(next, { [key]: value });
+	}
+	values.set(channel, next);
 	for (const listener of listeners) listener();
 }
 
+/** Drops the Diff opener, which only works while the channel's tabs are mounted. */
 export function forget(channel: string) {
-	values.delete(channel);
+	const { diff: _, ...rest } = values.get(channel) || {};
+	values.set(channel, rest);
 	for (const listener of listeners) listener();
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import type { Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo, Listing } from "@ace/host/protocol";
@@ -113,6 +113,9 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 	];
 }
 
+// Last read per repo and branch, so switching back to a channel shows its pull request at once.
+const pulls = new Map<string, GithubPull | null>();
+
 /** The newest pull request from the chat's branch, read again while it can be seen. */
 function usePull(
 	repo: string | undefined,
@@ -120,14 +123,17 @@ function usePull(
 	head: string | undefined,
 	open: boolean,
 ) {
-	const [pull, setPull] = useState<{ key: string; value: GithubPull | null }>();
+	const [, render] = useReducer((count: number) => count + 1, 0);
 	const key = repo && branch ? `${repo}\0${branch}` : undefined;
 	useEffect(() => {
 		if (!open || !repo || !branch) return;
 		let active = true;
 		const read = () =>
 			host.request<GithubPull | null>({ op: "github-pull", repo, branch }).then(
-				(value) => active && setPull({ key: `${repo}\0${branch}`, value }),
+				(value) => {
+					pulls.set(`${repo}\0${branch}`, value);
+					if (active) render();
+				},
 				() => {},
 			);
 		void read();
@@ -137,7 +143,7 @@ function usePull(
 			clearInterval(timer);
 		};
 	}, [open, repo, branch, head]);
-	return pull && pull.key === key ? pull.value : undefined;
+	return key ? pulls.get(key) : undefined;
 }
 
 export function ChannelDetails({ channel }: { channel: Listing }) {
