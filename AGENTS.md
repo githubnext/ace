@@ -46,6 +46,11 @@ to change.
 - File bugs and missing capabilities observed while dogfooding, or update the matching issue,
   and link them from the [dogfooding meta issue](https://github.com/githubnext/ace2/issues/5).
 - Open focused pull requests for changes. Keep independent work in separate PRs.
+- Do each unit of work in its own lane. In an Ace channel, use the channel's lane tool. Elsewhere,
+  use the [lane CLI](https://lane.lukeed.com/usage/), never a bare `git worktree add`:
+  `lane new <name>`, commit there, run `lane check`, `lane push`, then open the PR. Merge without
+  `--delete-branch`, and run `lane prune` afterwards; it removes squash-merged lanes and their
+  branches.
 - PR bodies follow [the template](.github/pull_request_template.md), including when created with
   `gh pr create --body`. Always fill in **Built in Ace**: if anything outside Ace was used, name it,
   say what it was used for and why Ace couldn't do it, and link an existing or new issue for the gap.
@@ -54,6 +59,7 @@ to change.
 
 ```sh
 bun install
+lane install hooks  # once per clone; captures `Why: <path>[#<anchor>] | <text>` commit trailers as notes
 bun ace --help   # CLI
 bun ace tabs --json  # discover open windows and tabs before targeting a tab rename
 bun ace backup <channel> <new-directory>  # local channel data, including committed WAL entries
@@ -71,3 +77,15 @@ for status, downloads, and explicit publishing. Signing credentials stay in GitH
 Use `type(target): verb-led description` with `chore`, `fix`, `feat`, or `break`. The target is
 the folder name (`channel`, `host`); omit it for repository-wide changes. Never commit secrets or
 credentials.
+
+<!-- lane:protocol -->
+
+## Context memory
+
+- Before editing a file, read `.lane/memory/<path>/` if it exists, or run `lane why <path>`.
+- Record non-obvious findings with `lane note add <path> -a <anchor> "..."`.
+- Do not edit `.lane/` by hand; landing manages it.
+- Land with `lane merge`, or `lane push` where trunk is protected, then `lane prune` once it merges.
+- Detailed workflow lives in `.agents/skills/lane/SKILL.md`; run `lane install skill` if it is absent.
+
+<!-- /lane:protocol -->

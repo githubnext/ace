@@ -97,6 +97,8 @@ export type Project = {
 	name: string;
 	/** The GitHub repository as owner/name. */
 	repo?: string;
+	/** False until the folder is a Git repository with a commit, which lanes start from. */
+	git?: false;
 };
 
 export type ProviderId = "anthropic" | "openai";
@@ -130,6 +132,8 @@ export type HostRequest =
 	| { op: "channels" }
 	| { op: "projects" }
 	| { op: "project-open"; path: string }
+	/** Initialize Git in an opened folder and commit its current files. */
+	| { op: "project-init"; path: string }
 	/**
 	 * Clone a known GitHub project into `path` on this host, or open the matching checkout already
 	 * there, then add it like `project-open`. The host expands `~`.

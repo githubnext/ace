@@ -38,7 +38,7 @@ export const label = (project: AppProject, host: string) =>
 
 export function projects(opened: Project[], channels: Listing[], host: string): AppProject[] {
 	const values = new Map<string, AppProject>();
-	function add(at: string, path: string, name: string, repo?: string) {
+	function add(at: string, path: string, name: string, repo?: string, git?: false) {
 		const id = projectId(at, path, repo);
 		const checkout = checkoutId(at, path);
 		const value = values.get(id);
@@ -52,6 +52,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 				checkouts: new Set([checkout]),
 			};
 			if (repo) created.repo = repo;
+			if (git === false) created.git = git;
 			return void values.set(id, created);
 		}
 		value.hosts.add(at);
@@ -61,7 +62,9 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 		value.path = path;
 	}
 	if (host) {
-		for (const project of opened) add(host, project.path, project.name, project.repo);
+		for (const project of opened) {
+			add(host, project.path, project.name, project.repo, project.git);
+		}
 	}
 	for (const channel of channels) {
 		const path = root(channel);
