@@ -1,6 +1,7 @@
 import {
 	type ComponentPropsWithRef,
 	type KeyboardEvent,
+	type ReactNode,
 	type Ref,
 	useEffect,
 	useImperativeHandle,
@@ -47,6 +48,35 @@ const KEYS: Record<string, Format> = {
 	"alt+8": "bullet",
 	"alt+`": "pre",
 };
+
+/**
+ * The textarea's text drawn beneath it, with known mentions as chips. A chip keeps every glyph's
+ * width so the caret and selection stay aligned: its avatar covers the `@`, and its pill is drawn
+ * outside the text box.
+ */
+function marked(text: string, mentions: Mention[] | undefined): ReactNode[] {
+	if (!mentions?.length) return [text];
+	let names = mentions.map(item => item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+	let re = new RegExp(`(^|\\s)@(${names})\\b`, "gi");
+	let out: ReactNode[] = [];
+	let last = 0;
+	for (let match of text.matchAll(re)) {
+		let at = match.index + match[1]!.length;
+		let name = match[2]!;
+		let avatar = mentions.find(item => item.name.toLowerCase() === name.toLowerCase())?.avatar;
+		out.push(text.slice(last, at));
+		out.push(
+			<span key={at} className="composer-mention">
+				<span className={avatar ? "text-transparent" : undefined}>@</span>
+				{avatar && <img src={avatar} alt="" />}
+				{name}
+			</span>,
+		);
+		last = at + name.length + 1;
+	}
+	out.push(text.slice(last));
+	return out;
+}
 
 /** No mouse or trackpad: a phone, or a tablet without a keyboard case. */
 function touchOnly() {
@@ -99,6 +129,8 @@ function Editor(
 	}: Props,
 ) {
 	let el = useRef<HTMLTextAreaElement>(null);
+	let mirror = useRef<HTMLDivElement>(null);
+	let [text, setText] = useState(defaultValue ?? "");
 	let [popup, setPopup] = useState<Popup | null>(null);
 	let query = useRef(0);
 	useImperativeHandle<HTMLTextAreaElement | null, HTMLTextAreaElement | null>(
@@ -128,6 +160,8 @@ function Editor(
 		if (!area) return;
 		area.style.height = "auto";
 		area.style.height = `${area.scrollHeight}px`;
+		// A scrollbar narrows the textarea's text; the mirror must wrap at the same width.
+		mirror.current?.style.setProperty("width", `${area.clientWidth}px`);
 	}
 
 	async function suggest(area: HTMLTextAreaElement) {
@@ -191,6 +225,7 @@ function Editor(
 	}
 
 	function input(area: HTMLTextAreaElement, typed: string | null) {
+		setText(area.value);
 		fit();
 		onChange?.(area.value);
 		void suggest(area);
@@ -234,17 +269,21 @@ function Editor(
 	}
 
 	return (
-		<>
+		<div className={cn("composer-editor", className)} hidden={hidden}>
+			<div ref={mirror} aria-hidden className="composer-mirror">
+				{marked(text, mentions)}
+				{/* A trailing line break needs a glyph after it to take up its line. */}
+				{"\u200b"}
+			</div>
 			<textarea
 				ref={el}
 				rows={1}
 				defaultValue={defaultValue}
-				hidden={hidden}
 				spellCheck
-				className={cn(
-					"block max-h-[300px] w-full resize-none overflow-y-auto bg-transparent p-3 leading-normal outline-none placeholder:text-muted-foreground",
-					className,
-				)}
+				className="composer-textarea"
+				onScroll={e => {
+					if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop;
+				}}
 				onInput={e => input(e.currentTarget, (e.nativeEvent as InputEvent).data)}
 				onKeyDown={keydown}
 				onBlur={() => setPopup(null)}
@@ -298,7 +337,7 @@ function Editor(
 					</PopoverPositioner>
 				</PopoverPortal>
 			</Popover>
-		</>
+		</div>
 	);
 }
 
