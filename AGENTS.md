@@ -46,14 +46,35 @@ to change.
 - File bugs and missing capabilities observed while dogfooding, or update the matching issue,
   and link them from the [dogfooding meta issue](https://github.com/githubnext/ace2/issues/5).
 - Open focused pull requests for changes. Keep independent work in separate PRs.
-- Do each unit of work in its own lane. In an Ace channel, use the channel's lane tool. Elsewhere,
-  use the [lane CLI](https://lane.lukeed.com/usage/), never a bare `git worktree add`:
-  `lane new <name>`, commit there, run `lane check`, `lane push`, then open the PR. Merge without
-  `--delete-branch`, and run `lane prune` afterwards; it removes squash-merged lanes and their
-  branches.
+- Do each unit of work in its own lane, and open its PR as described in [Lanes](#lanes).
 - PR bodies follow [the template](.github/pull_request_template.md), including when created with
   `gh pr create --body`. Always fill in **Built in Ace**: if anything outside Ace was used, name it,
   say what it was used for and why Ace couldn't do it, and link an existing or new issue for the gap.
+
+## Lanes
+
+The [lane CLI](https://lane.lukeed.com/usage/) keeps this repository's context memory in `.lane/`
+(see Context memory below), whichever tool created the worktree.
+
+- Install it once per machine with `curl -fsSL https://lane.lukeed.com | sh`. Ace adopts the
+  environment of a login shell (`$SHELL -lc`), which skips `~/.zshrc`, so put `~/.local/bin` on
+  the PATH in `~/.zprofile`. Otherwise Ace agents can't run `lane`, and the commit hook drops
+  `Why:` trailers. Run `lane install hooks` once per clone.
+- In an Ace channel, use the channel's lane tool. Its worktrees live in the channel's directory,
+  outside `.lane/trees/`, so `lane ls`, `lane merge`, `lane rm`, and `lane prune` don't manage
+  them; deleting the channel removes them. They start without ignored files, so run `bun install`
+  first. The tool records the lane's base as `lane.<branch>.base` for `lane push`.
+- Elsewhere, use `lane new <name>`, never a bare `git worktree add`; it clones ignored files such
+  as `node_modules` by reference.
+- To open a PR: commit, run `lane check` and resolve every note it lists, `git fetch origin`, then
+  `lane push` and `gh pr create`. `lane push` rebases onto the lane's base, promotes pending notes
+  and `Why:` trailers, and commits `.lane/`; a plain `git push` leaves them behind. A `lane new`
+  lane's base is local `main`, so pass `--base origin/main` there. From an Ace lane, its warning
+  that the lane has no id is expected.
+- Merge without `--delete-branch`, which would try to delete the branch the lane has checked out.
+  `lane prune` then removes a `lane new` lane once its remote branch is gone or local `main`
+  contains its work, even after a squash merge. It skips lanes with uncommitted changes, pending
+  notes, or later commits.
 
 ## Commands
 
@@ -77,6 +98,10 @@ for status, downloads, and explicit publishing. Signing credentials stay in GitH
 Use `type(target): verb-led description` with `chore`, `fix`, `feat`, or `break`. The target is
 the folder name (`channel`, `host`); omit it for repository-wide changes. Never commit secrets or
 credentials.
+
+When a change rests on a constraint later edits must keep, add a trailer such as
+`Why: packages/channel/src/lanes.ts#function lanes | <what must stay true>`. Name what must stay true, not
+what changed; `lane anchors <path>` lists valid anchors.
 
 <!-- lane:protocol -->
 

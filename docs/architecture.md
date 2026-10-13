@@ -92,7 +92,8 @@ is one pi conversation in that Session.
   first, from the project's HEAD in a repository without origin, or from an explicit base, without
   changing the project checkout. Each lane records that
   base as a ref or commit, and its Diff shows what a pull request into that base would. An explicit
-  base for an existing lane changes only that comparison.
+  base for an existing lane changes only that comparison. The base is also written to the
+  project's Git config as `lane.<branch>.base`, which the lane CLI rebases and pushes onto.
 - **Kill is durable.** Killing records pi's abort marks before the worker exits, so reopening the
   channel does not resume the killed work.
 - **Usage comes from pi's ledger.** A chat reports cumulative model and tool usage from

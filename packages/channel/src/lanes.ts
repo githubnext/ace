@@ -196,6 +196,17 @@ export function lanes(place: Place): Extension {
 						await configure(tx, api.conversationId, { cwd: path });
 						return target;
 					}, context);
+					// The lane CLI rebases and pushes onto this key, and otherwise onto the local trunk,
+					// which can be stale, hold unpushed commits, or differ from an explicit base.
+					if (target) {
+						await git(
+							env,
+							`-C ${quote(place.project)} config --local ${quote(`lane.${branch}.base`)} ${
+								quote(target)
+							}`,
+							context,
+						);
+					}
 					const verb = exists.value ? "Switched to" : "Started";
 					const from = exists.value ? "" : ` from ${selection!.commit.slice(0, 12)}`;
 					const against = target ? `; its Diff compares against ${target}` : "";
