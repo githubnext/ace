@@ -202,7 +202,8 @@ export function Composer(
 					author: user,
 					text: body,
 					...encoded,
-					...(model === "auto" ? {} : { model: { provider: provider!, modelId: rest.join("/") } }),
+					// An unpicked model lets the channel replace a chat model whose provider lost its key.
+					...(picked ? { model: { provider: provider!, modelId: rest.join("/") } } : {}),
 				});
 			} else {
 				await host.channel(channel.id, {

@@ -33,7 +33,7 @@ import { type Desktop, desktop } from "./desktop";
 import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
 import { metadata, MetadataDoc, validateName } from "./metadata";
-import { available, choose } from "./models";
+import { available, choose, usable } from "./models";
 import type {
 	ChannelInfo,
 	Chat,
@@ -456,7 +456,11 @@ export class Channel {
 	async #select(conversation: Conversation, requested: ModelRef | undefined, effort?: Effort) {
 		const agent = await conversation.agent(context);
 		const current = agent.model;
-		const model = requested || current || await (
+		// A chat's inherited model can lose its provider key; only an explicit request must keep it.
+		const kept = !requested && current && await usable(this.#options.models, current)
+			? current
+			: undefined;
+		const model = requested || kept || await (
 			this.#options.defaultModel?.() || choose(this.#options.models)
 		);
 		const selected = this.#options.models.getModel(model.provider, model.modelId);
@@ -480,8 +484,7 @@ export class Channel {
 				"The chat is busy; stop it or wait before changing its model or reasoning effort",
 			);
 		}
-		const available = await this.#options.models.getAvailable(model.provider);
-		if (!available.some((value) => value.id === model.modelId)) {
+		if (model !== kept && !await usable(this.#options.models, model)) {
 			throw new Error(
 				`Configure ${model.provider} for this channel before invoking an agent. Chat is still available.`,
 			);
