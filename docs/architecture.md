@@ -98,6 +98,14 @@ is one pi conversation in that Session.
 - **Usage comes from pi's ledger.** A chat reports cumulative model and tool usage from
   `UsageDoc`, including compaction. The app shows input, output, cache tokens, and estimated USD
   at model catalog prices. Reopening the chat reads the same totals; Ace keeps no second ledger.
+- **Agent work has captions and recaps.** After an agent's assistant message or the end of its
+  run, the channel captions each group of consecutive tool calls in the newest two segments of work
+  after a human message, with a fast model from the chat's provider when it has one. A running
+  group's caption is a present participle, refreshed when the group doubles; a finished group
+  gets a final past-tense caption. Once a segment ends, a stronger model writes its recap, which
+  the app shows on the folded turn. Both live in a conversation document keyed by first call, their
+  spend is the `caption` tool bucket in `UsageDoc`, and watches that opt in receive `caption` and
+  `recap` events. Without an available model, the app shows tool counts.
 - **Names and summaries are durable metadata.** The owner can rename a channel. The root chat's
   agent names a randomly named channel and keeps a short summary as work progresses, preserving
   deliberate names unless asked to rename. Metadata lives in a pi session document and is

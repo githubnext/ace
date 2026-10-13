@@ -2,6 +2,7 @@ import type { Event, REPO } from "../types";
 
 import { normalizeGithubComment } from "./github-comment";
 import {
+	captionTools,
 	createsFile,
 	editsFile,
 	summarizeTools,
@@ -160,6 +161,8 @@ type WorkingItem =
 type AgentTurn = {
 	/** Collapsed label for the working context once a final answer exists. */
 	summary: string;
+	/** A model's summary of the working context, shown above the label. */
+	recap?: string;
 	/** Intermediate items: tool calls and text produced while working. */
 	working: WorkingItem[];
 	/** The final text-only response, shown outside the collapsible section. */
@@ -992,12 +995,14 @@ function buildTurn(group: Group, working: boolean): AgentTurn {
 			if (prev?.type === "tools") {
 				prev.tools = prev.tools.concat(tools);
 				prev.summary = summarizeTools(prev.tools);
+				prev.caption = captionTools(prev.tools);
 			} else {
 				items.push({
 					type: "tools",
 					id,
 					uid: row.uid,
 					summary: summarizeTools(tools),
+					caption: captionTools(tools),
 					tools,
 				});
 			}
@@ -1051,7 +1056,8 @@ function buildTurn(group: Group, working: boolean): AgentTurn {
 
 	let tools = items.flatMap(item => item.type === "tools" ? item.tools : []);
 	let summary = items.length ? summarizeWorkingTools(tools, start, end) : "No working context";
-	return { summary, working: items, final, files, artifacts };
+	let recap = tools.find(tool => tool.recap)?.recap;
+	return { summary, ...(recap ? { recap } : {}), working: items, final, files, artifacts };
 }
 
 // -- Main reducer --

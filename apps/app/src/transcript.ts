@@ -36,6 +36,10 @@ export type Item =
 export type Transcript = {
 	items: Item[];
 	queue: QueuedMessage[];
+	/** Each tool call's group caption, by call ID. */
+	captions: Record<string, string>;
+	/** Each tool call's recap of the work it was part of, by call ID. */
+	recaps: Record<string, string>;
 	/** Text streamed for the reply being generated. */
 	draft: string;
 	busy: boolean;
@@ -45,7 +49,15 @@ export type Transcript = {
 	desktop?: boolean;
 };
 
-const EMPTY: Transcript = { items: [], queue: [], draft: "", busy: false, live: false };
+const EMPTY: Transcript = {
+	items: [],
+	queue: [],
+	captions: {},
+	recaps: {},
+	draft: "",
+	busy: false,
+	live: false,
+};
 
 /** Folds channel events into timeline items: tool calls attach to the reply that made them. */
 export function apply(state: Transcript, event: Event): Transcript {
@@ -119,6 +131,16 @@ export function apply(state: Transcript, event: Event): Transcript {
 						: item
 				),
 			};
+		case "caption": {
+			const captions = { ...state.captions };
+			for (const call of event.calls) captions[call] = event.text;
+			return { ...state, captions };
+		}
+		case "recap": {
+			const recaps = { ...state.recaps };
+			for (const call of event.calls) recaps[call] = event.text;
+			return { ...state, recaps };
+		}
 		case "delta":
 			return { ...state, draft: state.draft + event.text };
 		case "run":
@@ -189,7 +211,12 @@ export function useTranscript(
 					if (current()) setInfo(value);
 				}, () => {});
 			void refresh();
-			host.channel(channel, { op: "watch", queue: true, ...(chat === undefined ? {} : { chat }) }, {
+			host.channel(channel, {
+				op: "watch",
+				queue: true,
+				captions: true,
+				...(chat === undefined ? {} : { chat }),
+			}, {
 				event(event) {
 					if (!current()) return;
 					setState((state) => apply(state, event));

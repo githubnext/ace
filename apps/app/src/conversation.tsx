@@ -37,11 +37,28 @@ export function Conversation(
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
 	const events = useMemo(
 		() =>
-			toEvents(transcript.items, channel.id, transcript.busy, {
-				text: transcript.draft,
-				model: model?.modelId,
-			}, people),
-		[transcript.items, channel.id, transcript.busy, transcript.draft, model, people],
+			toEvents(
+				transcript.items,
+				channel.id,
+				transcript.busy,
+				{
+					text: transcript.draft,
+					model: model?.modelId,
+				},
+				people,
+				transcript.captions,
+				transcript.recaps,
+			),
+		[
+			transcript.items,
+			channel.id,
+			transcript.busy,
+			transcript.draft,
+			model,
+			people,
+			transcript.captions,
+			transcript.recaps,
+		],
 	);
 	// Keyed by Tailscale login for message authors and by GitHub login for mentions.
 	const avatars = useMemo(

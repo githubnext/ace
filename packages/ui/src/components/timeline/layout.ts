@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { clearCache } from "@chenglou/pretext";
+import { clearCache, layout, prepare } from "@chenglou/pretext";
 
 import {
 	call as callBlock,
@@ -56,6 +56,7 @@ const TOOL_GROUP_ROW_HEIGHT = TOOL_ROW_HEIGHT;
 const TOOL_GROUP_PAD_Y = 6;
 const TOOL_LIST_INDENT = 12;
 const WORKING_SUMMARY_HEIGHT = TOOL_GROUP_ROW_HEIGHT;
+const WORKING_SUMMARY_PAD_END = 6;
 const DAY_HEIGHT = 40;
 const REACTION_GAP = 4;
 const LANE = 52 * 16;
@@ -773,9 +774,9 @@ function itemHeight(
 
 		if (turn.working.length) {
 			let working = content - BUBBLE_PAD_X * 2;
-			let hasSummary = !!turn.final;
-			let expanded = !hasSummary || openWorking.has(group.id);
-			h += workingSectionHeight(turn.working, blocks, working, open, hasSummary, expanded);
+			let header = turn.final ? workingHeaderHeight(turn.recap, working) : 0;
+			let expanded = !turn.final || openWorking.has(group.id);
+			h += workingSectionHeight(turn.working, blocks, working, open, header, expanded);
 			children++;
 		}
 
@@ -830,11 +831,10 @@ function workingSectionHeight(
 	blocks: Map<string, Block[]>,
 	width: number,
 	open: Set<string>,
-	hasSummary: boolean,
+	header: number,
 	expanded: boolean,
 ): number {
-	let h = BUBBLE_PAD_Y * 2 + BUBBLE_BORDER * 2;
-	if (hasSummary) h += WORKING_SUMMARY_HEIGHT;
+	let h = BUBBLE_PAD_Y * 2 + BUBBLE_BORDER * 2 + header;
 	if (!expanded) return h;
 	let content = 0;
 	let count = 0;
@@ -843,8 +843,16 @@ function workingSectionHeight(
 		count++;
 	}
 	if (count > 1) content += (count - 1) * CONTENT_GAP;
-	if (hasSummary && count) content += CONTENT_GAP;
+	if (header && count) content += CONTENT_GAP;
 	return h + content;
+}
+
+/** The folded turn's label row, below its recap when there is one. */
+function workingHeaderHeight(recap: string | undefined, width: number): number {
+	if (!recap) return WORKING_SUMMARY_HEIGHT;
+	let { font, lineHeight } = fonts();
+	return layout(prepare(recap, font), width - WORKING_SUMMARY_PAD_END, lineHeight).height
+		+ WORKING_SUMMARY_HEIGHT;
 }
 
 function workingHeight(
@@ -900,4 +908,5 @@ export {
 	TURN_GAP,
 	useBlockMap,
 	WORKING_SUMMARY_HEIGHT,
+	WORKING_SUMMARY_PAD_END,
 };

@@ -82,6 +82,7 @@ import {
 	TURN_GAP,
 	useBlockMap,
 	WORKING_SUMMARY_HEIGHT,
+	WORKING_SUMMARY_PAD_END,
 } from "./layout";
 import {
 	IconChevronDownMicro,
@@ -336,6 +337,8 @@ function AgentWorkingItemView(
 		: first?.name || "tool";
 	let Icon = iconFor(/^view(file)?$/i.test(icon) ? "read" : icon);
 	let panel = `${item.id}-tools`;
+	let running = item.tools.some(tool => tool.status === "start" || tool.status === "pending");
+	let label = item.caption ? `${item.caption}${running ? "…" : ""}` : item.summary;
 	return (
 		<div
 			className={cn("flex min-w-0 flex-col", live && "timeline-stream-in")}
@@ -351,7 +354,10 @@ function AgentWorkingItemView(
 				style={{ blockSize: TOOL_GROUP_ROW_HEIGHT, maxInlineSize: "100%", ...workingTextFont }}
 			>
 				<Icon className="size-4 shrink-0" />
-				<span className="min-w-0 truncate">{item.summary}</span>
+				<span className="min-w-0 truncate">{label}</span>
+				{item.caption && (
+					<span className="shrink-0 text-xs text-muted-foreground/70">{item.summary}</span>
+				)}
 				<IconChevronDownMicro
 					className={cn(
 						"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
@@ -363,7 +369,7 @@ function AgentWorkingItemView(
 				<div
 					id={panel}
 					role="region"
-					aria-label={item.summary}
+					aria-label={item.caption || item.summary}
 					className="timeline-tools-expand-in flex min-w-0 flex-col"
 					style={{ gap: CONTENT_GAP, paddingInlineStart: TOOL_LIST_INDENT }}
 				>
@@ -428,23 +434,33 @@ function AgentWorkingContextView(
 					onClick={() => onToggle(groupId)}
 					aria-expanded={expanded}
 					aria-controls={panel}
-					className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-md pr-1.5 text-left text-sm"
-					style={{ blockSize: WORKING_SUMMARY_HEIGHT, maxInlineSize: "100%", ...workingTextFont }}
+					className="flex min-w-0 flex-col overflow-hidden rounded-md text-left text-sm"
+					style={{
+						maxInlineSize: "100%",
+						paddingInlineEnd: WORKING_SUMMARY_PAD_END,
+						...workingTextFont,
+					}}
 				>
-					<span className="min-w-0 truncate">{turn.summary}</span>
-					<IconChevronDownMicro
-						className={cn(
-							"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
-							!expanded && "-rotate-90",
-						)}
-					/>
+					{turn.recap && <span className="text-foreground/80">{turn.recap}</span>}
+					<span
+						className={cn("flex min-w-0 items-center gap-1.5", turn.recap && "text-xs")}
+						style={{ blockSize: WORKING_SUMMARY_HEIGHT }}
+					>
+						<span className="min-w-0 truncate">{turn.summary}</span>
+						<IconChevronDownMicro
+							className={cn(
+								"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
+								!expanded && "-rotate-90",
+							)}
+						/>
+					</span>
 				</button>
 			)}
 			{open && (
 				<div
 					id={panel}
 					role={collapsed ? "region" : undefined}
-					aria-label={collapsed ? turn.summary : undefined}
+					aria-label={collapsed ? turn.recap || turn.summary : undefined}
 					className={cn(
 						"flex min-w-0 flex-col",
 						collapsed && (settling ? "timeline-working-rollup-out" : "timeline-working-rollup-in"),
