@@ -68,7 +68,8 @@ async function advertised(run: (args: string) => Promise<string>, remote: string
 
 /**
  * Resolves a requested base in the project. Without one, a lane starts from origin's advertised
- * default branch, which a stale or missing local origin/HEAD can't be trusted to name.
+ * default branch, which a stale or missing local origin/HEAD can't be trusted to name, or from
+ * the project's HEAD in a repository without origin, such as a folder Ace initialized.
  */
 async function select(
 	env: ExecutionEnv,
@@ -77,9 +78,11 @@ async function select(
 	context: Context,
 ): Promise<Selection> {
 	const run = (args: string) => git(env, `-C ${quote(project)} ${args}`, context);
-	if (!requested) return advertised(run, "origin");
+	const remotes = (await run("remote")).split("\n");
+	if (!requested && remotes.includes("origin")) return advertised(run, "origin");
+	requested ||= "HEAD";
 	const ref = requested.replace(/^refs\/remotes\//, "");
-	const remote = (await run("remote")).split("\n")
+	const remote = remotes
 		.filter((name) => name && ref.startsWith(`${name}/`))
 		.sort((a, b) => b.length - a.length)[0];
 	const branch = remote && ref.slice(remote.length + 1);
@@ -119,7 +122,7 @@ export function lanes(place: Place): Extension {
 			defineTool({
 				name: "lane",
 				description:
-					"Start a lane (an isolated Git worktree and branch) for a new unit of work, switch to an existing lane, or list lanes. A new lane starts from origin's default branch, fetched first, unless base names a branch, tag, or commit; a remote branch such as origin/release is fetched first. The lane's Diff compares against that base. Passing base for an existing lane only changes what its Diff compares against; it never moves the worktree. Starting or switching makes the lane your working directory.",
+					"Start a lane (an isolated Git worktree and branch) for a new unit of work, switch to an existing lane, or list lanes. A new lane starts from origin's default branch, fetched first, or from the project's HEAD without origin, unless base names a branch, tag, or commit; a remote branch such as origin/release is fetched first. The lane's Diff compares against that base. Passing base for an existing lane only changes what its Diff compares against; it never moves the worktree. Starting or switching makes the lane your working directory.",
 				parameters: Type.Object({
 					action: Type.Union([Type.Literal("start"), Type.Literal("switch"), Type.Literal("list")]),
 					name: Type.Optional(

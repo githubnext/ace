@@ -202,6 +202,7 @@ const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
 	"project-open",
+	"project-init",
 	"project-clone",
 	"github-list",
 	"github-detail",
@@ -304,6 +305,11 @@ async function handle(
 			return projects.list();
 		case "project-open": {
 			const project = projects.open(request.path);
+			projectsChanged();
+			return project;
+		}
+		case "project-init": {
+			const project = projects.init(request.path);
 			projectsChanged();
 			return project;
 		}

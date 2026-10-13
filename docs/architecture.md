@@ -89,7 +89,8 @@ is one pi conversation in that Session.
   the parent kills the child. Agents in different channels only exchange messages.
 - **Lanes are Git worktrees** created by the chat's agent for each unit of work. A chat's working
   directory is its current lane. A new lane starts from origin's advertised default branch, fetched
-  first, or from an explicit base, without changing the project checkout. Each lane records that
+  first, from the project's HEAD in a repository without origin, or from an explicit base, without
+  changing the project checkout. Each lane records that
   base as a ref or commit, and its Diff shows what a pull request into that base would. An explicit
   base for an existing lane changes only that comparison.
 - **Kill is durable.** Killing records pi's abort marks before the worker exits, so reopening the
@@ -148,7 +149,10 @@ of a local channel while it runs, alongside its catalog record. Project files an
 have their own repository backup. Stored format changes require migrations; see [data](data.md).
 
 Opening a folder adds a project to the host's `projects.json`, independently of channel creation
-or model credentials. This is a list of local folders, not channel history. Existing catalog
+or model credentials. This is a list of local folders, not channel history. Channels start only in
+a Git repository with a commit, since lanes are worktrees of one. Until then the app offers to
+initialize the folder in place of starting a channel: the host runs `git init` and commits the
+folder's current files, which `.gitignore` can exclude. Existing catalog
 channels also contribute their project paths. Only local owner connections can read or change
 the opened-project list; teammates see the project information already present in channel listings.
 Setting up a known GitHub project is a local-only operation on that list: the host validates the
@@ -245,7 +249,7 @@ Stopping unregisters login hosting until the user enables it again. An authentic
 host can serve the UI, but the desktop does not manage that process as Ace Helper.
 
 Git, shell, Tailscale, and directory diagnostics come from the host through the same local-only
-boundary as provider settings. The project picker selects a local Git checkout; project creation
+boundary as provider settings. The project picker selects a local folder; project creation
 errors remain in the form so the person can fix the path or provider setup.
 
 Agents inspect and operate native windows through an injected desktop capability. The desktop embeds

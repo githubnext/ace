@@ -32,7 +32,7 @@ import { desktop, here, titlebar } from "./desktop";
 import { host } from "./host";
 import { Rename } from "./layout/rename";
 import { Navigation, type Page, WindowControls } from "./navigation";
-import { EmptyProjects, OpenProject } from "./open-project";
+import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import {
 	type AppProject,
 	channelProject,
@@ -283,8 +283,9 @@ export function App() {
 	);
 	const connected = status === "open" && !!hello.host;
 	const local = current?.host === hello.host;
+	const needsGit = local && current?.git === false;
 	// GitHub projects can be cloned here; other folders exist only on the hosts that hold them.
-	const creatable = local || !!current?.repo;
+	const creatable = (local && !needsGit) || !!current?.repo;
 	const repos: SessionSidebarRepo[] = [
 		{
 			id: ALL_PROJECTS,
@@ -362,6 +363,14 @@ export function App() {
 			toast.error("Could not open project", { description: (error as Error).message });
 		} finally {
 			picking.current = false;
+		}
+	}
+
+	async function init(path: string) {
+		try {
+			await host.request<Project>({ op: "project-init", path });
+		} catch (error) {
+			toast.error("Could not initialize Git", { description: (error as Error).message });
 		}
 	}
 
@@ -593,6 +602,7 @@ export function App() {
 									local={local}
 									connected={connected}
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}
+									onInit={() => init(current.path)}
 									onProject={chooseProject}
 									onOpen={() => void choose()}
 									onChannel={select}
@@ -641,6 +651,15 @@ export function App() {
 												? `Set it up on ${here} to start channels here.`
 												: "Open a checkout on this host to start channels here."}
 										</p>
+									)}
+									{!allProjects && needsGit && (
+										<div className="w-full max-w-[34rem]">
+											<InitGit
+												name={current.name}
+												disabled={!connected}
+												onInit={() => init(current.path)}
+											/>
+										</div>
 									)}
 									{!allProjects && creatable && (
 										<div className="flex gap-2">

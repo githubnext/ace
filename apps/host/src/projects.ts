@@ -19,9 +19,13 @@ import { config } from "./config";
 import { clone, remote, REMOTES, repository } from "./github";
 import type { Project } from "./protocol";
 
-type Checkout = { root: string; repo?: string };
+/** `commit` is whether lanes can start: the folder is a Git repository with a commit. */
+type Checkout = { root: string; repo?: string; commit: boolean };
 
-/** Worktrees and remotes rarely move, and listings resolve every channel's checkout. */
+/**
+ * Worktrees and remotes rarely move, and listings resolve every channel's checkout. A folder without
+ * a commit is checked again on each listing, so running `git init` outside Ace is noticed.
+ */
 const checkouts = new Map<string, Checkout>();
 
 /**
@@ -34,18 +38,20 @@ export function checkout(path: string): Checkout {
 	const git = (args: string[]) => spawnSync("git", ["-C", path, ...args], { encoding: "utf8" });
 	const worktrees = git(["worktree", "list", "--porcelain"]);
 	const main = worktrees.status === 0 ? /^worktree (.+)$/m.exec(worktrees.stdout)?.[1] : undefined;
-	const value: Checkout = { root: main || path };
+	const commit = !!main && git(["rev-parse", "--verify", "-q", "HEAD"]).status === 0;
+	const value: Checkout = { root: main || path, commit };
 	const remotes = git(REMOTES);
 	const repo = remotes.status === 0 ? remote(remotes.stdout) : null;
 	if (repo) value.repo = repo;
-	checkouts.set(path, value);
+	if (commit) checkouts.set(path, value);
 	return value;
 }
 
 function project(path: string): Project {
-	const { root, repo } = checkout(path);
+	const { root, repo, commit } = checkout(path);
 	const value: Project = { path: root, name: repo?.split("/")[1] || basename(root) || root };
 	if (repo) value.repo = repo;
+	if (!commit) value.git = false;
 	return value;
 }
 
@@ -93,6 +99,24 @@ export function open(value: string): Project {
 			rmSync(temporary, { force: true });
 		}
 	}
+	return project(path);
+}
+
+/**
+ * Makes an opened folder a Git repository whose first commit holds its current files, since lanes
+ * are worktrees of a commit and would otherwise start without them. `.gitignore` still applies.
+ */
+export function init(path: string): Project {
+	if (!paths().includes(path)) throw new Error("Open this folder in Ace first");
+	const git = (args: string[]) => {
+		const result = spawnSync("git", ["-C", path, ...args], { encoding: "utf8" });
+		if (result.error) throw new Error("Git is unavailable. Check This Mac in Settings.");
+		if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
+	};
+	if (checkout(path).commit) return project(path);
+	git(["init"]);
+	git(["add", "-A"]);
+	git(["commit", "--allow-empty", "-m", "Initial commit"]);
 	return project(path);
 }
 
