@@ -58,14 +58,12 @@ export function InitGit({ name, disabled, onInit }: {
 			<h2 className="text-sm font-medium">Initialize a Git repository to get started</h2>
 			<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
 				Channels work in lanes, which are Git worktrees. Ace will run <code>git init</code> in{" "}
-				{name} and commit its current files. Without a{" "}
-				<code>.gitignore</code>, Ace adds one that leaves out secrets such as{" "}
-				<code>.env</code>, dependencies, and build output.
+				{name}, add a <code>.gitignore</code> that leaves out secrets such as{" "}
+				<code>.env</code>, dependencies, and build output, and commit the rest.
 			</p>
 			<Button
 				disabled={disabled || busy}
-				onClick={() =>
-					void init()}
+				onClick={() => void init()}
 			>
 				{busy ? "Initializing…" : "Initialize Git"}
 			</Button>

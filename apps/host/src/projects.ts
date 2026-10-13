@@ -136,8 +136,8 @@ Thumbs.db
 
 /**
  * Makes an opened folder a Git repository whose first commit holds its current files, since lanes
- * are worktrees of a commit and would otherwise start without them. A folder's own `.gitignore`
- * is kept as it is; one is written only where none exists.
+ * are worktrees of a commit and would otherwise start without them. Ace commits only under its
+ * own `.gitignore`, so a folder that already has one is left for its owner to commit.
  */
 export function init(path: string): Project {
 	if (!paths().includes(path)) throw new Error("Open this folder in Ace first");
@@ -147,9 +147,14 @@ export function init(path: string): Project {
 		if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
 	};
 	if (checkout(path).commit) return project(path);
-	git(["init"]);
 	const ignore = join(path, ".gitignore");
-	if (!existsSync(ignore)) writeFileSync(ignore, IGNORE);
+	if (existsSync(ignore)) {
+		throw new Error(
+			`${path} already has a .gitignore. Initialize Git and commit its files yourself to start channels.`,
+		);
+	}
+	git(["init"]);
+	writeFileSync(ignore, IGNORE);
 	git(["add", "-A"]);
 	git(["commit", "--allow-empty", "-m", "Initial commit"]);
 	return project(path);

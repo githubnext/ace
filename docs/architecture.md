@@ -152,8 +152,8 @@ Opening a folder adds a project to the host's `projects.json`, independently of 
 or model credentials. This is a list of local folders, not channel history. Channels start only in
 a Git repository with a commit, since lanes are worktrees of one. Until then the app offers to
 initialize the folder in place of starting a channel: the host runs `git init` and commits the
-folder's current files. A folder without a `.gitignore` first gets one that excludes common
-secrets, dependencies, and build output. Existing catalog
+folder's current files under a `.gitignore` it writes to exclude common secrets, dependencies, and
+build output. A folder that already has a `.gitignore` is refused, so the person commits it. Existing catalog
 channels also contribute their project paths. Only local owner connections can read or change
 the opened-project list; teammates see the project information already present in channel listings.
 Setting up a known GitHub project is a local-only operation on that list: the host validates the
