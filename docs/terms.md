@@ -24,7 +24,8 @@ channel. Not a project or a checkout.
 
 **Project**:
 A named set of one or more repositories or local folders that a team works on. Many hosts can
-hold checkouts of the same project. Today a project is a single repository or folder.
+hold checkouts of the same project. Today a project is a single repository or folder; channels
+start in it once it is a Git repository with a commit.
 _Avoid_: repo (when you mean the project), workspace
 
 **Directory**:

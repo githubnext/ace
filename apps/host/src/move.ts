@@ -115,12 +115,6 @@ async function park(id: string): Promise<void> {
 	throw new Error("The channel's worker did not stop");
 }
 
-/** Only the lock this process took; a refused freeze leaves the running worker's lock alone. */
-function release(id: string): void {
-	const { pid } = catalog.paths(id);
-	if (existsSync(pid) && readFileSync(pid, "utf8") === String(process.pid)) rmSync(pid);
-}
-
 async function readLocal(id: string): Promise<Snapshot> {
 	const db = await openNodeSqliteDatabase(catalog.paths(id).storage);
 	try {
@@ -146,7 +140,7 @@ async function toHosted(record: catalog.Listing, url: string): Promise<void> {
 			digest = snapshot.digest;
 		} catch (error) {
 			catalog.write({ ...catalog.read(id), moving: undefined });
-			release(id);
+			catalog.unlock(id);
 			throw error;
 		}
 		catalog.write({ ...catalog.read(id), moving: { to: url, digest } });
@@ -161,11 +155,11 @@ async function toHosted(record: catalog.Listing, url: string): Promise<void> {
 			);
 		}
 		catalog.write({ ...catalog.read(id), moving: undefined });
-		release(id);
+		catalog.unlock(id);
 		throw error;
 	}
 	catalog.write({ ...catalog.read(id), hosted: url, moving: undefined, busy: false });
-	release(id);
+	catalog.unlock(id);
 	remember(url);
 }
 
@@ -204,11 +198,11 @@ async function toLocal(record: catalog.Listing): Promise<void> {
 			);
 		}
 		catalog.write({ ...catalog.read(id), moving: undefined });
-		release(id);
+		catalog.unlock(id);
 		throw error;
 	}
 	catalog.write({ ...catalog.read(id), hosted: undefined, moving: undefined, busy: false });
-	release(id);
+	catalog.unlock(id);
 }
 
 /** Move a channel to `target`: "local" or a hosting service URL. The frozen source is kept, not deleted. */

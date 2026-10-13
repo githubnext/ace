@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { resolve } from "node:path";
 
@@ -29,14 +29,18 @@ export async function defaultModel(): Promise<ModelRef> {
 	return preference() || choose(providers());
 }
 
-/** The Git top level containing `dir`. */
+/** The Git top level containing `dir`, which needs a commit for lanes to start from. */
 export function project(dir: string): string {
 	dir = resolve(dir === "~" ? homedir() : dir.startsWith("~/") ? homedir() + dir.slice(1) : dir);
-	const result = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], {
-		encoding: "utf8",
-	});
+	const git = (args: string[]) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+	const result = git(["rev-parse", "--show-toplevel"]);
 	if (result.error) throw new Error("Git is unavailable. Check This Mac in Settings.");
-	if (result.status !== 0) throw new Error(`${dir} is not inside a Git repository`);
+	if (result.status !== 0) {
+		throw new Error(`${dir} is not a Git repository. Initialize Git to start channels in it.`);
+	}
+	if (git(["rev-parse", "--verify", "-q", "HEAD"]).status !== 0) {
+		throw new Error(`${dir} has no commits yet. Commit its files to start channels in it.`);
+	}
 	return result.stdout.trim();
 }
 
@@ -176,14 +180,14 @@ export async function remove(id: string): Promise<void> {
 			throw new Error(`The hosting service did not delete the channel: ${response.status}`);
 		}
 	} else await hold(id);
-	const { lanes, pid } = catalog.paths(id);
+	const { lanes } = catalog.paths(id);
 	try {
 		for (const lane of existsSync(lanes) ? readdirSync(lanes) : []) {
 			spawnSync("git", ["-C", project, "worktree", "remove", "--force", `${lanes}/${lane}`]);
 		}
 		catalog.remove(id);
 	} catch (error) {
-		if (!hosted) rmSync(pid, { force: true });
+		if (!hosted) catalog.unlock(id);
 		throw error;
 	}
 }
