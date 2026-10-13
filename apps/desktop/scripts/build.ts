@@ -9,7 +9,7 @@ import { config, desktop } from "@ace/host/config";
 import { health } from "@ace/host/health";
 
 import { devIdentity } from "./sign";
-import { run } from "./sparkle";
+import { run } from "./downloads";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -104,6 +104,8 @@ async function dev(): Promise<void> {
 		ACE_KEYCHAIN_SERVICE: config.keychain,
 		ACE_PORT: String(config.port),
 		ACE_DESKTOP_CLIENT: join(bin, "ace-desktop-client"),
+		// The same lane CLI Ace Helper puts on its agents' PATH.
+		PATH: `${join(bin, "..", "Helpers")}:${process.env.PATH}`,
 	});
 	host = Bun.spawn([
 		process.execPath,

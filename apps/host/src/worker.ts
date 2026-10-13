@@ -57,7 +57,6 @@ const channel = await Channel.open({
 	onBusy: (busy) => catalog.busy(id, busy),
 	owner: record.owner,
 	project: record.project,
-	lanes: paths.lanes,
 	model: record.model,
 	defaultModel,
 	storage: await openNodeSqliteStorage(paths.storage),

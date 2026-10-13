@@ -44,6 +44,8 @@ export type Chat = {
 	model?: ModelRef;
 	effort?: Effort;
 	lane?: string;
+	/** The lane's worktree, present with `lane`. */
+	cwd?: string;
 	/** Older hosts may not report usage. */
 	usage?: Usage;
 	/**

@@ -11,7 +11,7 @@ import {
 } from "@earendil-works/pi-durable";
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 
-import { git, quote } from "./git";
+import { git, quote, run } from "./git";
 
 /**
  * Which chat last took each lane, which only that chat may write to while it is busy, and the
@@ -33,7 +33,7 @@ export const LanesDoc = defineDoc<
 const NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 /** The initial channel name remains the lane prefix after a rename. */
-export type Place = { name: string; project: string; lanes: string };
+export type Place = { name: string; project: string };
 
 /** A lane's base and the commit a new worktree starts from. */
 type Selection = { base: string; commit: string };
@@ -122,7 +122,7 @@ export function lanes(place: Place): Extension {
 			defineTool({
 				name: "lane",
 				description:
-					"Start a lane (an isolated Git worktree and branch) for a new unit of work, switch to an existing lane, or list lanes. A new lane starts from origin's default branch, fetched first, or from the project's HEAD without origin, unless base names a branch, tag, or commit; a remote branch such as origin/release is fetched first. The lane's Diff compares against that base. Passing base for an existing lane only changes what its Diff compares against; it never moves the worktree. Starting or switching makes the lane your working directory.",
+					"Start a lane (an isolated Git worktree and branch, created with the lane CLI) for a new unit of work, switch to an existing lane, or list lanes. A new lane starts from origin's default branch, fetched first, or from the project's HEAD without origin, unless base names a branch, tag, or commit; a remote branch such as origin/release is fetched first. The lane's Diff compares against that base. Passing base for an existing lane only changes what its Diff compares against; it never moves the worktree or changes the base lane push rebases onto. Starting or switching makes the lane your working directory.",
 				parameters: Type.Object({
 					action: Type.Union([Type.Literal("start"), Type.Literal("switch"), Type.Literal("list")]),
 					name: Type.Optional(
@@ -137,7 +137,7 @@ export function lanes(place: Place): Extension {
 						}),
 					),
 				}),
-				// A rerun reuses its memoized base and finds the worktree it created.
+				// A rerun reuses its memoized base and finds the worktree lane created.
 				replay: "safe",
 				executionMode: "sequential",
 				execute: async ({ action, name, base }, api, context) => {
@@ -150,19 +150,23 @@ export function lanes(place: Place): Extension {
 					if (!name || !NAME.test(name)) {
 						throw new Error("A lane name must be lowercase kebab-case");
 					}
-					const path = `${place.lanes}/${name}`;
+					const branch = `${place.name}/${name}`;
+					const recorded = (await api.snapshot(LanesDoc, context))?.lanes[name];
+					// `lane new` puts a lane at .lane/trees/<name>. Lanes started before Ace used it keep
+					// their worktrees in the channel's directory.
+					const created = `${place.project}/.lane/trees/${branch}`;
+					let path = recorded?.path || created;
 					const exists = await env.exists(path, context);
 					if (!exists.ok) throw exists.error;
 					if (action === "switch" && !exists.value) throw new Error(`No lane named ${name}`);
-					const owner = (await api.snapshot(LanesDoc, context))?.lanes[name]?.chat;
 					await guard(
-						owner,
+						recorded?.chat,
 						api.conversationId,
 						(chat) => api.snapshot(LiveDoc, chat, context),
 						name,
 					);
-					// The selection is durable before the worktree exists, so a rerun after a crash keeps
-					// it even if the base has since moved.
+					// The selection is durable before the worktree exists, so a rerun after a crash doesn't
+					// fetch again.
 					let selection = await api.memo<Selection>("selection", context);
 					if (!selection && (base || !exists.value)) {
 						selection = await api.memo(
@@ -171,14 +175,15 @@ export function lanes(place: Place): Extension {
 							context,
 						);
 					}
-					const branch = `${place.name}/${name}`;
+					// lane clones ignored files such as node_modules by reference and records the base that
+					// `lane push` rebases onto.
 					if (!exists.value) {
-						await git(
+						path = created;
+						await run(
 							env,
-							`-C ${quote(place.project)} worktree add --no-track -b ${branch} ${quote(path)} ${
-								selection!.commit
-							}`,
+							`lane new ${quote(branch)} --base ${quote(selection!.base)}`,
 							context,
+							{ cwd: place.project },
 						);
 					}
 					// Another chat can take the lane while this call fetches, so ownership is checked again
@@ -196,17 +201,6 @@ export function lanes(place: Place): Extension {
 						await configure(tx, api.conversationId, { cwd: path });
 						return target;
 					}, context);
-					// The lane CLI rebases and pushes onto this key, and otherwise onto the local trunk,
-					// which can be stale, hold unpushed commits, or differ from an explicit base.
-					if (target) {
-						await git(
-							env,
-							`-C ${quote(place.project)} config --local ${quote(`lane.${branch}.base`)} ${
-								quote(target)
-							}`,
-							context,
-						);
-					}
 					const verb = exists.value ? "Switched to" : "Started";
 					const from = exists.value ? "" : ` from ${selection!.commit.slice(0, 12)}`;
 					const against = target ? `; its Diff compares against ${target}` : "";

@@ -3,6 +3,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { laneVersion } from "./downloads";
+
 type Section = { name: string; version?: string; license?: string; texts: string[] };
 
 const repo = fileURLToPath(new URL("../../..", import.meta.url));
@@ -142,6 +144,7 @@ export async function notices(
 			texts: vendor("zig-zstd.txt", "zstd.txt"),
 		},
 		{ name: "zig-asar (Electrobun libasar)", license: "MIT", texts: [] },
+		{ name: "lane", version: laneVersion, license: "MIT", texts: vendor("lane.txt") },
 		// desktop-tools stages one directory of notices per native component it links.
 		...readdirSync(licenses).sort().map((name) => ({ name, texts: texts(join(licenses, name)) })),
 	];

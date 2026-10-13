@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { version } from "../package.json";
 import { notices } from "./notices";
-import { run, sparkle } from "./sparkle";
+import { lane, run, sparkle } from "./downloads";
 
 const build = process.env.ELECTROBUN_BUILD_DIR;
 const channel = process.env.ELECTROBUN_BUILD_ENV;
@@ -105,6 +105,11 @@ run([
 	"-o",
 	join(bin, "ace-window.dylib"),
 ]);
+
+// Ace Helper puts Helpers first on agents' PATH, so it holds nothing but the lane CLI.
+const helpers = join(contents, "Helpers");
+mkdirSync(helpers, { recursive: true });
+copyFileSync(await lane(), join(helpers, "lane"));
 
 const sdk = await sparkle();
 writeFileSync(

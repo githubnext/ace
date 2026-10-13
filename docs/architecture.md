@@ -92,8 +92,11 @@ is one pi conversation in that Session.
   first, from the project's HEAD in a repository without origin, or from an explicit base, without
   changing the project checkout. Each lane records that
   base as a ref or commit, and its Diff shows what a pull request into that base would. An explicit
-  base for an existing lane changes only that comparison. The base is also written to the
-  project's Git config as `lane.<branch>.base`, which the lane CLI rebases and pushes onto.
+  base for an existing lane changes only that comparison. The
+  [lane CLI](https://lane.lukeed.com/usage/), which Ace ships, creates each new lane at
+  `.lane/trees/<prefix>/<name>` with ignored files cloned by reference, records the starting base
+  that `lane push` rebases onto, and owns removal through `lane prune` and `lane rm`. Lanes started
+  before Ace used lane stay in the channel's directory.
 - **Kill is durable.** Killing records pi's abort marks before the worker exits, so reopening the
   channel does not resume the killed work.
 - **Usage comes from pi's ledger.** A chat reports cumulative model and tool usage from
@@ -132,7 +135,7 @@ security sandbox.
 ## Host
 
 `apps/host` keeps channels under `$ACE_HOME/channels/<id>/` (default `~/.local/state/ace`). Each
-directory holds `channel.json`, `channel.sqlite`, and the channel's lanes. Clients start a
+directory holds `channel.json` and `channel.sqlite`; lanes live in the project. Clients start a
 channel's worker on demand and talk to it over `channel.sock` with newline-delimited JSON. A worker
 retires when it has no clients and no live work.
 

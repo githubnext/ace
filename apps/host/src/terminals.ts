@@ -1,6 +1,3 @@
-import { join } from "node:path";
-
-import * as catalog from "./catalog";
 import { request } from "./client";
 import { log } from "./log";
 import type { ChannelInfo, TerminalFrame, TerminalOpened } from "./protocol";
@@ -31,8 +28,7 @@ async function cwd(channel: string, chat: number | undefined): Promise<string> {
 	const info = await request<ChannelInfo>(channel, { op: "info" });
 	// Without a chat, the channel's root chat: the one no other chat owns.
 	const id = chat ?? info.chats.find((value) => value.parent === undefined)?.id;
-	const lane = info.chats.find((value) => value.id === id)?.lane;
-	return lane ? join(catalog.paths(channel).lanes, lane) : info.project;
+	return info.chats.find((value) => value.id === id)?.cwd || info.project;
 }
 
 function emit(terminal: Terminal, frame: TerminalFrame) {

@@ -7,7 +7,7 @@ import { S3Client } from "bun";
 import { root } from "./build";
 import { publishGithub } from "./github-release";
 import { type Release, required, signedTool } from "./release";
-import { sparkle } from "./sparkle";
+import { sparkle } from "./downloads";
 
 const output = join(root, "artifacts", "sparkle");
 const release = await Bun.file(join(output, "release.json")).json() as Release;

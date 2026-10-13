@@ -82,7 +82,6 @@ export type Options = {
 	owner: string;
 	/** Paths inside the execution environment's file system. */
 	project: string;
-	lanes: string;
 	model?: ModelRef;
 	/** The host's current preference, consulted only for a chat's first agent invocation. */
 	defaultModel?(): Promise<ModelRef>;
@@ -313,7 +312,8 @@ export class Channel {
 				this.#harness.snapshot(LiveDoc, record.id, context),
 				this.#harness.snapshot(UsageDoc, record.id, context),
 			]);
-			const lane = agent?.cwd && byPath.get(agent.cwd);
+			const cwd = agent?.cwd;
+			const lane = cwd && byPath.get(cwd);
 			const chat: Chat = { id: record.id, busy: !!live?.run, usage: usage(spent) };
 			const window = agent?.model
 				&& this.#options.models.getModel(agent.model.provider, agent.model.modelId)?.contextWindow;
@@ -322,7 +322,7 @@ export class Channel {
 			if (record.owner) chat.parent = record.owner.conversationId;
 			if (agent?.model) chat.model = agent.model;
 			chat.effort = agent?.thinkingLevel || "off";
-			if (lane) chat.lane = lane;
+			if (lane) Object.assign(chat, { lane, cwd });
 			return chat;
 		}));
 		return { id, name, summary, revision, project, owner, ...this.#settings, chats };

@@ -53,28 +53,24 @@ to change.
 
 ## Lanes
 
-The [lane CLI](https://lane.lukeed.com/usage/) keeps this repository's context memory in `.lane/`
-(see Context memory below), whichever tool created the worktree.
+Lanes are [lane CLI](https://lane.lukeed.com/usage/) worktrees, and lane also keeps this
+repository's context memory in `.lane/` (see Context memory below).
 
-- Install it once per machine with `curl -fsSL https://lane.lukeed.com | sh`. Ace adopts the
-  environment of a login shell (`$SHELL -lc`), which skips `~/.zshrc`, so put `~/.local/bin` on
-  the PATH in `~/.zprofile`. Otherwise Ace agents can't run `lane`, and the commit hook drops
-  `Why:` trailers. Run `lane install hooks` once per clone.
-- In an Ace channel, use the channel's lane tool. Its worktrees live in the channel's directory,
-  outside `.lane/trees/`, so `lane ls`, `lane merge`, `lane rm`, and `lane prune` don't manage
-  them; deleting the channel removes them. They start without ignored files, so run `bun install`
-  first. The tool records the lane's base as `lane.<branch>.base` for `lane push`.
-- Elsewhere, use `lane new <name>`, never a bare `git worktree add`; it clones ignored files such
-  as `node_modules` by reference.
+- Ace ships lane and puts it first on its agents' PATH. Outside Ace, and for source runs of
+  `bun ace`, install it with `curl -fsSL https://lane.lukeed.com | sh`. Run `lane install hooks`
+  once per clone.
+- In an Ace channel, start lanes with the channel's lane tool. It runs `lane new <channel>/<name>`
+  from origin's fetched default branch, so the lane is at `.lane/trees/<channel>/<name>` with
+  ignored files such as `node_modules` cloned by reference. Elsewhere, run `lane new <name>`, never
+  a bare `git worktree add`.
 - To open a PR: commit, run `lane check` and resolve every note it lists, `git fetch origin`, then
   `lane push` and `gh pr create`. `lane push` rebases onto the lane's base, promotes pending notes
-  and `Why:` trailers, and commits `.lane/`; a plain `git push` leaves them behind. A `lane new`
-  lane's base is local `main`, so pass `--base origin/main` there. From an Ace lane, its warning
-  that the lane has no id is expected.
+  and `Why:` trailers, and commits `.lane/`; a plain `git push` leaves them behind. A lane from a
+  bare `lane new` has local `main` as its base, so pass `--base origin/main` there.
 - Merge without `--delete-branch`, which would try to delete the branch the lane has checked out.
-  `lane prune` then removes a `lane new` lane once its remote branch is gone or local `main`
-  contains its work, even after a squash merge. It skips lanes with uncommitted changes, pending
-  notes, or later commits.
+  `lane prune` then removes a lane once its remote branch is gone or local `main` contains its work,
+  even after a squash merge. It skips lanes with uncommitted changes, pending notes, or later
+  commits. Deleting a channel leaves its lanes for `lane prune` or `lane rm`.
 
 ## Commands
 

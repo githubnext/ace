@@ -19,7 +19,9 @@ it. pi-durable owns the database format, messages, runs, tool results, chats, an
 `-canary` and `-dev` suffixes. A source CLI uses the stable profile unless given `ACE_HOME`; target
 the installed app's profile explicitly when backing it up.
 
-Each channel directory holds `channel.json`, pi's `channel.sqlite`, and `lanes/`. SQLite may have
+Each channel directory holds `channel.json` and pi's `channel.sqlite`. Lanes are worktrees in the
+project at `.lane/trees/<prefix>/<name>`, created by the lane CLI; a `lanes/` directory holds those
+started before Ace used it. SQLite may have
 committed data in `channel.sqlite-wal`, so copying only a live `channel.sqlite` is not a backup.
 The socket, worker PID, and logs are process state, not durable channel content.
 
@@ -90,7 +92,9 @@ on changes and reconnection. Renaming never moves an existing lane or changes it
 
 Lanes live in pi's version 2 `ace.lanes` session document: each lane's chat, worktree path, and
 base. A base is a full ref name, such as `refs/remotes/origin/main`, `refs/heads/release`, or
-`refs/tags/v1`, or a commit when the requested base was an expression or a detached HEAD. pi
+`refs/tags/v1`, or a commit when the requested base was an expression or a detached HEAD. A new
+lane's starting base is also lane's own `lane.<branch>.base` Git setting, which `lane push` uses;
+a later base change moves only the Diff. pi
 migrates version 1 documents on read, keeping every lane's chat and path; the version 2 form is
 written on the next lane change. Version 1 lanes have no base, so their Diff compares against the
 locally known `origin/HEAD`, or the project's HEAD in a repository without origin, until a lane

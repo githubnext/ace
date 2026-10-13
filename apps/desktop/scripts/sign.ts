@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run } from "./sparkle";
+import { run } from "./downloads";
 
 /**
  * Development builds sign with ACE_CODESIGN_IDENTITY or this repository's local Git setting
@@ -68,6 +68,10 @@ export function sign(app: string, identity: string, release = false): void {
 	}
 	for (const file of readdirSync(frameworks).filter((name) => name.endsWith(".dylib"))) {
 		run(["/usr/bin/codesign", "--force", "--sign", identity, ...options, join(frameworks, file)]);
+	}
+	const helpers = join(app, "Contents", "Helpers");
+	for (const file of readdirSync(helpers)) {
+		run(["/usr/bin/codesign", "--force", "--sign", identity, ...options, join(helpers, file)]);
 	}
 	const entitlements = fileURLToPath(new URL("../native/entitlements.plist", import.meta.url));
 	for (const path of [...readdirSync(bin).map((file) => join(bin, file)), app]) {
