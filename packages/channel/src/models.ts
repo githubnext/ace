@@ -19,6 +19,11 @@ export async function available(models: Models): Promise<ModelOption[]> {
 	}));
 }
 
+export async function usable(models: Models, model: ModelRef): Promise<boolean> {
+	const found = await models.getAvailable(model.provider);
+	return found.some((value) => value.id === model.modelId);
+}
+
 /** Resolve an automatic choice only when admitting an agent invocation. */
 export async function choose(models: Models): Promise<ModelRef> {
 	const found = await available(models);
