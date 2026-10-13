@@ -97,8 +97,14 @@ version. The initial pipeline uses complete disk images; delta generation is def
 
 The source repository is public. Each published desktop version has a GitHub release tagged
 `desktop-<channel>-v<version>` at its exact source revision, with the signed DMG attached. Canary
-releases are published prereleases, not drafts or GitHub's latest stable release. Build-only runs
-create workflow artifacts but no GitHub release.
+releases are published prereleases, not drafts or GitHub's latest stable release. Stable releases
+are full releases marked as GitHub's latest. Build-only runs create workflow artifacts but no
+GitHub release.
+
+Both channels read the single version in `apps/desktop/package.json`; tags, archives, feeds, and
+bundle identifiers are per channel, so canary and stable can ship the same version from one commit.
+Stable `Ace.app` shares the CLI's data directory, Keychain service, and port 4140, so a stable Ace
+Helper conflicts with `bun ace serve` on the same machine. Canary data does not carry over to stable.
 
 Signed release artifacts also go to a public Cloudflare R2 bucket over HTTPS for Sparkle updates.
 The app contains no GitHub or Cloudflare credential. Publishing uses R2's bucket-scoped S3
