@@ -38,6 +38,8 @@ export type Transcript = {
 	queue: QueuedMessage[];
 	/** Each tool call's group caption, by call ID. */
 	captions: Record<string, string>;
+	/** Each tool call's recap of the work it was part of, by call ID. */
+	recaps: Record<string, string>;
 	/** Text streamed for the reply being generated. */
 	draft: string;
 	busy: boolean;
@@ -51,6 +53,7 @@ const EMPTY: Transcript = {
 	items: [],
 	queue: [],
 	captions: {},
+	recaps: {},
 	draft: "",
 	busy: false,
 	live: false,
@@ -132,6 +135,11 @@ export function apply(state: Transcript, event: Event): Transcript {
 			const captions = { ...state.captions };
 			for (const call of event.calls) captions[call] = event.text;
 			return { ...state, captions };
+		}
+		case "recap": {
+			const recaps = { ...state.recaps };
+			for (const call of event.calls) recaps[call] = event.text;
+			return { ...state, recaps };
 		}
 		case "delta":
 			return { ...state, draft: state.draft + event.text };

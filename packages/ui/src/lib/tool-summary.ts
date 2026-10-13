@@ -11,6 +11,7 @@ type ToolNode = {
 	status: Status;
 	agent?: Tool["agent"];
 	caption?: string;
+	recap?: string;
 	args?: string;
 	input?: Record<string, unknown>;
 	result?: string;
@@ -117,6 +118,7 @@ function toToolNode(t: Tool): ToolNode {
 	let node: ToolNode = { id: t.id, name: t.name, status: t.status };
 	if (t.agent) node.agent = t.agent;
 	if (t.caption) node.caption = t.caption;
+	if (t.recap) node.recap = t.recap;
 	node.input = t.arguments;
 	let args = summarizeArgs(t.arguments);
 	if (args) node.args = args;

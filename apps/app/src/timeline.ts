@@ -15,7 +15,12 @@ function text(value: string): Event.Message.Content.Text {
 	return parts.length ? { type: "text", text: value, parts } : { type: "text", text: value };
 }
 
-function tool(tool: Tool, busy: boolean, caption?: string): Event.Message.Content.Tool {
+function tool(
+	tool: Tool,
+	busy: boolean,
+	caption?: string,
+	recap?: string,
+): Event.Message.Content.Tool {
 	const status = tool.result ? (tool.result.error ? "error" : "success") : busy ? "start" : "error";
 	return {
 		type: "tool",
@@ -24,6 +29,7 @@ function tool(tool: Tool, busy: boolean, caption?: string): Event.Message.Conten
 		arguments: (tool.args ?? {}) as Record<string, unknown>,
 		status,
 		...(caption ? { caption } : {}),
+		...(recap ? { recap } : {}),
 		...(tool.result
 			? {
 				result: {
@@ -52,6 +58,7 @@ export function toEvents(
 	draft: { text: string; model?: string },
 	people: People,
 	captions: Record<string, string>,
+	recaps: Record<string, string>,
 ): Event[] {
 	const events = items.map((item) => {
 		const base = {
@@ -82,7 +89,9 @@ export function toEvents(
 		}
 		// Models narrate before calling tools, so the text introduces the group that follows it.
 		const content: Event.Message.Agent["content"] = item.text ? [text(item.text)] : [];
-		for (const call of item.tools) content.push(tool(call, busy, captions[call.call]));
+		for (const call of item.tools) {
+			content.push(tool(call, busy, captions[call.call], recaps[call.call]));
+		}
 		if (item.error) content.push(text(`Run failed: ${item.error}`));
 		if (item.stopped) content.push(text("Stopped."));
 		return {

@@ -26,6 +26,8 @@ export type Tool = {
 	agent?: Tool.Agent;
 	/** One line describing the group of consecutive calls this one belongs to. */
 	caption?: string;
+	/** A summary of all the work this call was part of, for the folded agent turn. */
+	recap?: string;
 	result?: { content: string; images?: string[] };
 	children?: Tool[];
 };

@@ -1,4 +1,4 @@
-import { getSupportedThinkingLevels, type Models } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, type Model, type Models } from "@earendil-works/pi-ai";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
 import {
 	AgentDoc,
@@ -27,7 +27,17 @@ import { CodingTools } from "@earendil-works/pi-durable/tools";
 
 import { type Directory, messaging, Subagent } from "./agents";
 import { type Browser, browser } from "./browser";
-import { caption, CaptionsDoc, fast, groups, isStale, spend } from "./captions";
+import {
+	caption,
+	CaptionsDoc,
+	FAST,
+	isStale,
+	pick,
+	recap,
+	segments,
+	spend,
+	STRONG,
+} from "./captions";
 import { instructions } from "./context";
 import { changes, patch } from "./changes";
 import { type Desktop, desktop } from "./desktop";
@@ -605,39 +615,60 @@ export class Channel {
 			conversation.context(context),
 			this.#harness.snapshot(CaptionsDoc, id, context),
 		]);
-		const { request, groups: found } = groups(view.messages, !!live?.run);
-		const captions = stored?.groups || {};
-		const stale = found.filter((group) =>
-			isStale(group, captions[group.calls[0]!.id]?.calls.length)
-		);
-		if (!stale.length) return;
-		const model = await fast(this.#options.models, agent?.model);
-		if (!model) return;
-		for (const group of stale) {
-			const key = group.calls[0]!.id;
-			const previous = found.slice(0, found.indexOf(group)).slice(-3)
-				.flatMap((earlier) => captions[earlier.calls[0]!.id]?.text || []);
-			const { text, usage } = await caption(
-				this.#options.models,
-				model,
-				request,
-				group,
-				previous,
-				this.#closing.signal,
-			);
-			const calls = group.calls.map((call) => call.id);
+		const captions = { ...stored?.groups };
+		const recaps = { ...stored?.recaps };
+		const { models } = this.#options;
+		const signal = this.#closing.signal;
+		let fast: Model<any> | undefined | null;
+		let strong: Model<any> | undefined | null;
+		for (const segment of segments(view.messages, !!live?.run)) {
+			for (const [index, group] of segment.groups.entries()) {
+				const key = group.calls[0]!.id;
+				if (!isStale(group, captions[key])) continue;
+				fast ??= await pick(models, FAST, agent?.model) || null;
+				if (!fast) return;
+				const previous = segment.groups.slice(Math.max(0, index - 3), index)
+					.flatMap((earlier) => captions[earlier.calls[0]!.id]?.text || []);
+				const { text, usage } = await caption(
+					models,
+					fast,
+					segment.request,
+					group,
+					previous,
+					signal,
+				);
+				const value = { calls: group.calls.map((call) => call.id), text, done: group.closed };
+				await this.#harness.commit(async (tx) => {
+					(await tx.doc(CaptionsDoc, id)).groups[key] = value;
+					spend(await tx.doc(UsageDoc, id), usage);
+				}, context);
+				captions[key] = value;
+				this.#sendCaption(id, { kind: "caption", chat: id, calls: value.calls, text });
+			}
+			if (!segment.closed || !segment.groups.length) continue;
+			const calls = segment.groups.flatMap((group) => group.calls.map((call) => call.id));
+			const key = calls[0]!;
+			if (recaps[key]?.calls.length === calls.length) continue;
+			strong ??= await pick(models, STRONG, agent?.model)
+				|| await pick(models, FAST, agent?.model) || null;
+			if (!strong) return;
+			const { text, usage } = await recap(models, strong, segment, captions, signal);
 			await this.#harness.commit(async (tx) => {
-				(await tx.doc(CaptionsDoc, id)).groups[key] = { calls, text };
+				(await tx.doc(CaptionsDoc, id)).recaps[key] = { calls, text };
 				spend(await tx.doc(UsageDoc, id), usage);
 			}, context);
-			captions[key] = { calls, text };
-			for (const listener of this.#listeners) {
-				if (listener.chat !== id || !listener.captions) continue;
-				try {
-					listener.send({ kind: "caption", chat: id, calls, text });
-				} catch {
-					this.#listeners.delete(listener);
-				}
+			recaps[key] = { calls, text };
+			this.#sendCaption(id, { kind: "recap", chat: id, calls, text });
+		}
+	}
+
+	#sendCaption(chat: ConversationId, event: Event): void {
+		for (const listener of this.#listeners) {
+			if (listener.chat !== chat || !listener.captions) continue;
+			try {
+				listener.send(event);
+			} catch {
+				this.#listeners.delete(listener);
 			}
 		}
 	}
@@ -672,6 +703,9 @@ export class Channel {
 			const captions = await this.#harness.snapshot(CaptionsDoc, conversation.id, context);
 			for (const { calls, text } of Object.values(captions?.groups || {})) {
 				send({ kind: "caption", chat: conversation.id, calls, text });
+			}
+			for (const { calls, text } of Object.values(captions?.recaps || {})) {
+				send({ kind: "recap", chat: conversation.id, calls, text });
 			}
 		}
 		if (stream.snapshot.run) send({ kind: "run", chat: conversation.id, state: "start" });

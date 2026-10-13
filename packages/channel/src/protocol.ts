@@ -183,7 +183,7 @@ export type Request =
 		chat?: ChatId;
 		/** Include queue events; older clients do not understand them. */
 		queue?: boolean;
-		/** Include caption events; older clients do not understand them. */
+		/** Include caption and recap events; older clients do not understand them. */
 		captions?: boolean;
 	};
 
@@ -237,6 +237,11 @@ export type Event =
 	 * and whenever a group is captioned again. Clients show it for whichever group holds `calls`.
 	 */
 	| { kind: "caption"; chat: ChatId; calls: string[]; text: string }
+	/**
+	 * A stronger model's summary of all the work after a human message, sent on attachment and
+	 * once the work ends. Clients show it for whichever agent turn holds `calls`.
+	 */
+	| { kind: "recap"; chat: ChatId; calls: string[]; text: string }
 	| { kind: "run"; chat: ChatId; state: "start" | "end" }
 	/**
 	 * Channel-wide metadata, sent initially and whenever its name, summary, or settings change.

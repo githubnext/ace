@@ -47,6 +47,7 @@ export function Conversation(
 				},
 				people,
 				transcript.captions,
+				transcript.recaps,
 			),
 		[
 			transcript.items,
@@ -56,6 +57,7 @@ export function Conversation(
 			model,
 			people,
 			transcript.captions,
+			transcript.recaps,
 		],
 	);
 	// Keyed by Tailscale login for message authors and by GitHub login for mentions.

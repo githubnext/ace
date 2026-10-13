@@ -82,6 +82,7 @@ import {
 	TURN_GAP,
 	useBlockMap,
 	WORKING_SUMMARY_HEIGHT,
+	WORKING_SUMMARY_PAD_END,
 } from "./layout";
 import {
 	IconChevronDownMicro,
@@ -433,23 +434,33 @@ function AgentWorkingContextView(
 					onClick={() => onToggle(groupId)}
 					aria-expanded={expanded}
 					aria-controls={panel}
-					className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-md pr-1.5 text-left text-sm"
-					style={{ blockSize: WORKING_SUMMARY_HEIGHT, maxInlineSize: "100%", ...workingTextFont }}
+					className="flex min-w-0 flex-col overflow-hidden rounded-md text-left text-sm"
+					style={{
+						maxInlineSize: "100%",
+						paddingInlineEnd: WORKING_SUMMARY_PAD_END,
+						...workingTextFont,
+					}}
 				>
-					<span className="min-w-0 truncate">{turn.summary}</span>
-					<IconChevronDownMicro
-						className={cn(
-							"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
-							!expanded && "-rotate-90",
-						)}
-					/>
+					{turn.recap && <span className="text-foreground/80">{turn.recap}</span>}
+					<span
+						className={cn("flex min-w-0 items-center gap-1.5", turn.recap && "text-xs")}
+						style={{ blockSize: WORKING_SUMMARY_HEIGHT }}
+					>
+						<span className="min-w-0 truncate">{turn.summary}</span>
+						<IconChevronDownMicro
+							className={cn(
+								"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
+								!expanded && "-rotate-90",
+							)}
+						/>
+					</span>
 				</button>
 			)}
 			{open && (
 				<div
 					id={panel}
 					role={collapsed ? "region" : undefined}
-					aria-label={collapsed ? turn.summary : undefined}
+					aria-label={collapsed ? turn.recap || turn.summary : undefined}
 					className={cn(
 						"flex min-w-0 flex-col",
 						collapsed && (settling ? "timeline-working-rollup-out" : "timeline-working-rollup-in"),

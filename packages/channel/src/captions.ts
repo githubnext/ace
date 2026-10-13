@@ -12,22 +12,24 @@ import { defineDoc, type UsageState } from "@earendil-works/pi-durable";
 import type { ModelRef } from "./protocol";
 
 /**
- * One line per group of consecutive tool calls, keyed by the group's first call. `calls` is
- * every call the caption describes, so a group that grew since is captioned again.
+ * Captions describe groups of consecutive tool calls, keyed by each group's first call; `done`
+ * marks a finished group's final, past-tense caption. Recaps describe all the work since a human
+ * message, keyed by its first call. `calls` lists every call the text describes.
  */
-export const CaptionsDoc = defineDoc<
-	{ groups: Record<string, { calls: string[]; text: string }> }
->({
+export const CaptionsDoc = defineDoc<{
+	groups: Record<string, { calls: string[]; text: string; done: boolean }>;
+	recaps: Record<string, { calls: string[]; text: string }>;
+}>({
 	kind: "ace.captions",
 	version: 1,
 	scope: "conversation",
 	history: "latest",
 	fork: "current",
-	initial: () => ({ groups: {} }),
+	initial: () => ({ groups: {}, recaps: {} }),
 });
 
 /** Cheap, quick models in preference order; the chat's own provider is tried first. */
-const FAST = [
+export const FAST = [
 	"anthropic/claude-haiku-4-5",
 	"openai/gpt-6-luna",
 	"openai-codex/gpt-6-luna",
@@ -36,13 +38,23 @@ const FAST = [
 	"google/gemini-flash-lite-latest",
 ];
 
-export async function fast(models: Models, chat?: ModelRef) {
+/** A recap runs once per run and is read first, so it gets a stronger model. */
+export const STRONG = [
+	"anthropic/claude-sonnet-5-5",
+	"openai/gpt-6-sol",
+	"openai-codex/gpt-6-sol",
+	"github-copilot/claude-sonnet-5.5",
+	"github-copilot/gpt-6-sol",
+	"google/gemini-3.8-flash",
+];
+
+export async function pick(models: Models, ids: string[], chat?: ModelRef) {
 	const ordered = chat
 		? [
-			...FAST.filter((id) => id.startsWith(`${chat.provider}/`)),
-			...FAST.filter((id) => !id.startsWith(`${chat.provider}/`)),
+			...ids.filter((id) => id.startsWith(`${chat.provider}/`)),
+			...ids.filter((id) => !id.startsWith(`${chat.provider}/`)),
 		]
-		: FAST;
+		: ids;
 	const available = new Map<string, Set<string>>();
 	for (const id of ordered) {
 		const [provider, modelId] = id.split("/") as [string, string];
@@ -64,61 +76,95 @@ export type Group = {
 	closed: boolean;
 };
 
-/** Tool call groups since the newest human input, in the order the timeline shows them. */
-export function groups(messages: readonly Message[], running: boolean) {
-	let start = messages.length;
-	while (start > 0 && messages[start - 1]!.role !== "user") start--;
-	const request = start > 0 ? plain(messages[start - 1]!) : "";
-	const found: Group[] = [];
+/** The agent's work after one human message: its narration and tool groups in order. */
+export type Segment = {
+	request: string;
+	steps: ({ text: string } | { group: Group })[];
+	groups: Group[];
+	/** What the agent said after its last tool call. */
+	answer: string;
+	/** A human message or the run's end follows it. */
+	closed: boolean;
+};
+
+/**
+ * The newest two segments: work a steering message cut short still gets its last captions and
+ * recap, and older transcripts are not captioned after the fact.
+ */
+export function segments(messages: readonly Message[], running: boolean): Segment[] {
+	const found: Segment[] = [];
 	const results = new Map<string, { text: string; error: boolean }>();
+	let segment: Segment | undefined;
 	let current: Group | undefined;
 	let narration = "";
-	for (const message of messages.slice(start)) {
+	for (const message of messages) {
+		if (message.role === "user") {
+			if (current) current.closed = true;
+			if (segment) segment.closed = true;
+			segment = { request: plain(message), steps: [], groups: [], answer: "", closed: false };
+			found.push(segment);
+			current = undefined;
+			narration = "";
+			continue;
+		}
 		if (message.role === "toolResult") {
 			results.set(message.toolCallId, { text: plain(message), error: message.isError });
 			continue;
 		}
-		if (message.role !== "assistant") continue;
+		if (message.role !== "assistant" || !segment) continue;
 		for (const block of message.content) {
 			if (block.type === "text" && block.text.trim()) {
 				if (current) current.closed = true;
 				current = undefined;
 				narration = block.text.trim();
+				segment.steps.push({ text: narration });
+				segment.answer += `${segment.answer ? "\n\n" : ""}${narration}`;
 			}
 			if (block.type !== "toolCall") continue;
 			if (!current) {
 				current = { calls: [], narration, closed: false };
-				found.push(current);
+				segment.groups.push(current);
+				segment.steps.push({ group: current });
 			}
+			segment.answer = "";
 			current.calls.push({ id: block.id, name: block.name, args: block.arguments });
 		}
 	}
-	if (current && !running) current.closed = true;
-	for (const group of found) {
-		for (const call of group.calls) {
-			const result = results.get(call.id);
-			if (!result) continue;
-			call.result = result.text;
-			call.error = result.error;
+	if (!running) {
+		if (current) current.closed = true;
+		if (segment) segment.closed = true;
+	}
+	const recent = found.slice(-2);
+	for (const { groups } of recent) {
+		for (const group of groups) {
+			for (const call of group.calls) {
+				const result = results.get(call.id);
+				if (!result) continue;
+				call.result = result.text;
+				call.error = result.error;
+			}
 		}
 	}
-	return { request, groups: found };
+	return recent;
 }
 
-/** Recaption a growing group only when it doubles, and once more when it closes. */
-export function isStale(group: Group, captioned?: number): boolean {
-	if (!captioned) return true;
-	const count = group.calls.length;
-	if (count <= captioned) return false;
-	return group.closed || count >= captioned * 2;
+/** Recaption a growing group when it doubles, and once more in the past tense when it closes. */
+export function isStale(group: Group, stored?: { calls: string[]; done: boolean }): boolean {
+	if (!stored) return true;
+	if (group.closed) return !stored.done;
+	return group.calls.length >= stored.calls.length * 2;
 }
 
-const PROMPT =
-	`You label steps in an AI coding agent's work log. Each step is a group of tool calls that the log folds under one line. Write that line: what the agent is doing in this step, and toward what, as a present-participle phrase in sentence case. Keep it under seven words; shorter is better.
+const CAPTION =
+	`You label steps in an AI coding agent's work log. Each step is a group of tool calls that the log folds under one line. Write that line: what the agent did in this step, and toward what, in sentence case. Keep it under seven words; shorter is better.
 
-Examples: "Investigating whether the editor causes the bug", "Editing the composer", "Wiring captions into the timeline", "Updating the repo and opening a PR".
+Name the specific thing (component, file, feature, or goal), never generic phrases like "Ran commands" or "Used tools". Describe this step, not the whole task. Reply with the line only: no quotes, preamble, or trailing punctuation.`;
 
-Name the specific thing (component, file, feature, or goal), never generic phrases like "Running commands" or "Using tools". Describe this step, not the whole task. Reply with the line only: no quotes, preamble, or trailing punctuation.`;
+const RUNNING =
+	`The step is still running: start with a present participle, as in "Investigating whether the editor causes the bug", "Editing the composer", or "Updating the repo and opening a PR".`;
+
+const DONE =
+	`The step has finished: start with a past-tense verb, as in "Investigated whether the editor causes the bug", "Edited the composer", or "Updated the repo and opened a PR".`;
 
 export async function caption(
 	models: Models,
@@ -127,7 +173,7 @@ export async function caption(
 	group: Group,
 	previous: string[],
 	signal: AbortSignal,
-): Promise<{ text: string; usage: Usage }> {
+) {
 	const calls = group.calls.slice(-30).map((call) => {
 		const result = call.result === undefined
 			? "(running)"
@@ -143,16 +189,75 @@ export async function caption(
 			calls.join("\n")
 		}`,
 	].filter(Boolean).join("\n\n");
-	// Thinking makes a one-line caption several times slower; use the least a model allows.
+	const reply = await complete(
+		models,
+		model,
+		`${CAPTION}\n\n${group.closed ? DONE : RUNNING}`,
+		input,
+		60,
+		signal,
+	);
+	const text = reply.text.trim().split("\n")[0]!.replace(/^["'“]+|["'”.:;…]+$/g, "").trim();
+	if (!text) throw new Error("The model replied with no caption");
+	return { text: clip(text, 100), usage: reply.usage };
+}
+
+const RECAP =
+	`You summarize an AI coding agent's work for the folded section of a chat transcript. The section holds the agent's narration and tool calls; its final answer is shown separately, right below the section. Write what the agent did to get there, so a reader can skip the section.
+
+Write one or two plain sentences, at most 40 words, in the past tense without a subject, such as "Traced how new chats choose a model through the composer, channel, and host defaults, then found where the CLI prints tool results." Be specific: name the files, components, and commands that mattered, and outcomes like failing checks, commits, or an opened pull request. Don't repeat the final answer's explanation. Reply with the summary only: no markdown, quotes, or preamble.`;
+
+export async function recap(
+	models: Models,
+	model: Model<any>,
+	segment: Segment,
+	captions: Record<string, { text: string }>,
+	signal: AbortSignal,
+) {
+	let budget = 80;
+	const log = segment.steps.map((step) => {
+		if ("text" in step) return `Agent: ${clip(step.text, 600)}`;
+		const { calls } = step.group;
+		const shown = calls.slice(0, Math.max(3, budget));
+		budget -= shown.length;
+		const label = captions[calls[0]!.id]?.text;
+		return [
+			`Step${label ? `: ${label}` : ""}`,
+			...shown.map((call) =>
+				`- ${call.name} ${clip(JSON.stringify(call.args), 160)}${call.error ? " (error)" : ""}`
+			),
+			...(shown.length < calls.length ? [`- … ${calls.length - shown.length} more`] : []),
+		].join("\n");
+	});
+	const input = [
+		`Request: ${clip(segment.request, 2000)}`,
+		`Work log:\n${log.join("\n\n")}`,
+		segment.answer && `Final answer (shown separately): ${clip(segment.answer, 1500)}`,
+	].filter(Boolean).join("\n\n");
+	const reply = await complete(models, model, RECAP, input, 300, signal);
+	const text = reply.text.trim().replace(/^["“]+|["”]+$/g, "");
+	if (!text) throw new Error("The model replied with no recap");
+	return { text: clip(text, 400), usage: reply.usage };
+}
+
+async function complete(
+	models: Models,
+	model: Model<any>,
+	systemPrompt: string,
+	input: string,
+	maxTokens: number,
+	signal: AbortSignal,
+) {
+	// Thinking makes these several times slower; use the least a model allows.
 	const levels = getSupportedThinkingLevels(model);
 	const reasoning = levels.includes("off")
 		? undefined
 		: levels.find((level): level is ThinkingLevel => level !== "off");
 	const reply: AssistantMessage = await models.completeSimple(model, {
-		systemPrompt: PROMPT,
+		systemPrompt,
 		messages: [{ role: "user", content: input, timestamp: Date.now() }],
 	}, {
-		maxTokens: reasoning ? 2000 : 60,
+		maxTokens: reasoning ? maxTokens + 2000 : maxTokens,
 		signal,
 		...(reasoning ? { reasoning } : {}),
 	});
@@ -160,11 +265,8 @@ export async function caption(
 		throw new Error(reply.errorMessage || `Caption ${reply.stopReason}`);
 	}
 	const text = reply.content.flatMap((block) => block.type === "text" ? [block.text] : [])
-		.join("").trim().split("\n")[0]!
-		.replace(/^["'“]+|["'”.…:;]+$/g, "")
-		.trim();
-	if (!text) throw new Error("Caption was empty");
-	return { text: clip(text, 100), usage: reply.usage };
+		.join("");
+	return { text, usage: reply.usage };
 }
 
 /** Adds to the conversation's ledger like a tool's spend, so usage totals include captions. */
