@@ -22,6 +22,20 @@ export function signedTool(command: string[]): void {
 	if (!result.success) throw new Error(`${command[0]} failed with exit code ${result.exitCode}`);
 }
 
+// Apple's ticket lookup intermittently drops connections (stapler exit 68) after notarization succeeds.
+async function staple(path: string): Promise<void> {
+	for (let attempt = 1;; attempt++) {
+		try {
+			return run(["xcrun", "stapler", "staple", path]);
+		} catch (error) {
+			if (attempt === 5) throw error;
+			const seconds = 20 * 2 ** (attempt - 1);
+			console.log(`Stapling attempt ${attempt} failed; retrying in ${seconds}s`);
+			await Bun.sleep(seconds * 1000);
+		}
+	}
+}
+
 export type Release = {
 	version: string;
 	revision: string;
@@ -133,7 +147,7 @@ async function release(): Promise<void> {
 		const zip = join(staging, "notarize.zip");
 		run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, zip]);
 		notarize(zip);
-		run(["xcrun", "stapler", "staple", app]);
+		await staple(app);
 		run(["/usr/sbin/spctl", "--assess", "--type", "execute", app]);
 		const volume = join(staging, "volume");
 		mkdirSync(volume);
@@ -154,7 +168,7 @@ async function release(): Promise<void> {
 		]);
 		run(["/usr/bin/codesign", "--force", "--sign", identity, "--timestamp", dmg]);
 		notarize(dmg);
-		run(["xcrun", "stapler", "staple", dmg]);
+		await staple(dmg);
 		run(["xcrun", "stapler", "validate", dmg]);
 		const url = `${origin.href.replace(/\/$/, "")}/${channel}/macos-arm64/`;
 		signedTool([
