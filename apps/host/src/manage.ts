@@ -171,7 +171,10 @@ async function hold(id: string): Promise<void> {
 	throw new Error("The channel's worker kept restarting; try deleting it again");
 }
 
-/** Removes the channel and its lane worktrees; lane branches stay in the project. */
+/**
+ * Removes the channel and the lane worktrees in its directory, which predate the lane CLI; lane
+ * branches stay in the project. Lanes `lane new` created stay too, for `lane prune` or `lane rm`.
+ */
 export async function remove(id: string): Promise<void> {
 	const { project, hosted } = catalog.read(id);
 	if (hosted) {

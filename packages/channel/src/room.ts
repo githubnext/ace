@@ -152,6 +152,8 @@ export function section(room: Room): PromptSection {
 				`The project checkout is ${room.project}. Never edit it directly. Before changing files,`,
 				"start a lane for the unit of work with the `lane` tool; start another lane when the work",
 				"changes to something unrelated. Your working directory is your current lane.",
+				"Lanes are lane CLI worktrees: push one for a pull request with `lane push`, which rebases it",
+				"onto its base and commits lane's context memory, not with a plain `git push`.",
 			].join("\n");
 		},
 	};

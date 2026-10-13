@@ -62,7 +62,8 @@ one chat; other tabs are views, not durable units.
 **Lane**:
 An isolated Git worktree for one unit of work, such as "implement auth". A chat may start or
 switch to another lane for a new piece of work, and another chat may continue an existing lane.
-At most one chat writes to a lane at a time.
+At most one chat writes to a lane at a time. Lanes are the lane CLI's lanes: `lane new` creates
+them and `lane push` lands them.
 _Avoid_: task (pi's term for a durable state machine), workspace, branch (a lane has one)
 
 **Participant**:

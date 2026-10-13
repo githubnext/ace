@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { version } from "../package.json";
 import { build, root } from "./build";
 import { sign } from "./sign";
-import { run, sparkle } from "./sparkle";
+import { run, sparkle } from "./downloads";
 
 export function required(name: string): string {
 	const value = process.env[name];
