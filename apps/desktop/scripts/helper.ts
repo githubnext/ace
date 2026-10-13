@@ -3,6 +3,8 @@ import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, writeFileSy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { version } from "../package.json";
+import { notices } from "./notices";
 import { run, sparkle } from "./sparkle";
 
 const build = process.env.ELECTROBUN_BUILD_DIR;
@@ -127,6 +129,11 @@ copyFileSync(join(tools, "out", "desktop-tools-client"), join(bin, "ace-desktop-
 cpSync(join(tools, "out", "Licenses"), join(contents, "Resources", "Licenses"), {
 	recursive: true,
 });
+const bundled = Bun.spawnSync([join(bin, "bun"), "--version"]).stdout.toString().trim();
+await notices(contents, version, [
+	`${runtime.stdout.toString().trim()} (Ace Helper)`,
+	`${bundled} (desktop)`,
+]);
 run([
 	"xcrun",
 	"swiftc",
