@@ -102,9 +102,42 @@ export function open(value: string): Project {
 	return project(path);
 }
 
+/** Secrets, dependencies, and build output that a first commit of a whole folder must not take. */
+const IGNORE = `# Secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+.gradle/
+Pods/
+
+# Build output and caches
+target/
+dist/
+build/
+.next/
+.nuxt/
+.turbo/
+.cache/
+coverage/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+`;
+
 /**
  * Makes an opened folder a Git repository whose first commit holds its current files, since lanes
- * are worktrees of a commit and would otherwise start without them. `.gitignore` still applies.
+ * are worktrees of a commit and would otherwise start without them. A folder's own `.gitignore`
+ * is kept as it is; one is written only where none exists.
  */
 export function init(path: string): Project {
 	if (!paths().includes(path)) throw new Error("Open this folder in Ace first");
@@ -115,6 +148,8 @@ export function init(path: string): Project {
 	};
 	if (checkout(path).commit) return project(path);
 	git(["init"]);
+	const ignore = join(path, ".gitignore");
+	if (!existsSync(ignore)) writeFileSync(ignore, IGNORE);
 	git(["add", "-A"]);
 	git(["commit", "--allow-empty", "-m", "Initial commit"]);
 	return project(path);
