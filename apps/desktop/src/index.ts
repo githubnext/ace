@@ -120,6 +120,8 @@ ApplicationMenu.setApplicationMenu([
 	{
 		label: "Ace",
 		submenu: [
+			{ label: "About Ace", role: "about" },
+			{ type: "divider" },
 			{ label: "Show Ace", action: "show" },
 			{ label: "Settings…", action: "settings", accelerator: "CmdOrCtrl+," },
 			{ label: "Check for Updates…", action: "updates" },

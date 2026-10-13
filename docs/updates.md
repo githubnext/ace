@@ -74,8 +74,11 @@ The bundle contains `libDesktopTools.dylib`, `ace-desktop-client` (the package's
 `desktop-tools-client`), and `libAceProject.dylib`, with needed Swift runtime libraries discovered
 from their compiled dependencies. It does not ship Peekaboo's standalone app
 or CLI. Sparkle's license and the native dependencies' licenses and notices are included in
-Resources. Code is signed inside out, including the Swift runtimes, Ace Helper, and Sparkle's nested
-installers. The desktop client uses the app's actual bundle identifier followed by `.desktop-client`;
+Resources. The build also writes `notices.html` there, covering every npm package the web, desktop,
+and helper bundles contain (from their module graphs), Bun, Electrobun's native tools, and those
+native notices; licenses with no package file are vendored in `apps/desktop/licenses`. About Ace
+links to it through `Credits.html`, opening the installed bundle's copy. Code is signed inside out,
+including the Swift runtimes, Ace Helper, and Sparkle's nested installers. The desktop client uses the app's actual bundle identifier followed by `.desktop-client`;
 the embedded bridge accepts only a client with that identifier and the app's Apple Team ID. Paths
 containing spaces are passed as individual command arguments.
 
