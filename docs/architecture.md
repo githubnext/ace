@@ -187,6 +187,13 @@ key through the app or CLI takes effect without restarting workers. Keychain acc
 distinct from missing keys. Settings exposes provider status and environment overrides, never
 stored key values; it validates new keys against the provider before saving them.
 
+Some providers also accept a subscription sign-in: today OpenAI, through Sign in with ChatGPT.
+The OAuth credential is stored as JSON in the keychain under `<PROVIDER>_OAUTH`, and while it
+exists it is used instead of that provider's API key. Workers refresh it on demand under an
+exclusive SQLite lock in the settings directory, because refresh tokens rotate and several
+processes may refresh at once. Ace does not offer Claude Pro/Max sign-in: Anthropic's terms
+limit those tokens to Claude Code and Claude.ai.
+
 The default model for a chat's first agent run is a nonsecret preference in `settings.json` under
 `~/Library/Application Support/Ace` on macOS, or `$XDG_CONFIG_HOME/ace` on Linux. The app and CLI
 read the same preference; `ACE_MODEL` and an explicit per-channel model still take precedence.

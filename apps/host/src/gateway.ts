@@ -36,7 +36,17 @@ import {
 	type People,
 } from "./protocol";
 import { type Machine, self, whois } from "./tailnet";
-import { checkKey, removeKey, setKey, setModel, settings } from "./settings";
+import {
+	cancelLogin,
+	checkKey,
+	logout,
+	pasteLogin,
+	removeKey,
+	setKey,
+	setModel,
+	settings,
+	startLogin,
+} from "./settings";
 import { resume, shutdown } from "./shutdown";
 import * as terminals from "./terminals";
 import * as web from "./web";
@@ -213,6 +223,10 @@ const localOps = new Set<HostRequest["op"]>([
 	"key-set",
 	"key-check",
 	"key-remove",
+	"login-start",
+	"login-paste",
+	"login-cancel",
+	"logout",
 	"preferences",
 	"update-prepare",
 	"update-cancel",
@@ -356,6 +370,19 @@ async function handle(
 			return checkKey(request.provider);
 		case "key-remove":
 			await removeKey(request.provider);
+			return settingsChanged();
+		case "login-start": {
+			const url = await startLogin(request.provider, settingsChanged);
+			settingsChanged();
+			return url;
+		}
+		case "login-paste":
+			return pasteLogin(request.provider, request.value);
+		case "login-cancel":
+			cancelLogin(request.provider);
+			return settingsChanged();
+		case "logout":
+			await logout(request.provider);
 			return settingsChanged();
 		case "preferences":
 			await setModel(request.model);

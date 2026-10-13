@@ -13,7 +13,7 @@ import * as directory from "./directory";
 import * as web from "./web";
 import { serve } from "./gateway";
 import { GatewayClient } from "./gateway-client";
-import { forget, store } from "./keys";
+import { credentials, deviceId, forget, models as providers, store, subscriptions } from "./keys";
 import { dir as logDir, failure, log, open as openLog } from "./log";
 import { type Filter, follow, print } from "./logs";
 import { health } from "./health";
@@ -44,6 +44,8 @@ const HELP = `ace — channels on this host
   ace model [provider/id|auto]                   show or set the model for a chat's first agent run
   ace key set <NAME>                             store a key in the OS keychain, read from stdin
   ace key rm <NAME>
+  ace login <provider>                           use a subscription instead of the provider's API key
+  ace logout <provider>
   ace directory [<url> | off]                    the team's directory, which lists every host's channels
   ace web [<url> | off]                          the deployed web app your devices may use with this host
   ace serve [--port 4140]                         serve the app and its WebSocket gateway
@@ -54,7 +56,8 @@ const HELP = `ace — channels on this host
 
 Models are provider/id, such as openai/gpt-6-astra or anthropic/claude-opus-5-5.
 A credential such as OPENAI_API_KEY comes from ACE_OPENAI_API_KEY, then OPENAI_API_KEY, then the
-keychain. Store keys there for the desktop app, which starts without your shell's environment.`;
+keychain. Store keys there for the desktop app, which starts without your shell's environment.
+Subscriptions: ${[...subscriptions].map(([id, name]) => `${id} (${name})`).join(", ")}.`;
 
 const { values: flags, positionals } = parseArgs({
 	allowPositionals: true,
@@ -297,6 +300,33 @@ async function main() {
 			if (!value) throw new Error("No key on stdin");
 			await store(name, value);
 			return console.log(`Stored ${name} in the keychain`);
+		}
+		case "login": {
+			const name = subscriptions.get(ref || "");
+			if (!name) {
+				throw new Error(`ace login <provider>, one of ${[...subscriptions.keys()].join(", ")}`);
+			}
+			await providers().login(ref!, "oauth", {
+				notify(event) {
+					if (event.type === "auth_url") console.log(`Sign in with ${name}:\n${event.url}`);
+					if (event.type === "progress") console.log(event.message);
+				},
+				async prompt(prompt) {
+					if (prompt.type !== "manual_code") throw new Error("Unsupported sign-in prompt");
+					console.log(`On another machine? Paste the address your browser ended on:`);
+					for await (const line of console) if (line.trim()) return line.trim();
+					throw new Error("Sign-in cancelled");
+				},
+			}, { getDeviceId: deviceId });
+			return console.log(`Signed in with ${name}. ${ref} requests now use the subscription.`);
+		}
+		case "logout": {
+			const name = subscriptions.get(ref || "");
+			if (!name) {
+				throw new Error(`ace logout <provider>, one of ${[...subscriptions.keys()].join(", ")}`);
+			}
+			await credentials.delete(ref!);
+			return console.log(`Signed out of ${name}`);
 		}
 	}
 

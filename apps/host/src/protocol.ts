@@ -110,7 +110,20 @@ export type CredentialStatus = {
 	error?: string;
 };
 
-export type ProviderSettings = CredentialStatus & { id: ProviderId; name: string };
+/** A provider's subscription sign-in. While signed in, it is used instead of the API key. */
+export type Subscription = {
+	name: string;
+	signedIn: boolean;
+	/** A sign-in started on this host that has not finished. */
+	login?: { url?: string; error?: string };
+	error?: string;
+};
+
+export type ProviderSettings = CredentialStatus & {
+	id: ProviderId;
+	name: string;
+	subscription?: Subscription;
+};
 
 export type Settings = {
 	providers: ProviderSettings[];
@@ -159,6 +172,11 @@ export type HostRequest =
 	| { op: "key-set"; provider: ProviderId; value: string }
 	| { op: "key-check"; provider: ProviderId }
 	| { op: "key-remove"; provider: ProviderId }
+	/** Returns the provider's sign-in page; the host's callback or `login-paste` completes it. */
+	| { op: "login-start"; provider: ProviderId }
+	| { op: "login-paste"; provider: ProviderId; value: string }
+	| { op: "login-cancel"; provider: ProviderId }
+	| { op: "logout"; provider: ProviderId }
 	| { op: "preferences"; model: ModelRef | null }
 	/** Quiesce this helper before replacing its application, or recover a canceled update. */
 	| { op: "update-prepare" }

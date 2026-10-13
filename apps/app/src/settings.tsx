@@ -1,7 +1,8 @@
-import { type ComponentType, useEffect, useState, useSyncExternalStore } from "react";
+import { type ComponentType, Fragment, useEffect, useState, useSyncExternalStore } from "react";
 
 import {
 	Button,
+	buttonVariants,
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -12,6 +13,7 @@ import {
 } from "@ace/ui";
 import {
 	IconArrowDownToLine,
+	IconExternal,
 	IconKey,
 	IconLaptop,
 	IconPointer,
@@ -19,7 +21,12 @@ import {
 	IconServer,
 	IconSettings,
 } from "@ace/ui/icons";
-import type { ProviderSettings, Settings as HostSettings } from "@ace/host/protocol";
+import type {
+	HostRequest,
+	ProviderSettings,
+	Settings as HostSettings,
+	Subscription as Plan,
+} from "@ace/host/protocol";
 
 import { desktop } from "./desktop";
 import { host } from "./host";
@@ -43,7 +50,7 @@ const all: (Info & { desktop?: boolean })[] = [
 		id: "providers",
 		label: "Providers",
 		description:
-			"Provider keys stay in your system keychain. Changes apply to the next model request.",
+			"Provider keys and subscription sign-ins stay in your system keychain. Changes apply to the next model request.",
 		icon: IconKey,
 	},
 	{
@@ -123,6 +130,8 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 			description={
 				<>
 					{sources[provider.source]}
+					{provider.source !== "missing" && provider.subscription?.signedIn
+						&& ` · Unused while signed in with ${provider.subscription.name}`}
 					{provider.override && (
 						<>
 							{" · "}
@@ -240,6 +249,113 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 					Remove…
 				</Button>
 			)}
+		</Row>
+	);
+}
+
+function Subscription(
+	{ provider, plan, disabled }: { provider: ProviderSettings; plan: Plan; disabled: boolean },
+) {
+	const [value, setValue] = useState("");
+	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
+	const locked = disabled || action.busy;
+	const pending = plan.login && !plan.login.error;
+
+	async function run(request: HostRequest) {
+		setAction({ busy: true });
+		try {
+			await host.request(request);
+			setValue("");
+			setAction({});
+		} catch (error) {
+			setAction({ error: (error as Error).message });
+		}
+	}
+
+	const signIn = (
+		<Button
+			variant="outline"
+			disabled={locked}
+			onClick={() => void run({ op: "login-start", provider: provider.id })}
+		>
+			Sign in with {plan.name}
+		</Button>
+	);
+
+	return (
+		<Row
+			label={`${plan.name} subscription`}
+			description={plan.signedIn
+				? `Signed in. ${provider.name} requests use your ${plan.name} plan instead of an API key.`
+				: pending
+				? "Finish signing in from your browser."
+				: `Use your ${plan.name} plan for ${provider.name} models instead of an API key.`}
+			footer={
+				<>
+					{pending && (
+						<form
+							className="flex flex-col gap-2 @md:flex-row"
+							onSubmit={(event) => {
+								event.preventDefault();
+								void run({ op: "login-paste", provider: provider.id, value });
+							}}
+						>
+							<Input
+								spellCheck={false}
+								aria-label={`${plan.name} sign-in address`}
+								value={value}
+								maxLength={8192}
+								disabled={locked}
+								placeholder="Browser on another machine? Paste the address it ended on"
+								onChange={(event) => setValue(event.target.value)}
+							/>
+							<Button type="submit" variant="outline" disabled={locked || !value.trim()}>
+								Continue
+							</Button>
+						</form>
+					)}
+					{plan.error && <Problem>{plan.error}</Problem>}
+					{plan.login?.error && <Problem>{plan.login.error}</Problem>}
+					{action.error && <Problem>{action.error}</Problem>}
+				</>
+			}
+		>
+			{plan.signedIn
+				? (
+					<Button
+						variant="ghost"
+						disabled={locked}
+						onClick={() => void run({ op: "logout", provider: provider.id })}
+					>
+						Sign out
+					</Button>
+				)
+				: pending
+				? (
+					<>
+						{plan.login?.url && (
+							<a
+								href={plan.login.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								className={buttonVariants({ variant: "outline" })}
+								// WebKit skips links on Tab unless macOS keyboard navigation is on.
+								tabIndex={0}
+							>
+								<IconExternal aria-hidden />
+								Open sign-in page
+							</a>
+						)}
+						<Button
+							variant="ghost"
+							disabled={action.busy}
+							onClick={() => void run({ op: "login-cancel", provider: provider.id })}
+						>
+							Cancel
+						</Button>
+					</>
+				)
+				: signIn}
 		</Row>
 	);
 }
@@ -433,7 +549,16 @@ export function Settings(
 								{result.settings && (
 									<Group>
 										{result.settings.providers.map((provider) => (
-											<Provider key={provider.id} provider={provider} disabled={offline} />
+											<Fragment key={provider.id}>
+												<Provider provider={provider} disabled={offline} />
+												{provider.subscription && (
+													<Subscription
+														provider={provider}
+														plan={provider.subscription}
+														disabled={offline}
+													/>
+												)}
+											</Fragment>
 										))}
 									</Group>
 								)}

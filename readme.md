@@ -32,6 +32,7 @@ hosted service.
 
 Requires Bun 1.4 or later and a model provider key. Ace reads a key such as `OPENAI_API_KEY` from
 `ACE_OPENAI_API_KEY`, then `OPENAI_API_KEY`, then the OS keychain (`bun ace key set OPENAI_API_KEY`).
+A ChatGPT plan works instead of an OpenAI key: `bun ace login openai`, or Settings → Providers.
 
 ```sh
 bun install
