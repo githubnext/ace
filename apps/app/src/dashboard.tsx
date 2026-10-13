@@ -12,6 +12,7 @@ import { IconChevronDown, IconHash, IconPlus } from "@ace/ui/icons";
 import type { Listing } from "@ace/host/protocol";
 
 import { here } from "./desktop";
+import { InitGit } from "./open-project";
 import type { AppProject } from "./projects";
 
 /**
@@ -45,7 +46,19 @@ function adopt(project: AppProject): string {
 const MODES = [{ id: "ace", name: "Ace", placeholder: "Start a new channel" }];
 
 export function Dashboard(
-	{ project, repos, channels, local, connected, onSetup, onProject, onOpen, onChannel, onCreate }: {
+	{
+		project,
+		repos,
+		channels,
+		local,
+		connected,
+		onSetup,
+		onInit,
+		onProject,
+		onOpen,
+		onChannel,
+		onCreate,
+	}: {
 		project: AppProject;
 		repos: SessionSidebarRepo[];
 		channels: Listing[];
@@ -53,6 +66,7 @@ export function Dashboard(
 		connected: boolean;
 		/** Offered for a GitHub project with no checkout on this host. */
 		onSetup?: () => void;
+		onInit: () => Promise<void>;
 		onProject: (id: string) => void;
 		onOpen: () => void;
 		onChannel: (channel: Listing) => void;
@@ -62,7 +76,8 @@ export function Dashboard(
 	const composer = useRef<ChatComposerHandle>(null);
 	const [busy, setBusy] = useState(false);
 	const [scope] = useState(() => adopt(project));
-	const creatable = local || !!onSetup;
+	const needsGit = local && project.git === false;
+	const creatable = (local && !needsGit) || !!onSetup;
 	const active = channels.filter((channel) => channel.state !== "archived")
 		.sort((a, b) => b.created - a.created);
 	const hour = new Date().getHours();
@@ -119,6 +134,11 @@ export function Dashboard(
 					</Button>
 				)}
 			</section>
+			{needsGit && (
+				<div className="mx-auto mt-9 max-w-[39rem]">
+					<InitGit name={project.name} disabled={!connected} onInit={onInit} />
+				</div>
+			)}
 			{creatable && (
 				<div className="mx-auto mt-9 max-w-[39rem]">
 					<ChatComposer

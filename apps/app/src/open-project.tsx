@@ -10,7 +10,7 @@ import {
 	DialogTitle,
 	Input,
 } from "@ace/ui";
-import { IconFolderSearch } from "@ace/ui/icons";
+import { IconBranch, IconFolderSearch } from "@ace/ui/icons";
 
 import { desktop } from "./desktop";
 
@@ -31,6 +31,42 @@ export function EmptyProjects({ onOpen, disabled }: { onOpen: () => void; disabl
 					{desktop && <kbd className="ml-2 text-xs opacity-60">⌘O</kbd>}
 				</Button>
 			</div>
+		</div>
+	);
+}
+
+/** Lanes are Git worktrees, so a folder needs a commit before it can start channels. */
+export function InitGit({ name, disabled, onInit }: {
+	name: string;
+	disabled: boolean;
+	onInit: () => Promise<void>;
+}) {
+	const [busy, setBusy] = useState(false);
+
+	async function init() {
+		setBusy(true);
+		try {
+			await onInit();
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	return (
+		<div className="flex w-full flex-col items-center gap-3 rounded-lg border border-border/70 bg-muted/30 px-5 py-6 text-center">
+			<IconBranch className="size-5 text-muted-foreground" aria-hidden />
+			<h2 className="text-sm font-medium">Initialize a Git repository to get started</h2>
+			<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
+				Channels work in lanes, which are Git worktrees. Ace will run <code>git init</code> in{" "}
+				{name}, add a <code>.gitignore</code> that leaves out secrets such as{" "}
+				<code>.env</code>, dependencies, and build output, and commit the rest.
+			</p>
+			<Button
+				disabled={disabled || busy}
+				onClick={() => void init()}
+			>
+				{busy ? "Initializing…" : "Initialize Git"}
+			</Button>
 		</div>
 	);
 }

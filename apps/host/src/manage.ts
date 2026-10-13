@@ -29,14 +29,18 @@ export async function defaultModel(): Promise<ModelRef> {
 	return preference() || choose(providers());
 }
 
-/** The Git top level containing `dir`. */
+/** The Git top level containing `dir`, which needs a commit for lanes to start from. */
 export function project(dir: string): string {
 	dir = resolve(dir === "~" ? homedir() : dir.startsWith("~/") ? homedir() + dir.slice(1) : dir);
-	const result = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], {
-		encoding: "utf8",
-	});
+	const git = (args: string[]) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+	const result = git(["rev-parse", "--show-toplevel"]);
 	if (result.error) throw new Error("Git is unavailable. Check This Mac in Settings.");
-	if (result.status !== 0) throw new Error(`${dir} is not inside a Git repository`);
+	if (result.status !== 0) {
+		throw new Error(`${dir} is not a Git repository. Initialize Git to start channels in it.`);
+	}
+	if (git(["rev-parse", "--verify", "-q", "HEAD"]).status !== 0) {
+		throw new Error(`${dir} has no commits yet. Commit its files to start channels in it.`);
+	}
 	return result.stdout.trim();
 }
 
