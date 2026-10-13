@@ -5,7 +5,6 @@ import {
 	ChatComposer,
 	type ChatComposerHandle,
 	ProjectPicker,
-	serialize,
 	type SessionSidebarRepo,
 } from "@ace/ui";
 import { IconChevronDown, IconHash, IconPlus } from "@ace/ui/icons";
@@ -89,8 +88,7 @@ export function Dashboard(
 		try {
 			await onCreate(text, () => {
 				const input = composer.current;
-				const doc = input?.get();
-				if (input && doc && serialize(doc) === text) input.clear();
+				if (input && input.get() === text) input.clear();
 			});
 		} finally {
 			setBusy(false);
@@ -154,7 +152,7 @@ export function Dashboard(
 						submitBusy={busy}
 						canSend={connected && !busy}
 						clearOnSend={false}
-						onSend={({ doc }) => void start(serialize(doc))}
+						onSend={({ text }) => void start(text)}
 					/>
 				</div>
 			)}

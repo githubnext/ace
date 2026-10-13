@@ -1,33 +1,26 @@
 import { useRef } from "react";
-import { TextSelection } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
+
+import { assign } from "../components/composer/format";
+import { type Doc, flatten } from "./use-draft";
 
 const MAX = 10;
 
-/** A stored history entry: the document JSON plus the mode it was sent in. */
-type Entry = { doc: Record<string, unknown>; mode?: string };
+/** A sent message's text plus the mode it was sent in. */
+type Entry = { text: string; mode?: string };
 
 /**
- * Normalize a raw stored value into an Entry. Earlier versions stored the bare
- * document JSON (`{ type: "doc", ... }`); read those as a modeless entry.
+ * Normalize a stored value. Earlier versions stored rich-text document JSON, first bare
+ * (`{ type: "doc", ... }`) and then as `{ doc, mode }`.
  */
-function entry(raw: Record<string, unknown>): Entry {
-	if (raw.type === "doc") return { doc: raw };
-	return raw as Entry;
-}
-
-function clear(view: EditorView) {
-	let { schema } = view.state;
-	let empty = schema.node("doc", null, [schema.node("paragraph")]);
-	let tr = view.state.tr
-		.replaceWith(0, view.state.doc.content.size, empty.content)
-		.setMeta("addToHistory", false);
-	view.dispatch(tr);
+function entry(raw: Doc & { doc?: Doc; mode?: string; text?: string }): Entry {
+	if (raw.type === "doc") return { text: flatten(raw) };
+	if (raw.doc) return { text: flatten(raw.doc), mode: raw.mode };
+	return { text: raw.text || "", mode: raw.mode };
 }
 
 /**
  * Navigate sent-message history with ArrowUp/ArrowDown.
- * Only starts when input is empty. Call `reset` on onChange to exit history mode.
+ * Only starts from an empty draft. Call `reset` on change to exit history mode.
  */
 function useHistory(scope?: string) {
 	let k = `ace:history:${scope || location.pathname}`;
@@ -36,30 +29,17 @@ function useHistory(scope?: string) {
 	function load(): Entry[] {
 		try {
 			let raw = localStorage.getItem(k);
-			return raw ? (JSON.parse(raw) as Record<string, unknown>[]).map(entry) : [];
+			return raw ? (JSON.parse(raw) as Parameters<typeof entry>[0][]).map(entry) : [];
 		} catch {
 			return [];
 		}
 	}
 
-	function apply(view: EditorView, json: Record<string, unknown>) {
-		// Dispatch a transaction (rather than view.updateState) so dispatchTransaction
-		// runs and onUpdate fires — that's what the composer's mention-detector
-		// listens to. updateState would silently swap the doc without notifying.
-		// `addToHistory: false` keeps the recall out of the undo stack so undo
-		// behaves like the previous updateState-based implementation.
-		let doc = view.state.schema.nodeFromJSON(json);
-		let tr = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content);
-		tr.setSelection(TextSelection.atEnd(tr.doc));
-		tr.setMeta("addToHistory", false);
-		view.dispatch(tr);
-	}
-
-	/** Add current document (and the mode it was sent in) to history. Call on send. */
-	function push(view: EditorView, mode?: string) {
-		if (!view.state.doc.textContent) return;
+	/** Add sent text (and the mode it was sent in) to history. Call on send. */
+	function push(text: string, mode?: string) {
+		if (!text.trim()) return;
 		let items = load();
-		items.push({ doc: view.state.doc.toJSON(), mode });
+		items.push({ text, mode });
 		if (items.length > MAX) items = items.slice(-MAX);
 		try {
 			localStorage.setItem(k, JSON.stringify(items));
@@ -68,19 +48,20 @@ function useHistory(scope?: string) {
 	}
 
 	/**
-	 * ProseMirror key handler for history navigation. `onMode` receives the mode
-	 * a recalled entry was sent in (undefined when returning to an empty box) so
-	 * the composer can restore mode state alongside the document.
+	 * Key handler for history navigation; `empty` says whether the draft holds any words of its
+	 * own. `onMode` receives the mode a recalled entry was sent in
+	 * (undefined when returning to an empty box) so the composer can restore it alongside the text.
 	 */
 	function handleKey(
-		view: EditorView,
-		e: KeyboardEvent,
+		el: HTMLTextAreaElement,
+		e: { key: string; preventDefault(): void },
+		empty: boolean,
 		onMode?: (mode?: string) => void,
 	): boolean {
 		if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return false;
 
 		let browsing = index.current !== -1;
-		if (!browsing && view.state.doc.textContent) return false;
+		if (!browsing && !empty) return false;
 
 		let items = load();
 		if (!items.length) return false;
@@ -89,32 +70,32 @@ function useHistory(scope?: string) {
 			let next = browsing ? index.current - 1 : items.length - 1;
 			if (next < 0) return browsing;
 			e.preventDefault();
-			index.current = next;
-			apply(view, items[next]!.doc);
+			recall(el, items[next]!, next);
 			onMode?.(items[next]!.mode);
 			return true;
 		}
 
-		if (e.key === "ArrowDown") {
-			if (!browsing) return false;
-			e.preventDefault();
-			let next = index.current + 1;
-			if (next >= items.length) {
-				index.current = -1;
-				clear(view);
-				onMode?.(undefined);
-				return true;
-			}
-			index.current = next;
-			apply(view, items[next]!.doc);
-			onMode?.(items[next]!.mode);
+		if (!browsing) return false;
+		e.preventDefault();
+		let next = index.current + 1;
+		if (next >= items.length) {
+			assign(el, "");
+			index.current = -1;
+			onMode?.(undefined);
 			return true;
 		}
-
-		return false;
+		recall(el, items[next]!, next);
+		onMode?.(items[next]!.mode);
+		return true;
 	}
 
-	/** Reset browsing index. Call on onChange to exit history mode. */
+	function recall(el: HTMLTextAreaElement, item: Entry, at: number) {
+		assign(el, item.text);
+		// Assigning fires the change that resets browsing; the recalled position outlives it.
+		index.current = at;
+	}
+
+	/** Reset browsing index. Call on change to exit history mode. */
 	function reset() {
 		index.current = -1;
 	}

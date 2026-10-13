@@ -1,6 +1,6 @@
 /* Shared syntax highlighting palette.
-   Seeded from Vitesse, tinted toward the warm/green theme so code, diffs,
-   and the rich-text editor all share one source of truth. */
+   Seeded from Vitesse, tinted toward the warm/green theme so code and diffs
+   share one source of truth. */
 
 :root {
 	/* Active Shiki tokens (switch on .dark below) */

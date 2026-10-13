@@ -33,7 +33,7 @@ import {
 	protectDocumentReferences,
 	resolveDocument,
 	restoreDocumentReferences,
-} from "../rich-text/references";
+} from "../../lib/references";
 
 import {
 	CODE_FONT,

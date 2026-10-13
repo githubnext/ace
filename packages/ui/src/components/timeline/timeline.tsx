@@ -31,7 +31,7 @@ import {
 	type MessageToolbarProps,
 } from "../message-toolbar/message-toolbar";
 import { Reactions } from "../reactions/reactions";
-import type { DocumentCandidate } from "../rich-text/references";
+import type { DocumentCandidate } from "../../lib/references";
 import {
 	ScrollView,
 	type ScrollViewHandle,

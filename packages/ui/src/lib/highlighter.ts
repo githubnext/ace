@@ -5,7 +5,6 @@ import {
 	type FileDiffMetadata,
 	type FileDiffOptions,
 	type FileOptions,
-	getSharedHighlighter,
 	getSingularPatch,
 	parseDiffFromFile,
 	registerCustomTheme,
@@ -23,25 +22,6 @@ const theme = createCSSVariablesTheme({
 });
 
 registerCustomTheme("ace", () => Promise.resolve(theme));
-
-/** Languages preloaded into the shared diffs highlighter. Consumers that route
- *  through `codeToHtml` (Code, CodeView, ToolResult) lazy-load any bundled
- *  language on demand via Shiki's own singleton, so this list only needs to
- *  cover the rich-text editor preload path. */
-const langs = [
-	"bash",
-	"css",
-	"diff",
-	"html",
-	"js",
-	"json",
-	"jsx",
-	"markdown",
-	"rust",
-	"shell",
-	"ts",
-	"tsx",
-];
 
 /** Maps every Shiki language id and alias to its canonical id. Built once
  *  from `bundledLanguagesInfo` so new Shiki languages are picked up
@@ -315,11 +295,6 @@ function render(key: string, fn: () => string | Promise<string>) {
 	return entry;
 }
 
-/** Lazily returns a shared Shiki highlighter loaded with the "ace" theme and common languages. */
-function getHighlighter() {
-	return getSharedHighlighter({ themes: ["ace"], langs });
-}
-
 function cached(source: string, language?: string) {
 	return get(key(language, source))?.html;
 }
@@ -407,7 +382,6 @@ export {
 	cachedFile,
 	diffOptions,
 	fileOptions,
-	getHighlighter,
 	highlight,
 	highlightDiff,
 	highlightFile,

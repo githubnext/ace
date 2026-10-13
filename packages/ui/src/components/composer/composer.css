@@ -79,3 +79,17 @@ button[data-beam="ace"]::after {
 		opacity: 1;
 	}
 }
+
+[data-slot="input"][data-mode="terminal"] {
+	display: flex;
+	align-items: start;
+
+	textarea {
+		flex: 1;
+		min-inline-size: 0;
+		font-family: "Monaspace Neon", ui-monospace, monospace;
+		font-size: 0.8125rem;
+		caret-shape: block;
+		padding-inline-start: 0.375rem;
+	}
+}

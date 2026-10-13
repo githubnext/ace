@@ -40,7 +40,6 @@ type ActionEvent = {
 type Props = {
 	className?: string;
 	disabled?: Partial<Record<Action, boolean>>;
-	value?: Partial<Record<Action, boolean>>;
 	onAction?: (event: ActionEvent) => void;
 };
 
@@ -76,8 +75,7 @@ const GROUPS: Item[][] = [
 ];
 
 function ToolbarButton(
-	{ label, action, icon: Icon, active, disabled, onAction }: Item & {
-		active?: boolean;
+	{ label, action, icon: Icon, disabled, onAction }: Item & {
 		disabled?: boolean;
 		onAction?: (event: ActionEvent) => void;
 	},
@@ -92,10 +90,7 @@ function ToolbarButton(
 								variant="ghost"
 								size="icon-sm"
 								disabled={disabled}
-								className={cn(
-									"text-muted-foreground",
-									active && "bg-primary/15 text-foreground hover:bg-primary/25",
-								)}
+								className="text-muted-foreground"
 							/>
 						}
 						onMouseDown={(e) => {
@@ -115,7 +110,7 @@ function ToolbarButton(
 	);
 }
 
-function ComposerToolbar({ className, disabled, value, onAction }: Props) {
+function ComposerToolbar({ className, disabled, onAction }: Props) {
 	return (
 		<TooltipProvider>
 			<div
@@ -135,7 +130,6 @@ function ComposerToolbar({ className, disabled, value, onAction }: Props) {
 								<ToolbarButton
 									key={item.action}
 									{...item}
-									active={value?.[item.action]}
 									disabled={disabled?.[item.action]}
 									onAction={onAction}
 								/>

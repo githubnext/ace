@@ -1,4 +1,4 @@
-/* Shared content styles — chat blocks + rich-text editor.
+/* Shared content styles for chat blocks.
    Syntax highlighting tokens (--syntax-*) live in `../styles/syntax.css`. */
 
 @reference "../../shadcn.css";

@@ -212,6 +212,7 @@ export const IconCodeBlockMicro = micro(SquareCode);
 export const IconCodeMicro = micro(Code);
 export const IconConsoleMicro = micro(SquareTerminal);
 export const IconEmojiMicro = micro(FaceGrinning);
+export const IconEyeMicro = micro(Eye);
 export const IconItalicMicro = micro(Italic);
 export const IconLinkMicro = micro(Link);
 export const IconListTodoMicro = micro(ListTodo);

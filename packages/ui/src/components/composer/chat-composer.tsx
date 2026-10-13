@@ -3,6 +3,7 @@ import {
 	type ComponentPropsWithRef,
 	type ComponentType,
 	Fragment,
+	type KeyboardEvent,
 	type ReactNode,
 	type Ref,
 	useEffect,
@@ -14,16 +15,11 @@ import {
 } from "react";
 import { Toolbar } from "@base-ui/react/toolbar";
 import * as fuzzysort from "fuzzysort";
-import type { MarkType, Node as ProseMirrorNode, NodeType } from "prosemirror-model";
-import { TextSelection } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
 
 import { useDraft } from "../../hooks/use-draft";
 import { useHistory } from "../../hooks/use-history";
 import { useMic } from "../../hooks/use-mic";
-import { lookupCustomEmoji } from "../../lib/emoji";
-import { parse } from "../../lib/markdown";
-import { cn, isUrl } from "../../lib/utils";
+import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import {
 	Combobox,
@@ -51,35 +47,18 @@ import { Waveform } from "../../ui/waveform";
 import { type Attachment, AttachmentList } from "./attachment-list";
 import { Composer } from "./composer";
 import { ComposerToolbar, type ComposerToolbarEvent } from "./composer-toolbar";
+import { Editor, type Mention } from "./editor";
+import { assign, edit as splice, format } from "./format";
+import { Preview } from "./preview";
 import { canSendMessage } from "./send";
 import { useAttachments } from "./use-attachments";
-import {
-	clearLink,
-	getLinkInfo,
-	setLink as setLinkCmd,
-	toggleBold,
-	toggleBullet,
-	toggleCode,
-	toggleCodeBlock,
-	toggleItalic,
-	toggleOrdered,
-	toggleQuote,
-	toggleStrike,
-	toggleUnderline,
-} from "../rich-text/commands";
-import {
-	type DocumentCandidate,
-	type Mention,
-	RichText,
-	type SlashCommand,
-} from "../rich-text/rich-text";
-import { schema } from "../rich-text/schema";
 import {
 	IconArrowUpMicro,
 	IconCheckMicro,
 	IconChevronDownMicro,
 	IconChevronRightMicro,
 	IconConsoleMicro,
+	IconEyeMicro,
 	IconListTodoMicro,
 	IconMessageMicro,
 	IconSparkleMicro,
@@ -142,7 +121,7 @@ function glyph(mode?: Mode): ComponentType<{ className?: string }> {
 
 /** Payload passed to `onSend`. */
 type SendPayload = {
-	doc: ProseMirrorNode;
+	/** Markdown source as written. */
 	text: string;
 	attachments: Attachment[];
 	mode: string;
@@ -153,8 +132,8 @@ type SendPayload = {
 /** Imperative handle exposed via `ref`. */
 type ChatComposerHandle = {
 	focus: () => void;
-	/** Read the current document without changing the editor or its saved draft. */
-	get: () => ProseMirrorNode | undefined;
+	/** Read the current text without changing the editor or its saved draft. */
+	get: () => string | undefined;
 	clear: () => void;
 	set: (text: string) => void;
 	insert: (text: string) => void;
@@ -164,11 +143,6 @@ type Props = {
 	/** Storage scope for drafts and recalled messages. Defaults to the current pathname. */
 	scope?: string;
 	mentions?: Mention[];
-	/** Documents available for &name.md references. */
-	documents?: readonly DocumentCandidate[];
-	/** Enables the reserved Plan reference in & autocomplete. */
-	plan?: boolean;
-	commands?: SlashCommand[];
 	/** Available modes. Defaults to a single "chat" mode. */
 	modes?: Mode[];
 	/** Available models. Omit to hide the model picker. */
@@ -225,35 +199,10 @@ type Props = {
 	ref?: Ref<ChatComposerHandle>;
 };
 
-type Active = {
-	bold: boolean;
-	italic: boolean;
-	underline: boolean;
-	strike: boolean;
-	link: boolean;
-	ordered: boolean;
-	bullet: boolean;
-	quote: boolean;
-	code: boolean;
-	pre: boolean;
-};
-
-type LinkState = {
-	open: boolean;
-	name: string;
-	href: string;
-	anchor: HTMLElement | { getBoundingClientRect: () => DOMRect } | null;
-};
-
 type EmojiState = {
 	open: boolean;
 	anchor: HTMLElement | { getBoundingClientRect: () => DOMRect } | null;
 };
-
-type Command = (
-	state: EditorView["state"],
-	dispatch?: (tr: EditorView["state"]["tr"]) => void,
-) => boolean;
 
 type StopProps = ComponentPropsWithRef<"button">;
 
@@ -307,189 +256,37 @@ const DEFAULT_MODES: Mode[] = [
 
 const EMPTY_MODELS: Model[] = [];
 
-const EMPTY_ACTIVE: Active = {
-	bold: false,
-	italic: false,
-	underline: false,
-	strike: false,
-	link: false,
-	ordered: false,
-	bullet: false,
-	quote: false,
-	code: false,
-	pre: false,
-};
-
-const EMPTY_LINK: LinkState = { open: false, name: "", href: "", anchor: null };
 const EMPTY_EMOJI: EmojiState = { open: false, anchor: null };
 const IDLE = 5000;
 const ESCAPE_WINDOW = 350;
 
-const ACTIONS = {
-	bold: toggleBold,
-	italic: toggleItalic,
-	underline: toggleUnderline,
-	strike: toggleStrike,
-	ordered: toggleOrdered(),
-	bullet: toggleBullet(),
-	quote: toggleQuote,
-	code: toggleCode,
-	pre: toggleCodeBlock,
-} satisfies Record<Exclude<ComposerToolbarEvent["action"], "attach" | "emoji" | "link">, Command>;
-
-function hasMark(view: EditorView, type: MarkType) {
-	let { state } = view;
-	let { from, to, empty } = state.selection;
-	if (empty) return !!type.isInSet(state.storedMarks || state.selection.$from.marks());
-	return state.doc.rangeHasMark(from, to, type);
+function literal(name: string) {
+	return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function hasNode(view: EditorView, type: NodeType) {
-	let { $from } = view.state.selection;
-	for (let d = $from.depth; d > 0; d--) {
-		if ($from.node(d).type === type) return true;
-	}
-	return false;
+/** Matches `@name` the way the channel recognizes an invocation. */
+function mentionPattern(name: string, flags = "i") {
+	return new RegExp(`(^|\\s)@${literal(name)}\\b`, flags);
 }
 
-function getActive(view: EditorView): Active {
-	return {
-		bold: hasMark(view, schema.marks.strong),
-		italic: hasMark(view, schema.marks.em),
-		underline: hasMark(view, schema.marks.underline),
-		strike: hasMark(view, schema.marks.strike),
-		link: hasMark(view, schema.marks.link),
-		ordered: hasNode(view, schema.nodes.ordered_list),
-		bullet: hasNode(view, schema.nodes.bullet_list),
-		quote: hasNode(view, schema.nodes.blockquote),
-		code: hasMark(view, schema.marks.code),
-		pre: view.state.selection.$from.parent.type === schema.nodes.code_block,
-	};
+function hasMention(text: string, name: string) {
+	return mentionPattern(name).test(text);
 }
 
-function hasMention(view: EditorView, name: string) {
-	let found = false;
-	view.state.doc.descendants(node => {
-		if (found) return false;
-		if (isMention(node, name)) found = true;
-	});
-	return found;
+/** Leaving a mention's mode drops its leading mention, the mode's marker, and unlinks the rest. */
+function demote(text: string, name: string) {
+	let lead = new RegExp(`^\\s*@${literal(name)}\\b ?`, "i");
+	return text.replace(lead, "").replace(
+		mentionPattern(name, "gi"),
+		(match, space: string) => space + match.slice(space.length + 1),
+	);
 }
 
-function isMention(node: ProseMirrorNode, name: string) {
-	return node.type === schema.nodes.mention
-		&& typeof node.attrs.name === "string"
-		&& node.attrs.name.toLowerCase() === name.toLowerCase();
-}
-
-function demoteMentions(view: EditorView, name: string) {
-	let { tr } = view.state;
-	let changed = false;
-	view.state.doc.descendants((node, pos) => {
-		if (!isMention(node, name)) return;
-		let from = tr.mapping.map(pos);
-		changed = true;
-		let end = from + node.nodeSize;
-		// The leading mention is the mode's marker, not the person's words; leaving the mode drops it.
-		if (pos === 1) tr.delete(from, tr.doc.textBetween(end, end + 1) === " " ? end + 1 : end);
-		else tr.replaceWith(from, end, schema.text(node.attrs.name));
-	});
-	if (changed) view.dispatch(tr);
-	return changed;
-}
-
-function demoteLeadingMention(view: EditorView, name: string) {
-	let block = view.state.doc.firstChild;
-	if (!block?.isTextblock) return false;
-
-	let start = 1;
-	let text = `@${name}`;
-	let lower = text.toLowerCase();
-	let offset = 0;
-
-	for (let i = 0; i < block.childCount; i++) {
-		let node = block.child(i);
-		let pos = start + offset;
-		if (node.isText) {
-			let value = node.text || "";
-			let i = value.length - value.trimStart().length;
-			if (i === value.length) {
-				offset += node.nodeSize;
-				continue;
-			}
-			if (value.slice(i, i + text.length).toLowerCase() !== lower) {
-				break;
-			}
-			let after = value[i + text.length];
-			if (after && !/\s/.test(after)) {
-				break;
-			}
-			view.dispatch(view.state.tr.delete(pos + i, pos + i + 1));
-			return true;
-		}
-		if (isMention(node, name)) {
-			view.dispatch(
-				view.state.tr.replaceWith(pos, pos + node.nodeSize, schema.text(node.attrs.name)),
-			);
-			return true;
-		}
-		break;
-	}
-
-	return false;
-}
-
-function promoteMention(view: EditorView, entry: Mention) {
-	let block = view.state.doc.firstChild;
-	if (!block?.isTextblock) return false;
-
-	let start = 1;
-	let size = entry.name.length;
-	let lower = entry.name.toLowerCase();
-	let offset = 0;
-
-	for (let i = 0; i < block.childCount; i++) {
-		let node = block.child(i);
-		let pos = start + offset;
-		if (!node.isText) break;
-
-		let value = node.text || "";
-		let j = value.length - value.trimStart().length;
-		if (j === value.length) {
-			offset += node.nodeSize;
-			continue;
-		}
-		if (value.slice(j, j + size).toLowerCase() !== lower) {
-			break;
-		}
-		let after = value[j + size];
-		if (after && !/\s/.test(after)) {
-			break;
-		}
-
-		let mention = schema.nodes.mention.create({
-			id: entry.id ?? null,
-			name: entry.name,
-			avatar: entry.avatar ?? null,
-		});
-		view.dispatch(view.state.tr.replaceWith(pos + j, pos + j + size, mention));
-		return true;
-	}
-
-	return false;
-}
-
-function insertModeMention(view: EditorView, entry: Mention) {
-	let tr = view.state.tr.insert(1, [modeMention(entry), schema.text(" ")]);
-	view.dispatch(tr.setSelection(view.state.selection.map(tr.doc, tr.mapping)));
-}
-
-function modeMention(entry: Mention) {
-	return schema.nodes.mention.create({
-		id: entry.id ?? null,
-		name: entry.name,
-		avatar: entry.avatar ?? null,
-	});
+/** Entering a mention's mode marks the draft with its mention, adopting a leading bare name. */
+function promote(text: string, name: string) {
+	let bare = new RegExp(`^(\\s*)(${literal(name)}\\b)`, "i");
+	if (bare.test(text)) return text.replace(bare, "$1@$2");
+	return `@${name} ${text.trimStart()}`;
 }
 
 function presentation({
@@ -584,14 +381,11 @@ function presentation({
 	};
 }
 
-/** Opinionated chat composer: rich text, attachments, mentions, slash commands,
- * modes, models, and an optional microphone. */
+/** Opinionated chat composer: markdown source with a preview, attachments, mentions, modes,
+ * models, and an optional microphone. */
 function useComposer({
 	scope,
 	mentions,
-	documents,
-	plan = false,
-	commands,
 	modes = DEFAULT_MODES,
 	models,
 	agents,
@@ -657,30 +451,26 @@ function useComposer({
 	}, [items, query]);
 	let selected = items.find(item => item.id === curModel) ?? items[0];
 
-	let [empty, setEmpty] = useState(true);
-	let [value, setValue] = useState("");
+	let draft = useDraft(scope);
+	let [value, setValue] = useState(draft.defaultValue ?? "");
+	let empty = !value;
 	let [recording, setRecording] = useState(false);
 	let [toolbar, setToolbar] = useState(tools);
+	let [preview, setPreview] = useState(false);
 	let [modelMenu, setModelMenu] = useState(false);
 	let [keys, setKeys] = useState(false);
-	let [active, setActive] = useState(EMPTY_ACTIVE);
-	let [link, setLinkState] = useState<LinkState>(EMPTY_LINK);
 	let [emoji, setEmoji] = useState<EmojiState>(EMPTY_EMOJI);
 
-	let draft = useDraft(scope);
 	let restoredMode = useRef(draft.defaultValue ? curMode : undefined);
 	let history = useHistory(scope);
 	let analyser = useMic(mic && recording);
 
-	let view = useRef<EditorView | null>(null);
+	let input = useRef<HTMLTextAreaElement | null>(null);
 	let file = useRef<HTMLInputElement | null>(null);
-	let selection = useRef<{ from: number; to: number } | null>(null);
 
 	let inputs = {
 		modes,
 		mentions,
-		documents,
-		plan,
 		onModeChange,
 		onModelChange,
 		onAgentChange,
@@ -793,19 +583,11 @@ function useComposer({
 	}
 
 	function clear() {
-		let v = view.current;
-		if (!v) return;
+		let el = input.current;
+		if (!el) return;
 		let mode = latest.current.modes.find(m => m.id === modeRef.current);
-		let entry = mode?.mention
-			? latest.current.mentions?.find(m => m.name === mode.mention)
-			: undefined;
-		let doc = parse();
-		let tr = v.state.tr.replaceWith(0, v.state.doc.content.size, doc.content);
-		if (!latest.current.editing && entry) {
-			tr = tr.insert(1, [modeMention(entry), schema.text(" ")]);
-			tr = tr.setSelection(TextSelection.atEnd(tr.doc));
-		}
-		v.dispatch(tr);
+		let mark = mode?.mention && !latest.current.editing ? `@${mode.mention} ` : "";
+		assign(el, mark);
 		draft.clear();
 		type(false);
 	}
@@ -813,170 +595,94 @@ function useComposer({
 	function cancel() {
 		clear();
 		latest.current.onCancelEdit?.();
-		view.current?.focus();
+		input.current?.focus();
 	}
 
 	function exit() {
 		updateMode(modes[0]!.id);
-		view.current?.focus();
+		input.current?.focus();
 	}
 
 	useImperativeHandle(ref, () => ({
-		focus: () => view.current?.focus(),
-		get: () => view.current?.state.doc,
+		focus: () => input.current?.focus(),
+		get: () => input.current?.value,
 		clear,
 		set: (text: string) => {
-			let v = view.current;
-			if (!v) return;
-			let doc = parse(
-				text,
-				latest.current.mentions,
-				latest.current.documents,
-				latest.current.plan,
-			);
-			let tr = v.state.tr.replaceWith(0, v.state.doc.content.size, doc.content);
-			v.dispatch(tr.setSelection(TextSelection.atEnd(tr.doc)));
-			v.focus();
+			let el = input.current;
+			if (!el) return;
+			assign(el, text);
+			el.focus();
 		},
 		insert: (text: string) => {
-			let v = view.current;
-			if (!v) return;
-			v.dispatch(v.state.tr.insertText(text));
-			v.focus();
+			let el = input.current;
+			if (el) splice(el, el.selectionStart, el.selectionEnd, text);
 		},
 	}));
 
-	// Sync mention-modes: keep the doc in sync with the active mode.
+	// Keep the draft's leading mention in step with the active mode.
 	useEffect(() => {
-		let v = view.current;
-		if (!v || !mentions?.length) return;
+		let el = input.current;
+		if (!el || !mentions?.length) return;
 		if (latest.current.editing) return;
 		// Preserve restored mentions until their inferred mode reaches the controlled prop.
 		if (restoredMode.current === curMode) return;
 		restoredMode.current = undefined;
 
+		let text = el.value;
 		for (let m of modes) {
-			if (m.id === curMode || !m.mention) continue;
-			demoteMentions(v, m.mention);
+			if (m.id !== curMode && m.mention) text = demote(text, m.mention);
 		}
-
-		let target = modes.find(m => m.id === curMode);
-		if (!target?.mention) return;
-		let entry = mentions.find(x => x.name === target.mention);
-		if (!entry || hasMention(v, entry.name)) return;
-		if (promoteMention(v, entry)) return;
-
-		insertModeMention(v, entry);
+		let target = modes.find(m => m.id === curMode)?.mention;
+		let entry = target ? mentions.find(x => x.name === target) : undefined;
+		if (entry && !hasMention(text, entry.name)) text = promote(text, entry.name);
+		if (text === el.value) return;
+		let tail = el.value.length - el.selectionEnd;
+		assign(el, text, Math.max(0, text.length - tail));
 	}, [curMode, mentions, modes]);
-
-	function run(cmd: Command) {
-		let v = view.current;
-		if (!v) return;
-		cmd(v.state, v.dispatch);
-		v.focus();
-	}
-
-	function closeLink() {
-		selection.current = null;
-		setLinkState(EMPTY_LINK);
-	}
 
 	function closeEmoji() {
 		setEmoji(EMPTY_EMOJI);
 	}
 
 	function openEmoji(anchor: HTMLElement | { getBoundingClientRect: () => DOMRect }) {
-		closeLink();
 		setEmoji(prev => prev.open && prev.anchor === anchor ? EMPTY_EMOJI : { open: true, anchor });
 	}
 
 	function insertEmoji(item: Emoji) {
-		let v = view.current;
-		if (v) {
-			let { from } = v.state.selection;
-			let custom = item.native ? undefined : lookupCustomEmoji(item.id);
-			let tr = custom
-				? v.state.tr.insert(
-					from,
-					schema.nodes.emoji.create({ id: item.id, name: custom.alt, src: custom.src }),
-				)
-				: v.state.tr.insertText(pick(item), from);
-			v.dispatch(tr);
-			v.focus();
-		}
+		let el = input.current;
+		if (el) splice(el, el.selectionStart, el.selectionEnd, pick(item));
 		closeEmoji();
 	}
 
-	function openLink(anchor: HTMLElement | { getBoundingClientRect: () => DOMRect }) {
-		closeEmoji();
-		let v = view.current;
-		if (!v) return;
-		let current = getLinkInfo(v.state);
-		let { from, to, empty } = v.state.selection;
-		let text = empty ? "" : v.state.doc.textBetween(from, to, " ");
-		let name = "";
-		let href = "";
-
-		if (current) {
-			name = current.text;
-			href = current.href;
-		} else if (text) {
-			if (isUrl(text)) href = text;
-			else name = text;
-		}
-
-		setLinkState({ open: true, name, href, anchor });
-		selection.current = { from, to };
-	}
-
-	function restore() {
-		let v = view.current;
-		let range = selection.current;
-		if (!v || !range) return null;
-		v.dispatch(v.state.tr.setSelection(TextSelection.create(v.state.doc, range.from, range.to)));
-		return v;
-	}
-
-	function saveLink() {
-		let v = restore();
-		if (!v) return closeLink();
-		if (!link.href.trim()) clearLink(v.state, v.dispatch);
-		else setLinkCmd(link.href, link.name)(v.state, v.dispatch);
-		closeLink();
-		v.focus();
-	}
-
-	function removeLink() {
-		let v = restore();
-		if (!v) return closeLink();
-		clearLink(v.state, v.dispatch);
-		closeLink();
-		v.focus();
+	function togglePreview() {
+		let next = !preview;
+		setPreview(next);
+		if (!next) requestAnimationFrame(() => input.current?.focus());
 	}
 
 	function send() {
-		let v = view.current;
-		if (!v) return;
-		let text = v.state.doc.textContent;
+		let el = input.current;
+		if (!el) return;
+		let text = el.value;
 		let sentMode = modeRef.current;
 		let mode = latest.current.modes.find(item => item.id === sentMode);
 		let attachments = mode?.kind === "terminal" ? [] : attachRef.current;
 		if (!canSendMessage({ text, attachments, enabled: canSend })) return;
 		type(false);
 		latest.current.onSend({
-			doc: v.state.doc,
 			text,
 			attachments,
 			mode: sentMode,
 			model: modelRef.current,
 			agent: agentRef.current,
 		});
-		history.push(v, sentMode);
+		history.push(text, sentMode);
+		setPreview(false);
 		if (clearOnSend) {
 			clear();
 			resetAttach();
 		}
-		v.focus();
+		el.focus();
 	}
 
 	function action(event: ComposerToolbarEvent) {
@@ -985,20 +691,54 @@ function useComposer({
 			return;
 		}
 		if (event.action === "emoji") return openEmoji(event.trigger);
-		if (event.action === "link") return openLink(event.trigger);
-		run(ACTIONS[event.action]);
+		let el = input.current;
+		if (el) format(el, event.action);
 	}
 
-	function change(v: EditorView) {
-		draft.save(v);
+	/** The draft without the active mode's leading mention: what the person has written. */
+	function own(text: string) {
+		let mention = latest.current.modes.find(m => m.id === modeRef.current)?.mention;
+		return mention ? demote(text, mention) : text;
+	}
+
+	function change(text: string) {
+		draft.save(text);
 		history.reset();
-		let value = Boolean(v.state.doc.textContent);
-		type(value, value);
+		let typed = Boolean(own(text).trim());
+		type(typed, typed);
+		setValue(text);
+		latest.current.onTextChange?.(text);
+		infer(text);
 	}
 
-	function keydown(v: EditorView, e: KeyboardEvent) {
+	/** A mention typed or removed by hand switches to or from its mode. */
+	function infer(text: string) {
 		let ms = latest.current.modes;
-		if (!ms.length) return false;
+		if (!latest.current.mentions?.length) return;
+		for (let m of ms) {
+			if (m.mention && hasMention(text, m.mention) && modeRef.current !== m.id) {
+				return updateMode(m.id);
+			}
+		}
+		let cur = ms.find(m => m.id === modeRef.current);
+		if (cur?.mention && !hasMention(text, cur.mention)) updateMode(ms[0]!.id);
+	}
+
+	useEffect(() => {
+		if (!draft.defaultValue) return;
+		latest.current.onTextChange?.(draft.defaultValue);
+		infer(draft.defaultValue);
+	}, []);
+
+	function keydown(e: KeyboardEvent<HTMLElement>) {
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p" && !terminal) {
+			e.preventDefault();
+			togglePreview();
+			return true;
+		}
+		let el = input.current;
+		let ms = latest.current.modes;
+		if (!el || !ms.length || e.target !== el) return false;
 		if (e.key === "Escape" && latest.current.editing) {
 			esc.current = 0;
 			e.preventDefault();
@@ -1012,12 +752,7 @@ function useComposer({
 			if (modeRef.current !== ms[0]!.id) {
 				esc.current = 0;
 				e.preventDefault();
-				let cur = ms.find(m => m.id === modeRef.current);
 				updateMode(ms[0]!.id);
-				if (cur?.mention) {
-					demoteMentions(v, cur.mention)
-						|| demoteLeadingMention(v, cur.mention);
-				}
 				return true;
 			}
 			let ace = ms.find(m => m.id === "ace");
@@ -1028,13 +763,8 @@ function useComposer({
 				return true;
 			}
 			esc.current = now;
-			for (let m of ms) {
-				if (!m.mention || !demoteLeadingMention(v, m.mention)) continue;
-				e.preventDefault();
-				return true;
-			}
 		}
-		if (e.key === "!" && !e.metaKey && !e.ctrlKey && !v.state.doc.textContent) {
+		if (e.key === "!" && !e.metaKey && !e.ctrlKey && !el.value) {
 			let term = ms.find(m => m.kind === "terminal");
 			if (term && modeRef.current !== term.id) {
 				e.preventDefault();
@@ -1042,29 +772,8 @@ function useComposer({
 				return true;
 			}
 		}
-		return history.handleKey(v, e, m => updateMode(m || ms[0]!.id));
-	}
-
-	function update(v: EditorView) {
-		setActive(getActive(v));
-		let text = v.state.doc.textContent;
-		let value = Boolean(text);
-		setValue(text);
-		setEmpty(!value);
-		latest.current.onTextChange?.(text);
-
-		let ms = latest.current.modes;
-		let list = latest.current.mentions;
-		if (!list?.length) return;
-
-		for (let m of ms) {
-			if (!m.mention) continue;
-			if (hasMention(v, m.mention) && modeRef.current !== m.id) {
-				return updateMode(m.id);
-			}
-		}
-		let cur = ms.find(m => m.id === modeRef.current);
-		if (cur?.mention && !hasMention(v, cur.mention)) updateMode(ms[0]!.id);
+		let blank = !own(el.value).trim();
+		return history.handleKey(el, e, blank, m => updateMode(m || ms[0]!.id));
 	}
 
 	let {
@@ -1109,9 +818,6 @@ function useComposer({
 
 	return {
 		mentions,
-		documents,
-		plan,
-		commands,
 		modes,
 		agents,
 		efforts,
@@ -1134,14 +840,14 @@ function useComposer({
 		ace,
 		attachable,
 		edit,
-		active,
 		file,
-		view,
+		input,
 		draft,
 		change,
 		keydown,
-		update,
-		openLink,
+		preview,
+		togglePreview,
+		value,
 		send,
 		cwd,
 		current,
@@ -1181,11 +887,6 @@ function useComposer({
 		planning,
 		setRecording,
 		cancel,
-		link,
-		closeLink,
-		setLinkState,
-		saveLink,
-		removeLink,
 		emoji,
 		closeEmoji,
 		insertEmoji,
@@ -1210,23 +911,20 @@ function ChatComposer(props: Props) {
 		file,
 		edit,
 		toolbar,
-		active,
 		action,
-		view,
+		input,
 		draft,
 		mentions,
-		documents,
-		plan,
-		commands,
-		openLink,
 		change,
 		keydown,
+		preview,
+		value,
 		send,
-		update,
 		placeholder,
 		cwd,
 		current,
 	} = state;
+	let previewing = preview && !terminal;
 	return (
 		<Composer className={className}>
 			<Composer.Attachments open={curAttach.length > 0 && !terminal}>
@@ -1256,8 +954,8 @@ function ChatComposer(props: Props) {
 						e.target.value = "";
 					}}
 				/>
-				<Composer.Header open={toolbar && !terminal}>
-					<ComposerToolbar disabled={{ attach: !attachable }} value={active} onAction={action} />
+				<Composer.Header open={toolbar && !terminal && !previewing}>
+					<ComposerToolbar disabled={{ attach: !attachable }} onAction={action} />
 				</Composer.Header>
 				<Composer.Input data-mode={terminal ? "terminal" : undefined}>
 					{terminal && (
@@ -1265,37 +963,40 @@ function ChatComposer(props: Props) {
 							<IconChevronRightMicro className="size-3.5" />
 						</div>
 					)}
-					<RichText
-						ref={view}
+					<Editor
+						ref={input}
 						aria-label="Message"
 						defaultValue={draft.defaultValue}
 						mentions={mentions}
-						documents={documents}
-						plan={plan}
-						commands={commands}
-						onLink={openLink}
 						onChange={change}
 						onKeyDown={keydown}
 						onSubmit={send}
-						onUpdate={update}
 						onFiles={attachable ? addFiles : undefined}
 						placeholder={placeholder ?? (terminal && cwd ? cwd : current?.placeholder)}
+						hidden={previewing}
 						className="text-sm text-foreground"
 					/>
+					{previewing && (
+						<Preview
+							raw={value}
+							mentions={mentions}
+							onKeyDown={keydown}
+							className="text-sm text-foreground outline-none"
+						/>
+					)}
 				</Composer.Input>
 				<Composer.Footer>
 					<ComposerOptions state={state} />
 					<ComposerButtons state={state} />
 				</Composer.Footer>
 			</Composer.Body>
-			<ComposerLink state={state} />
 			<ComposerEmoji state={state} />
 		</Composer>
 	);
 }
 
 function ComposerMode({ state }: { state: ComposerState }) {
-	let { edit, CurrentIcon, current, modes, updateMode, view } = state;
+	let { edit, CurrentIcon, current, modes, updateMode, input } = state;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -1325,7 +1026,7 @@ function ComposerMode({ state }: { state: ComposerState }) {
 							key={m.id}
 							onClick={() => {
 								updateMode(m.id);
-								view.current?.focus();
+								input.current?.focus();
 							}}
 						>
 							<Icon className="size-3 shrink-0 text-muted-foreground group-focus/dropdown-menu-item:text-popover-foreground" />
@@ -1339,7 +1040,7 @@ function ComposerMode({ state }: { state: ComposerState }) {
 }
 
 function ComposerAgent({ state }: { state: ComposerState }) {
-	let { AgentIcon, selectedAgent, agents, updateAgent, view, curAgent } = state;
+	let { AgentIcon, selectedAgent, agents, updateAgent, input, curAgent } = state;
 	if (!selectedAgent) return null;
 	return (
 		<DropdownMenu>
@@ -1372,7 +1073,7 @@ function ComposerAgent({ state }: { state: ComposerState }) {
 							<DropdownMenuItem
 								onClick={() => {
 									updateAgent(entry.id);
-									view.current?.focus();
+									input.current?.focus();
 								}}
 							>
 								<EntryIcon
@@ -1398,7 +1099,7 @@ function ComposerAgent({ state }: { state: ComposerState }) {
 }
 
 function ComposerEffort({ state }: { state: ComposerState }) {
-	let { efforts, effort, onEffortChange, view } = state;
+	let { efforts, effort, onEffortChange, input } = state;
 	let selected = efforts?.find(item => item.id === effort);
 	if (!selected || !onEffortChange) return null;
 	return (
@@ -1428,7 +1129,7 @@ function ComposerEffort({ state }: { state: ComposerState }) {
 							key={entry.id}
 							onClick={() => {
 								onEffortChange(entry.id);
-								view.current?.focus();
+								input.current?.focus();
 							}}
 						>
 							<span className="min-w-0 flex-1 truncate">{entry.name}</span>
@@ -1543,6 +1244,8 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 		analyser,
 		toolbar,
 		setToolbar,
+		preview,
+		togglePreview,
 	} = state;
 	return (
 		<Composer.Start className="min-w-0">
@@ -1591,6 +1294,29 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 					)
 					: (
 						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger
+									render={
+										<Toolbar.Button
+											aria-label="Preview"
+											aria-pressed={preview}
+											onClick={togglePreview}
+											render={
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													className="text-muted-foreground aria-pressed:text-foreground"
+												/>
+											}
+										/>
+									}
+								>
+									<IconEyeMicro />
+								</TooltipTrigger>
+								<TooltipContent>
+									{preview ? "Edit" : "Preview"} <span className="text-muted-foreground">⇧⌘P</span>
+								</TooltipContent>
+							</Tooltip>
 							<Tooltip>
 								<TooltipTrigger
 									render={
@@ -1732,88 +1458,6 @@ function ComposerButtons({ state }: { state: ComposerState }) {
 					)}
 			</TooltipProvider>
 		</Composer.End>
-	);
-}
-
-function ComposerLink({ state }: { state: ComposerState }) {
-	let { link, closeLink, setLinkState, saveLink, removeLink } = state;
-	return (
-		<Popover open={link.open} onOpenChange={(open) => !open && closeLink()}>
-			<PopoverPortal>
-				<PopoverPositioner
-					anchor={link.anchor || undefined}
-					side="bottom"
-					align="start"
-					sideOffset={6}
-				>
-					<PopoverPopup className="w-80 p-3" finalFocus={false}>
-						<div className="flex flex-col gap-3">
-							<label className="flex flex-col gap-1">
-								<span className="text-xs font-medium text-muted-foreground">Link</span>
-								<input
-									value={link.href}
-									onChange={(e) => setLinkState((prev) => ({ ...prev, href: e.target.value }))}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											saveLink();
-										}
-										if (e.key === "Escape") {
-											e.preventDefault();
-											closeLink();
-										}
-									}}
-									placeholder="https://example.com"
-									className="h-9 rounded-md squircle border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-								/>
-							</label>
-							<label className="flex flex-col gap-1">
-								<span className="text-xs font-medium text-muted-foreground">Name</span>
-								<input
-									value={link.name}
-									onChange={(e) => setLinkState((prev) => ({ ...prev, name: e.target.value }))}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											saveLink();
-										}
-										if (e.key === "Escape") {
-											e.preventDefault();
-											closeLink();
-										}
-									}}
-									placeholder="Link label"
-									className="h-9 rounded-md squircle border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-								/>
-							</label>
-							<div className="flex justify-end gap-2">
-								<button
-									type="button"
-									onClick={() => closeLink()}
-									className="rounded-md squircle px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-								>
-									Cancel
-								</button>
-								<button
-									type="button"
-									onClick={() => removeLink()}
-									className="rounded-md squircle px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-								>
-									Remove
-								</button>
-								<button
-									type="button"
-									onClick={() => saveLink()}
-									className="rounded-md squircle bg-foreground px-2 py-1 text-xs font-medium text-background"
-								>
-									Apply
-								</button>
-							</div>
-						</div>
-					</PopoverPopup>
-				</PopoverPositioner>
-			</PopoverPortal>
-		</Popover>
 	);
 }
 

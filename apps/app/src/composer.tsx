@@ -6,7 +6,6 @@ import {
 	Button,
 	ChatComposer,
 	type ChatComposerHandle,
-	serialize,
 	toast,
 	useMedia,
 } from "@ace/ui";
@@ -188,7 +187,7 @@ export function Composer(
 				description: "The owner has turned off teammate agent invocation.",
 			});
 		}
-		const doc = composer.current?.get();
+		const written = composer.current?.get();
 		sending.current = true;
 		setPending(true);
 		try {
@@ -213,7 +212,7 @@ export function Composer(
 					...encoded,
 				});
 			}
-			if (composer.current?.get() === doc) composer.current?.clear();
+			if (composer.current?.get() === written) composer.current?.clear();
 			const sent = new Set(attached);
 			setAttached((current) => current.filter((value) => !sent.has(value)));
 		} catch (error) {
@@ -256,7 +255,7 @@ export function Composer(
 				onStop={() => void host.channel(channel.id, { op: "stop", chat: id })}
 				canSend={ready && status === "open" && !pending && !refused}
 				clearOnSend={false}
-				onSend={({ doc, mode, attachments }) => void send(serialize(doc), mode, attachments)}
+				onSend={({ text, mode, attachments }) => void send(text, mode, attachments)}
 			/>
 			{refused
 				? <Refusal mode={mode} onChat={() => changeMode("chat")} />

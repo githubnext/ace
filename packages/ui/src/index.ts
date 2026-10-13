@@ -25,6 +25,7 @@ export {
 	type SendPayload,
 } from "./components/composer/chat-composer";
 export { Composer } from "./components/composer/composer";
+export { type Mention } from "./components/composer/editor";
 export { canSendMessage } from "./components/composer/send";
 export {
 	DiffView,
@@ -59,29 +60,6 @@ export {
 } from "./components/requests/question";
 export { QuestionInput } from "./components/requests/question-input";
 export { isAnswered } from "./components/requests/question-state";
-export {
-	clearLink,
-	getLink,
-	getLinkInfo,
-	setLink,
-	toggleBold,
-	toggleBullet,
-	toggleCode,
-	toggleCodeBlock,
-	toggleItalic,
-	toggleOrdered,
-	toggleQuote,
-	toggleStrike,
-	toggleUnderline,
-} from "./components/rich-text/commands";
-export {
-	type DocumentCandidate,
-	type Mention,
-	RichText,
-	type SlashCommand,
-	type SuggestState,
-} from "./components/rich-text/rich-text";
-export { schema as richTextSchema } from "./components/rich-text/schema";
 export {
 	ScrollView,
 	type ScrollViewHandle,
@@ -125,6 +103,7 @@ export {
 export { TurnSummary } from "./components/turn-summary/turn-summary";
 export { TypingDots, type TypingDotsProps } from "./components/typing-dots/typing-dots";
 export { UserMenu } from "./components/user-menu/user-menu";
+export { type DocumentCandidate } from "./lib/references";
 export type { TimelineWorking } from "./lib/timeline";
 export { Waveform } from "./ui/waveform";
 
@@ -202,7 +181,6 @@ export { useSuppressMotion } from "./hooks/use-suppress-motion";
 export { agentColor, agentLabel } from "./lib/agent";
 export { aceAvatar, aceLogo } from "./lib/emoji";
 export { glow, type GlowPreset, type GlowScheme, type GlowTone } from "./lib/glow";
-export { serialize } from "./lib/markdown";
 export { media, screen } from "./lib/screens";
 export { frame, visible } from "./lib/scroll";
 
