@@ -27,6 +27,7 @@ import { CodingTools } from "@earendil-works/pi-durable/tools";
 
 import { type Directory, messaging, Subagent } from "./agents";
 import { type Browser, browser } from "./browser";
+import { caption, CaptionsDoc, fast, groups, isStale, spend } from "./captions";
 import { instructions } from "./context";
 import { changes, patch } from "./changes";
 import { type Desktop, desktop } from "./desktop";
@@ -104,7 +105,10 @@ export class Channel {
 	#publishedBusy?: boolean;
 	#unsubscribe?: () => void;
 	#admissions = new Map<ChatId, Promise<unknown>>();
-	#listeners = new Set<{ chat: ChatId; send: Send }>();
+	#listeners = new Set<{ chat: ChatId; send: Send; captions: boolean }>();
+	/** Chats with a captioning pass in progress; `true` when another pass must follow it. */
+	#captioning = new Map<ConversationId, boolean>();
+	#closing = new AbortController();
 
 	private constructor(
 		options: Options,
@@ -179,6 +183,9 @@ export class Channel {
 		await channel.#snapshotBusy();
 		channel.#unsubscribe = harness.subscribeCommits(({ changes }) => {
 			for (const change of changes) {
+				if (change.type === "entry" && change.value.model?.[0]?.role === "assistant") {
+					channel.#caption(change.value.conversationId);
+				}
 				if (change.type !== "document") continue;
 				// Commit order, not request completion order, decides the state clients see.
 				if (change.record.kind === SettingsDoc.definition.kind) {
@@ -190,7 +197,9 @@ export class Channel {
 				const { scope } = change.record;
 				if (scope.kind !== "conversation") continue;
 				if (change.value?.run) channel.#runs.add(scope.conversationId);
-				else channel.#runs.delete(scope.conversationId);
+				else if (channel.#runs.delete(scope.conversationId)) {
+					channel.#caption(scope.conversationId);
+				}
 			}
 			// Publish once per atomic commit, not once per chat or streaming delta.
 			channel.#publishBusy();
@@ -252,7 +261,7 @@ export class Channel {
 			case "rename":
 				return this.#rename(request);
 			case "watch":
-				return this.#watch(request.chat, send, request.queue);
+				return this.#watch(request.chat, send, request.queue, request.captions);
 			case "changes": {
 				const { cwd, lane } = await this.#place(request.chat);
 				return changes(this.#options.env(cwd), cwd, this.#options.project, lane, context);
@@ -373,6 +382,7 @@ export class Channel {
 	async close(): Promise<void> {
 		this.#log("info", "channel.close");
 		this.#unsubscribe?.();
+		this.#closing.abort();
 		try {
 			await this.#harness.close(context);
 		} finally {
@@ -571,8 +581,74 @@ export class Channel {
 		}
 	}
 
+	/** Coalesces requests so each chat has at most one captioning pass running. */
+	#caption(id: ConversationId): void {
+		if (this.#captioning.has(id)) return void this.#captioning.set(id, true);
+		this.#captioning.set(id, false);
+		void (async () => {
+			do {
+				this.#captioning.set(id, false);
+				await this.#captionPass(id).catch((error) => {
+					if (!this.#closing.signal.aborted) this.#log("warn", "caption", failure(error));
+				});
+			} while (this.#captioning.get(id) && !this.#closing.signal.aborted);
+			this.#captioning.delete(id);
+		})();
+	}
+
+	async #captionPass(id: ConversationId): Promise<void> {
+		const conversation = await this.#harness.conversation(id, context);
+		if (!conversation) return;
+		const [agent, live, view, stored] = await Promise.all([
+			this.#harness.snapshot(AgentDoc, id, context),
+			this.#harness.snapshot(LiveDoc, id, context),
+			conversation.context(context),
+			this.#harness.snapshot(CaptionsDoc, id, context),
+		]);
+		const { request, groups: found } = groups(view.messages, !!live?.run);
+		const captions = stored?.groups || {};
+		const stale = found.filter((group) =>
+			isStale(group, captions[group.calls[0]!.id]?.calls.length)
+		);
+		if (!stale.length) return;
+		const model = await fast(this.#options.models, agent?.model);
+		if (!model) return;
+		for (const group of stale) {
+			const key = group.calls[0]!.id;
+			const previous = found.slice(0, found.indexOf(group)).slice(-3)
+				.flatMap((earlier) => captions[earlier.calls[0]!.id]?.text || []);
+			const { text, usage } = await caption(
+				this.#options.models,
+				model,
+				request,
+				group,
+				previous,
+				this.#closing.signal,
+			);
+			const calls = group.calls.map((call) => call.id);
+			await this.#harness.commit(async (tx) => {
+				(await tx.doc(CaptionsDoc, id)).groups[key] = { calls, text };
+				spend(await tx.doc(UsageDoc, id), usage);
+			}, context);
+			captions[key] = { calls, text };
+			for (const listener of this.#listeners) {
+				if (listener.chat !== id || !listener.captions) continue;
+				try {
+					listener.send({ kind: "caption", chat: id, calls, text });
+				} catch {
+					this.#listeners.delete(listener);
+				}
+			}
+		}
+	}
+
 	/** Replays the chat's active transcript, then streams. Resolves when the stream ends. */
-	async #watch(chat: ChatId | undefined, send: Send, includeQueue = false) {
+	async #watch(
+		chat: ChatId | undefined,
+		send: Send,
+		includeQueue = false,
+		includeCaptions = false,
+	) {
 		const conversation = await this.#conversation(chat);
 		const stream = await watchEvents(this.#harness, conversation.id, context);
 		// Agent events expose only inbox IDs. The shared conversation mount carries their content,
@@ -583,7 +659,7 @@ export class Channel {
 				throw error;
 			})
 			: undefined;
-		const listener = { chat: conversation.id, send };
+		const listener = { chat: conversation.id, send, captions: includeCaptions };
 		this.#listeners.add(listener);
 		void stream.closed.then(() => {
 			this.#listeners.delete(listener);
@@ -592,6 +668,12 @@ export class Channel {
 		void view?.closed.then(() => stream.stop());
 		send(this.#event(conversation.id));
 		for (const entry of stream.snapshot.entries) for (const event of events(entry)) send(event);
+		if (includeCaptions) {
+			const captions = await this.#harness.snapshot(CaptionsDoc, conversation.id, context);
+			for (const { calls, text } of Object.values(captions?.groups || {})) {
+				send({ kind: "caption", chat: conversation.id, calls, text });
+			}
+		}
 		if (stream.snapshot.run) send({ kind: "run", chat: conversation.id, state: "start" });
 		if (view) {
 			send({ kind: "queue", chat: conversation.id, messages: queue(view.value) });

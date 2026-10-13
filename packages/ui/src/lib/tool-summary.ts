@@ -10,6 +10,7 @@ type ToolNode = {
 	name: string;
 	status: Status;
 	agent?: Tool["agent"];
+	caption?: string;
 	args?: string;
 	input?: Record<string, unknown>;
 	result?: string;
@@ -21,6 +22,8 @@ type ToolGroup = {
 	id: string;
 	uid: string;
 	summary: string;
+	/** The newest caption among the group's tools. */
+	caption?: string;
 	tools: ToolNode[];
 };
 
@@ -113,6 +116,7 @@ const SUMMARY_FIELDS = [
 function toToolNode(t: Tool): ToolNode {
 	let node: ToolNode = { id: t.id, name: t.name, status: t.status };
 	if (t.agent) node.agent = t.agent;
+	if (t.caption) node.caption = t.caption;
 	node.input = t.arguments;
 	let args = summarizeArgs(t.arguments);
 	if (args) node.args = args;
@@ -151,6 +155,10 @@ function summarizeWorkingTools(tools: readonly ToolNode[], start: number, end: n
 		? plural(seconds, "second")
 		: `${plural(minutes, "minute")}${remaining ? ` ${plural(remaining, "second")}` : ""}`;
 	return `Worked for ${duration}, ran ${plural(tools.length, "tool call")}`;
+}
+
+function captionTools(tools: readonly ToolNode[]): string | undefined {
+	return tools.findLast((tool) => tool.caption)?.caption;
 }
 
 function editsFile(tool: ToolNode): boolean {
@@ -223,5 +231,5 @@ function plural(count: number, one: string, many = one + "s"): string {
 	return `${count} ${count === 1 ? one : many}`;
 }
 
-export { createsFile, editsFile, summarizeTools, summarizeWorkingTools, toToolNode };
+export { captionTools, createsFile, editsFile, summarizeTools, summarizeWorkingTools, toToolNode };
 export type { Status, ToolGroup, ToolKind, ToolNode };

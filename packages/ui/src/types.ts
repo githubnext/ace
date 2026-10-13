@@ -24,6 +24,8 @@ export type Tool = {
 	arguments: Record<string, unknown>;
 	status: "plan" | "start" | "pending" | "success" | "error";
 	agent?: Tool.Agent;
+	/** One line describing the group of consecutive calls this one belongs to. */
+	caption?: string;
 	result?: { content: string; images?: string[] };
 	children?: Tool[];
 };

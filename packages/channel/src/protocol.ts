@@ -183,6 +183,8 @@ export type Request =
 		chat?: ChatId;
 		/** Include queue events; older clients do not understand them. */
 		queue?: boolean;
+		/** Include caption events; older clients do not understand them. */
+		captions?: boolean;
 	};
 
 export type Event =
@@ -230,6 +232,11 @@ export type Event =
 		images?: Image[];
 		stopped?: boolean;
 	}
+	/**
+	 * A fast model's one-line description of a group of consecutive tool calls, sent on attachment
+	 * and whenever a group is captioned again. Clients show it for whichever group holds `calls`.
+	 */
+	| { kind: "caption"; chat: ChatId; calls: string[]; text: string }
 	| { kind: "run"; chat: ChatId; state: "start" | "end" }
 	/**
 	 * Channel-wide metadata, sent initially and whenever its name, summary, or settings change.

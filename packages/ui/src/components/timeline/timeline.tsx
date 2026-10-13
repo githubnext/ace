@@ -336,6 +336,8 @@ function AgentWorkingItemView(
 		: first?.name || "tool";
 	let Icon = iconFor(/^view(file)?$/i.test(icon) ? "read" : icon);
 	let panel = `${item.id}-tools`;
+	let running = item.tools.some(tool => tool.status === "start" || tool.status === "pending");
+	let label = item.caption ? `${item.caption}${running ? "…" : ""}` : item.summary;
 	return (
 		<div
 			className={cn("flex min-w-0 flex-col", live && "timeline-stream-in")}
@@ -351,7 +353,10 @@ function AgentWorkingItemView(
 				style={{ blockSize: TOOL_GROUP_ROW_HEIGHT, maxInlineSize: "100%", ...workingTextFont }}
 			>
 				<Icon className="size-4 shrink-0" />
-				<span className="min-w-0 truncate">{item.summary}</span>
+				<span className="min-w-0 truncate">{label}</span>
+				{item.caption && (
+					<span className="shrink-0 text-xs text-muted-foreground/70">{item.summary}</span>
+				)}
 				<IconChevronDownMicro
 					className={cn(
 						"size-3 shrink-0 origin-center rotate-0 transition-[rotate] duration-200 ease-out motion-reduce:transition-none",
@@ -363,7 +368,7 @@ function AgentWorkingItemView(
 				<div
 					id={panel}
 					role="region"
-					aria-label={item.summary}
+					aria-label={item.caption || item.summary}
 					className="timeline-tools-expand-in flex min-w-0 flex-col"
 					style={{ gap: CONTENT_GAP, paddingInlineStart: TOOL_LIST_INDENT }}
 				>

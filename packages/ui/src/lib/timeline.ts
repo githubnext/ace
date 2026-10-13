@@ -2,6 +2,7 @@ import type { Event, REPO } from "../types";
 
 import { normalizeGithubComment } from "./github-comment";
 import {
+	captionTools,
 	createsFile,
 	editsFile,
 	summarizeTools,
@@ -992,12 +993,14 @@ function buildTurn(group: Group, working: boolean): AgentTurn {
 			if (prev?.type === "tools") {
 				prev.tools = prev.tools.concat(tools);
 				prev.summary = summarizeTools(prev.tools);
+				prev.caption = captionTools(prev.tools);
 			} else {
 				items.push({
 					type: "tools",
 					id,
 					uid: row.uid,
 					summary: summarizeTools(tools),
+					caption: captionTools(tools),
 					tools,
 				});
 			}
