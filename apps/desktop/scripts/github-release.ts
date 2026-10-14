@@ -6,6 +6,7 @@ import type { Release } from "./release";
 
 type GithubRelease = {
 	id: number;
+	tag_name: string;
 	draft: boolean;
 	prerelease: boolean;
 	target_commitish: string;
@@ -25,6 +26,13 @@ function gh(args: string[], missing = false): string | undefined {
 	const error = result.stderr.toString().trim();
 	if (missing && error.includes("(HTTP 404)")) return undefined;
 	throw new Error(error || "GitHub release command failed");
+}
+
+const version = (tag: string) => tag.slice(tag.lastIndexOf("-v") + 2);
+
+function compare(a: string, b: string): number {
+	const [x, y] = [a.split(".").map(Number), b.split(".").map(Number)];
+	return x[0]! - y[0]! || x[1]! - y[1]! || x[2]! - y[2]!;
 }
 
 export async function publishGithub(directory: string): Promise<void> {
@@ -50,24 +58,42 @@ export async function publishGithub(directory: string): Promise<void> {
 		throw new Error(`${tag} already points to another source revision`);
 	}
 	// Listing includes unfinished drafts, so retries can resume after an upload failure.
-	const existing = gh([
+	const releases = gh([
 		"api",
 		`${endpoint}/releases`,
 		"--paginate",
 		"--jq",
-		`.[] | select(.tag_name == "${tag}")`,
-	]);
+		`.[] | select(.tag_name | startswith("desktop-${release.channel}-v"))`,
+	])!.split("\n").filter(Boolean).map((line) => JSON.parse(line) as GithubRelease);
+	const existing = releases.find((item) => item.tag_name === tag);
 	let published: GithubRelease;
 	if (existing) {
-		published = JSON.parse(existing) as GithubRelease;
+		published = existing;
 		if (
 			published.prerelease !== prerelease
 			|| (published.draft && published.target_commitish !== release.revision)
 			|| (!published.draft && !commit)
 		) throw new Error(`${tag} does not match the requested release`);
 	} else {
+		const previous = releases
+			.filter((item) => !item.draft && compare(version(item.tag_name), release.version) < 0)
+			.sort((a, b) => compare(version(b.tag_name), version(a.tag_name)))[0];
+		const changes = JSON.parse(
+			gh([
+				"api",
+				`${endpoint}/releases/generate-notes`,
+				"--method",
+				"POST",
+				"-f",
+				`tag_name=${tag}`,
+				"-f",
+				`target_commitish=${release.revision}`,
+				...(previous ? ["-f", `previous_tag_name=${previous.tag_name}`] : []),
+			])!,
+		) as { body: string };
 		const notes = `Ace ${release.channel} ${release.version} for Apple silicon (macOS 15+).\n\n`
-			+ `Source: ${release.revision}\n\nSHA-256 (${release.archive}): ${digest}`;
+			+ `Source: ${release.revision}\n\nSHA-256 (${release.archive}): ${digest}\n\n`
+			+ changes.body;
 		published = JSON.parse(
 			gh([
 				"api",
