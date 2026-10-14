@@ -24,7 +24,8 @@ import {
 } from "../components/rich-text/references";
 import type { Mention } from "../components/rich-text/rich-text";
 
-const LINE_START = /^\s*(?:[-+>=#]|\d+\.)/;
+const MARKER = /^(\s*)([-+>#=<])/;
+const ORDERED = /^(\s*\d+)([.)])/;
 
 /**
  * Markdown serializer for the rich-text schema. Extends the default ProseMirror
@@ -64,14 +65,15 @@ const serializer = new MarkdownSerializer(
 			state.write(`:${node.attrs.name}:`);
 		},
 		text(state, node, parent, index) {
-			// A line after a hard break can open a list, quote, or heading that interrupts the
-			// paragraph, which strands the break's trailing backslash as literal text.
+			// A line can open a list, quote, heading, or HTML block even after leading spaces; after
+			// a hard break it interrupts the paragraph and strands the break's backslash as text.
 			let text = node.text!;
-			let broken = index > 0 && parent.child(index - 1).type === schema.nodes.hard_break;
-			if (!broken || !LINE_START.test(text)) {
+			let start = index === 0 || parent.child(index - 1).type === schema.nodes.hard_break;
+			if (!start || !MARKER.test(text) && !ORDERED.test(text)) {
 				return defaultMarkdownSerializer.nodes.text!(state, node, parent, index);
 			}
-			state.text(state.esc(text, true).replace(/^(\s*)=/, "$1\\="), false);
+			text = state.esc(text).replace(MARKER, "$1\\$2").replace(ORDERED, "$1\\$2");
+			state.text(text, false);
 		},
 	},
 	{
