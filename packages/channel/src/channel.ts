@@ -3,6 +3,7 @@ import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
 import {
 	AgentDoc,
 	type AgentEvent,
+	type CommitChange,
 	type Conversation,
 	type ConversationId,
 	type ConversationRecord,
@@ -14,9 +15,11 @@ import {
 	Harness,
 	InboxDoc,
 	LiveDoc,
+	type LiveState,
 	ROOT_CONVERSATION_ID,
 	type Storage,
 	type SubmissionId,
+	type SubmissionRecord,
 	ToolResultEntry,
 	UsageDoc,
 	type UsageState,
@@ -54,6 +57,7 @@ import type {
 	Metadata,
 	ModelRef,
 	Request,
+	RunEnd,
 	Usage,
 } from "./protocol";
 import { queue } from "./queue";
@@ -100,6 +104,8 @@ export type Options = {
 	onActivity?(at: number): void;
 	/** Rebuildable channel-wide projection of pi live runs, including child chats. */
 	onBusy?(busy: boolean): void;
+	/** Publish each run a person invoked as it ends, for their attention. */
+	onRun?(run: RunEnd): void;
 	log: Log;
 };
 
@@ -113,7 +119,8 @@ export class Channel {
 	/** Committed settings, maintained from pi's commit stream before native dispatch. */
 	#settings: Settings;
 	#active = 0;
-	#runs = new Set<ConversationId>();
+	/** Each live run's inputs, from pi's `LiveDoc`. */
+	#runs = new Map<ConversationId, readonly SubmissionId[]>();
 	#publishedBusy?: boolean;
 	#unsubscribe?: () => void;
 	#admissions = new Map<ChatId, Promise<unknown>>();
@@ -198,6 +205,7 @@ export class Channel {
 		// and subscription cannot miss a run transition. LiveDoc forks start empty in pi.
 		await channel.#snapshotBusy();
 		channel.#unsubscribe = harness.subscribeCommits(({ changes }) => {
+			const ended: [ConversationId, readonly SubmissionId[]][] = [];
 			for (const change of changes) {
 				if (change.type === "entry" && change.value.model?.[0]?.role === "assistant") {
 					channel.#caption(change.value.conversationId);
@@ -212,11 +220,17 @@ export class Channel {
 				if (change.record.kind !== LiveDoc.definition.kind) continue;
 				const { scope } = change.record;
 				if (scope.kind !== "conversation") continue;
-				if (change.value?.run) channel.#runs.add(scope.conversationId);
-				else if (channel.#runs.delete(scope.conversationId)) {
+				const { run } = (change.value || {}) as LiveState;
+				const inputs = channel.#runs.get(scope.conversationId);
+				if (run) channel.#runs.set(scope.conversationId, run.inputs);
+				else if (inputs) {
+					channel.#runs.delete(scope.conversationId);
 					channel.#caption(scope.conversationId);
+					ended.push([scope.conversationId, inputs]);
 				}
 			}
+			// Ending a run settles its inputs in the same commit, in no particular change order.
+			for (const [chat, inputs] of ended) void channel.#ended(chat, inputs, changes);
 			// Publish once per atomic commit, not once per chat or streaming delta.
 			channel.#publishBusy();
 			if (changes.some((change) => change.type === "entry")) channel.#activity();
@@ -366,7 +380,7 @@ export class Channel {
 			);
 			for (const { id } of page.items) {
 				const live = await this.#harness.snapshot(LiveDoc, id, context);
-				if (live?.run) this.#runs.add(id);
+				if (live?.run) this.#runs.set(id, live.run.inputs);
 			}
 			cursor = page.next;
 		} while (cursor);
@@ -381,6 +395,37 @@ export class Channel {
 			this.#publishedBusy = busy;
 		} catch (error) {
 			this.#log("warn", "busy.publish", failure(error));
+		}
+	}
+
+	async #ended(
+		chat: ConversationId,
+		inputs: readonly SubmissionId[],
+		changes: readonly CommitChange[],
+	): Promise<void> {
+		const settled = new Map<SubmissionId, SubmissionRecord>();
+		for (const change of changes) {
+			if (change.type === "submission") settled.set(change.value.id, change.value);
+		}
+		const last = settled.get(inputs.at(-1)!);
+		if (!last) return;
+		const outcome = last.status === "done"
+			? "done"
+			: last.reason === "aborted"
+			? "stopped"
+			: "failed";
+		try {
+			// The newest human input names who is waiting; agents' inputs are their parents' work.
+			const author = await this.#harness.commit(async (tx) => {
+				for (const id of inputs.toReversed()) {
+					const entry = settled.get(id)?.entry;
+					const human = entry === undefined ? undefined : room.human((await tx.entry(entry))!);
+					if (human && !room.isAgent(human.author)) return human.author;
+				}
+			}, context);
+			if (author) this.#options.onRun?.({ chat, at: Date.now(), outcome, author });
+		} catch (error) {
+			this.#log("warn", "run.publish", failure(error));
 		}
 	}
 

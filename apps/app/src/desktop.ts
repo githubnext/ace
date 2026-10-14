@@ -22,6 +22,7 @@ export const desktop = view && token
 		helper: (action: HelperAction) => rpc.request.helper({ token, action }),
 		native: (action: NativeAction) => rpc.request.native({ token, action }),
 		updates: (action: UpdateAction) => rpc.request.updates({ token, action }),
+		notify: (title: string, body: string) => rpc.request.notify({ token, title, body }),
 	}
 	: undefined;
 

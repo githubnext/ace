@@ -132,6 +132,7 @@ export class HostedChannel extends DurableObject<Env> {
 				...config,
 				onMetadata: (metadata) => this.#project({ metadata }),
 				onActivity: (active) => this.#project({ active }),
+				onRun: (ran) => this.#project({ ran }),
 				onBusy: (busy) => {
 					this.#reside(busy);
 					this.#project({ busy });

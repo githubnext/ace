@@ -66,6 +66,7 @@ export type DesktopRPC = {
 			helper: { params: { token: string; action: HelperAction }; response: HelperState };
 			native: { params: { token: string; action: NativeAction }; response: NativeState };
 			updates: { params: { token: string; action: UpdateAction }; response: UpdateState };
+			notify: { params: { token: string; title: string; body: string }; response: null };
 		};
 		messages: {};
 	};

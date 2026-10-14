@@ -64,6 +64,11 @@ const rpc = BrowserView.defineRPC<DesktopRPC>({
 				authorize(token);
 				return native.act(action);
 			},
+			notify: ({ token, title, body }) => {
+				authorize(token);
+				Utils.showNotification({ title, body });
+				return null;
+			},
 		},
 		messages: {},
 	},

@@ -16,7 +16,7 @@ import {
 
 import { type Browser, type BrowserRequest, type BrowserResult, isBrowserAction } from "./browser";
 import { type Desktop, type DesktopRequest, type DesktopResult, isDesktopAction } from "./desktop";
-import type { Metadata } from "./protocol";
+import type { Metadata, RunEnd } from "./protocol";
 
 declare function btoa(data: string): string;
 declare function atob(data: string): string;
@@ -30,9 +30,12 @@ export type Call =
 	| { cancel: CallId };
 
 /** Metadata and activity are projected by the workspace host even when no client watches the channel. */
-export type WorkspaceMessage = Call | { metadata: Metadata } | { active: number } | {
-	busy: boolean;
-};
+export type WorkspaceMessage =
+	| Call
+	| { metadata: Metadata }
+	| { active: number }
+	| { busy: boolean }
+	| { ran: RunEnd };
 
 /** Workspace to channel. */
 export type Reply =

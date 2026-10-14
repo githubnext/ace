@@ -68,8 +68,19 @@ const deleting = new Set<string>();
 function local(): Listing[] {
 	return catalog.list().map((record) => {
 		const state = record.archived ? "archived" : isRunning(record.id) ? "running" : "dormant";
-		const { id, name: channel, summary, revision, owner, project, model, created, active, hosted } =
-			record;
+		const {
+			id,
+			name: channel,
+			summary,
+			revision,
+			owner,
+			project,
+			model,
+			created,
+			active,
+			ran,
+			hosted,
+		} = record;
 		const listing: Listing = {
 			id,
 			host: name,
@@ -84,6 +95,7 @@ function local(): Listing[] {
 			busy: state === "running" && !!record.busy && (!hosted || workspace.isConnected(id)),
 		};
 		if (active) listing.active = active;
+		if (ran) listing.ran = ran;
 		const { root, repo } = projects.checkout(project);
 		listing.root = root;
 		if (repo) listing.repo = repo;

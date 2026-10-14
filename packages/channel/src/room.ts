@@ -19,6 +19,11 @@ export function isAuthor(value: string): boolean {
 	return AUTHOR.test(value);
 }
 
+/** Subagent tasks and cross-channel messages carry `agent@<chat or channel>` authors. */
+export function isAgent(author: string): boolean {
+	return author.startsWith("agent@");
+}
+
 /**
  * Agents see every participant's messages as `author: text`. Invocations are pi inputs, which carry
  * only content, so the author prefix is also how an input's author is recovered.

@@ -12,7 +12,7 @@ import {
 import { userInfo } from "node:os";
 import { join } from "node:path";
 
-import { type Metadata, type ModelRef, validateName } from "@ace/channel";
+import { type Metadata, type ModelRef, type RunEnd, validateName } from "@ace/channel";
 
 import { config } from "./config";
 import { login } from "./tailnet";
@@ -36,6 +36,8 @@ export type Listing = {
 	active?: number;
 	/** Rebuildable live-run projection, not history; valid only while its source is connected. */
 	busy?: boolean;
+	/** The latest invoked run's end, a hint for its author's attention; pi keeps the run itself. */
+	ran?: RunEnd;
 	archived?: boolean;
 	/** Base URL of the service hosting the channel; this host serves its workspace. */
 	hosted?: string;
@@ -183,6 +185,10 @@ export function busy(id: string, busy: boolean): void {
 	const record = read(id);
 	if (record.busy === busy) return;
 	write({ ...record, busy });
+}
+
+export function ran(id: string, ran: RunEnd): void {
+	write({ ...read(id), ran });
 }
 
 export function list(): Listing[] {
