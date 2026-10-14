@@ -166,12 +166,6 @@ ApplicationMenu.setApplicationMenu([
 				action: "channels-toggle",
 				accelerator: "CmdOrCtrl+Shift+b",
 			},
-			{ type: "divider" },
-			{
-				label: "Toggle Annotations",
-				action: "annotations-toggle",
-				accelerator: "CmdOrCtrl+Shift+a",
-			},
 		],
 	},
 ]);
@@ -225,7 +219,6 @@ Electrobun.events.on("application-menu-clicked", ({ data }) => {
 			"prs",
 			"nav-toggle",
 			"channels-toggle",
-			"annotations-toggle",
 		].includes(
 			data.action,
 		)

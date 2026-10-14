@@ -130,7 +130,3 @@ body {
 :root[data-layout-resize="none"] * {
 	cursor: not-allowed !important;
 }
-
-.ace-annotations:not([data-ace-ready]) {
-	visibility: hidden;
-}
