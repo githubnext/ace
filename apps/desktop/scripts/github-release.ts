@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 
 import { root } from "./build";
-import type { Release } from "./release";
+import { archiveName, prefix, type Release } from "./release";
 
 type GithubRelease = {
 	id: number;
@@ -41,7 +41,7 @@ export async function publishGithub(directory: string): Promise<void> {
 		!/^(canary|stable)$/.test(release.channel)
 		|| !/^\d+\.\d+\.\d+$/.test(release.version)
 		|| !/^[a-f0-9]{40}$/.test(release.revision)
-		|| release.archive !== `ace-${release.channel}-${release.version}-macos-arm64.dmg`
+		|| release.archive !== archiveName(release.channel, release.version)
 	) throw new Error("Invalid desktop release manifest");
 	const archive = join(directory, release.archive);
 	const digest = createHash("sha256").update(await Bun.file(archive).bytes()).digest("hex");
@@ -49,7 +49,11 @@ export async function publishGithub(directory: string): Promise<void> {
 
 	const repo = process.env.GITHUB_REPOSITORY
 		|| gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])!;
-	const tag = `desktop-${release.channel}-v${release.version}`;
+	const tags = `desktop-${prefix(release.channel)}v`;
+	const tag = `${tags}${release.version}`;
+	const title = release.channel === "stable"
+		? `Ace ${release.version}`
+		: `Ace canary ${release.version}`;
 	const endpoint = `repos/${repo}`;
 	const prerelease = release.channel === "canary";
 	const ref = gh(["api", `${endpoint}/git/ref/tags/${tag}`], true);
@@ -63,7 +67,7 @@ export async function publishGithub(directory: string): Promise<void> {
 		`${endpoint}/releases`,
 		"--paginate",
 		"--jq",
-		`.[] | select(.tag_name | startswith("desktop-${release.channel}-v"))`,
+		`.[] | select(.tag_name | startswith("${tags}"))`,
 	])!.split("\n").filter(Boolean).map((line) => JSON.parse(line) as GithubRelease);
 	const existing = releases.find((item) => item.tag_name === tag);
 	let published: GithubRelease;
@@ -91,7 +95,7 @@ export async function publishGithub(directory: string): Promise<void> {
 				...(previous ? ["-f", `previous_tag_name=${previous.tag_name}`] : []),
 			])!,
 		) as { body: string };
-		const notes = `Ace ${release.channel} ${release.version} for Apple silicon (macOS 15+).\n\n`
+		const notes = `${title} for Apple silicon (macOS 15+).\n\n`
 			+ `Source: ${release.revision}\n\nSHA-256 (${release.archive}): ${digest}\n\n`
 			+ changes.body;
 		published = JSON.parse(
@@ -105,7 +109,7 @@ export async function publishGithub(directory: string): Promise<void> {
 				"-f",
 				`target_commitish=${release.revision}`,
 				"-f",
-				`name=Ace ${release.channel} ${release.version}`,
+				`name=${title}`,
 				"-f",
 				`body=${notes}`,
 				"-F",
