@@ -53,7 +53,7 @@ export async function publishGithub(directory: string): Promise<void> {
 	const tag = `${tags}${release.version}`;
 	const title = release.channel === "stable"
 		? `Ace ${release.version}`
-		: `Ace canary ${release.version}`;
+		: `Ace Canary ${release.version}`;
 	const endpoint = `repos/${repo}`;
 	const prerelease = release.channel === "canary";
 	const ref = gh(["api", `${endpoint}/git/ref/tags/${tag}`], true);

@@ -57,6 +57,17 @@ run([
 	"15.0",
 	join(contents, "Info.plist"),
 ]);
+// Electrobun names non-stable bundles "Ace-<channel>", which macOS shows in the menu bar.
+if (channel === "canary") {
+	run([
+		"/usr/bin/plutil",
+		"-replace",
+		"CFBundleName",
+		"-string",
+		"Ace Canary",
+		join(contents, "Info.plist"),
+	]);
+}
 
 // Only the helper needs node:sqlite; changing Electrobun's runtime breaks its native callbacks.
 run([
