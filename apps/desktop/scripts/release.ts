@@ -45,6 +45,12 @@ export type Release = {
 	sha256: string;
 };
 
+// The main channel's public names omit the channel; only canary is labeled.
+export const prefix = (channel: string) => channel === "stable" ? "" : `${channel}-`;
+
+export const archiveName = (channel: string, version: string) =>
+	`ace-${prefix(channel)}${version}-macos-arm64.dmg`;
+
 async function release(): Promise<void> {
 	const channel = process.argv[2] || "canary";
 	if (channel !== "canary" && channel !== "stable") throw new Error("Choose canary or stable");
@@ -153,7 +159,7 @@ async function release(): Promise<void> {
 		mkdirSync(volume);
 		run(["/usr/bin/ditto", app, join(volume, `${name}.app`)]);
 		symlinkSync("/Applications", join(volume, "Applications"));
-		const filename = `ace-${channel}-${version}-macos-arm64.dmg`;
+		const filename = archiveName(channel, version);
 		const dmg = join(output, filename);
 		run([
 			"/usr/bin/hdiutil",

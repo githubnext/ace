@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { root } from "./build";
-import type { Release } from "./release";
+import { archiveName, type Release } from "./release";
 
 const workflow = "desktop-release.yml";
 const help = `Signed desktop builds from an Ace channel or terminal. Requires gh auth login.
@@ -88,7 +88,7 @@ function download(repo: string, id: string, run: Run): void {
 	if (
 		!/^\d+\.\d+\.\d+$/.test(release.version)
 		|| artifact.name !== `ace-${release.channel}-macos-arm64`
-		|| release.archive !== `ace-${release.channel}-${release.version}-macos-arm64.dmg`
+		|| release.archive !== archiveName(release.channel, release.version)
 		|| !/^[a-f0-9]{40}$/.test(release.revision)
 	) throw new Error("The downloaded release manifest does not match this build");
 	const title = `Ace ${release.channel} at ${release.revision}`;

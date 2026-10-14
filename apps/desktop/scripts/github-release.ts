@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 
 import { root } from "./build";
-import type { Release } from "./release";
+import { archiveName, prefix, type Release } from "./release";
 
 type GithubRelease = {
 	id: number;
+	tag_name: string;
 	draft: boolean;
 	prerelease: boolean;
 	target_commitish: string;
@@ -27,13 +28,20 @@ function gh(args: string[], missing = false): string | undefined {
 	throw new Error(error || "GitHub release command failed");
 }
 
+const version = (tag: string) => tag.slice(tag.lastIndexOf("-v") + 2);
+
+function compare(a: string, b: string): number {
+	const [x, y] = [a.split(".").map(Number), b.split(".").map(Number)];
+	return x[0]! - y[0]! || x[1]! - y[1]! || x[2]! - y[2]!;
+}
+
 export async function publishGithub(directory: string): Promise<void> {
 	const release = await Bun.file(join(directory, "release.json")).json() as Release;
 	if (
 		!/^(canary|stable)$/.test(release.channel)
 		|| !/^\d+\.\d+\.\d+$/.test(release.version)
 		|| !/^[a-f0-9]{40}$/.test(release.revision)
-		|| release.archive !== `ace-${release.channel}-${release.version}-macos-arm64.dmg`
+		|| release.archive !== archiveName(release.channel, release.version)
 	) throw new Error("Invalid desktop release manifest");
 	const archive = join(directory, release.archive);
 	const digest = createHash("sha256").update(await Bun.file(archive).bytes()).digest("hex");
@@ -41,7 +49,11 @@ export async function publishGithub(directory: string): Promise<void> {
 
 	const repo = process.env.GITHUB_REPOSITORY
 		|| gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])!;
-	const tag = `desktop-${release.channel}-v${release.version}`;
+	const tags = `desktop-${prefix(release.channel)}v`;
+	const tag = `${tags}${release.version}`;
+	const title = release.channel === "stable"
+		? `Ace ${release.version}`
+		: `Ace Canary ${release.version}`;
 	const endpoint = `repos/${repo}`;
 	const prerelease = release.channel === "canary";
 	const ref = gh(["api", `${endpoint}/git/ref/tags/${tag}`], true);
@@ -50,24 +62,42 @@ export async function publishGithub(directory: string): Promise<void> {
 		throw new Error(`${tag} already points to another source revision`);
 	}
 	// Listing includes unfinished drafts, so retries can resume after an upload failure.
-	const existing = gh([
+	const releases = gh([
 		"api",
 		`${endpoint}/releases`,
 		"--paginate",
 		"--jq",
-		`.[] | select(.tag_name == "${tag}")`,
-	]);
+		`.[] | select(.tag_name | startswith("${tags}"))`,
+	])!.split("\n").filter(Boolean).map((line) => JSON.parse(line) as GithubRelease);
+	const existing = releases.find((item) => item.tag_name === tag);
 	let published: GithubRelease;
 	if (existing) {
-		published = JSON.parse(existing) as GithubRelease;
+		published = existing;
 		if (
 			published.prerelease !== prerelease
 			|| (published.draft && published.target_commitish !== release.revision)
 			|| (!published.draft && !commit)
 		) throw new Error(`${tag} does not match the requested release`);
 	} else {
-		const notes = `Ace ${release.channel} ${release.version} for Apple silicon (macOS 15+).\n\n`
-			+ `Source: ${release.revision}\n\nSHA-256 (${release.archive}): ${digest}`;
+		const previous = releases
+			.filter((item) => !item.draft && compare(version(item.tag_name), release.version) < 0)
+			.sort((a, b) => compare(version(b.tag_name), version(a.tag_name)))[0];
+		const changes = JSON.parse(
+			gh([
+				"api",
+				`${endpoint}/releases/generate-notes`,
+				"--method",
+				"POST",
+				"-f",
+				`tag_name=${tag}`,
+				"-f",
+				`target_commitish=${release.revision}`,
+				...(previous ? ["-f", `previous_tag_name=${previous.tag_name}`] : []),
+			])!,
+		) as { body: string };
+		const notes = `${title} for Apple silicon (macOS 15+).\n\n`
+			+ `Source: ${release.revision}\n\nSHA-256 (${release.archive}): ${digest}\n\n`
+			+ changes.body;
 		published = JSON.parse(
 			gh([
 				"api",
@@ -79,7 +109,7 @@ export async function publishGithub(directory: string): Promise<void> {
 				"-f",
 				`target_commitish=${release.revision}`,
 				"-f",
-				`name=Ace ${release.channel} ${release.version}`,
+				`name=${title}`,
 				"-f",
 				`body=${notes}`,
 				"-F",
