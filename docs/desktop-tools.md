@@ -291,7 +291,7 @@ changing its own state or opening a window.
 Modifier-clicks and long presses need a separate foreground interaction contract; they are not
 emulated with held keys or mouse buttons across calls. Remaining clipboard writes, foreground
 interactions, commands in Ace’s own menus, and complete dialog workflows are later slices of
-[native computer use](https://github.com/githubnext/ace2/issues/8).
+[native computer use](https://github.com/githubnext/ace/issues/8).
 
 Captures are resized and compressed before entering pi's existing channel history. Text and
 image payloads are bounded so a result also fits the storage limits of a team-deployed hosted
@@ -382,4 +382,4 @@ app, which owns macOS permissions. The channel receives an injected capability a
 durable tool result.
 Peekaboo coordinates concurrent native operations across channels; Ace does not add a competing
 desktop lock. Moving a channel's work to another host is tracked separately in
-[channel migration](https://github.com/githubnext/ace2/issues/49).
+[channel migration](https://github.com/githubnext/ace/issues/49).

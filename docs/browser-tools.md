@@ -5,7 +5,7 @@ the machine running the channel's tools. It talks to Chrome or Chromium directly
 DevTools Protocol on loopback. The model receives bounded text and a screenshot. The same result
 appears in the chat's expandable tool output, including after reopening the channel.
 
-This is the first part of [#50](https://github.com/githubnext/ace2/issues/50). There is no DOM
+This is the first part of [#50](https://github.com/githubnext/ace/issues/50). There is no DOM
 input, element references, console or network inspection, file upload, viewport or mobile
 emulation, browser launch or quit, iframe content, or Browser Preview tab yet.
 

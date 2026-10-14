@@ -137,8 +137,8 @@ and Ace's grouped permission in macOS background-item settings.
 - Packaged UI checks covered native Cmd+O, opening projects before provider setup, channel
   creation, project switching, and a real Anthropic shell-tool reply. Fixed a render loop by
   caching object snapshots in the shared local-storage hook.
-- Follow-up work is tracked in the [dogfooding](https://github.com/githubnext/ace2/issues/5) and
-  [desktop distribution](https://github.com/githubnext/ace2/issues/7) meta issues. Team directory
+- Follow-up work is tracked in the [dogfooding](https://github.com/githubnext/ace/issues/5) and
+  [desktop distribution](https://github.com/githubnext/ace/issues/7) meta issues. Team directory
   configuration and providers beyond Anthropic/OpenAI still use the CLI; directory status in
   Settings is read-only.
 
@@ -267,6 +267,6 @@ identity and protocol before connecting. Listing or renaming tabs over the tailn
 Only the explicitly selected window changes live. Names use the existing saved layout for that
 channel in the browser profile; another window sharing that profile can load the saved name on
 reload, and a later layout save from either window can overwrite the other's saved labels.
-Independent window persistence is tracked in [#45](https://github.com/githubnext/ace2/issues/45).
+Independent window persistence is tracked in [#45](https://github.com/githubnext/ace/issues/45).
 A tab label does not change the channel's durable name or another participant's view.
 Closed windows and windows without an open channel do not appear in the listing.

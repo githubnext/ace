@@ -153,6 +153,6 @@ export async function notices(
 	writeFileSync(
 		join(resources, "Credits.html"),
 		`<p style="font:11px -apple-system;text-align:center">Open source under the MIT license.<br>
-<a href="notices.html">Third-party notices</a> &middot; <a href="https://github.com/githubnext/ace2">Source</a></p>`,
+<a href="notices.html">Third-party notices</a> &middot; <a href="https://github.com/githubnext/ace">Source</a></p>`,
 	);
 }
