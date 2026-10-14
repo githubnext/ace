@@ -24,6 +24,7 @@ import { IconHash, IconPlus } from "@ace/ui/icons";
 import type { Hello, HostRequest, Listing, MoveTarget, People, Project } from "@ace/host/protocol";
 
 import { chosen, deployed, remember } from "./address";
+import { glow, type Outcome, useAttention } from "./attention";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { Dashboard } from "./dashboard";
 import { Github, GithubSidebar } from "./github";
@@ -107,7 +108,7 @@ const INACTIVE_AFTER = 6 * 60 * 60_000;
 const ALL_PROJECTS = "all";
 const RECENT_CHANNELS = 10;
 
-function row(channel: Listing, user: string, host: string): SidebarRow {
+function row(channel: Listing, user: string, host: string, outcome?: Outcome): SidebarRow {
 	return {
 		uid: channel.id,
 		kind: "session",
@@ -130,7 +131,8 @@ function row(channel: Listing, user: string, host: string): SidebarRow {
 			? "offline"
 			: "idle",
 		agent: channel.state === "running" && channel.busy ? "thinking" : "idle",
-		unreadCount: 0,
+		unreadCount: outcome === "done" ? 1 : 0,
+		needsAttention: outcome === "failed",
 		mentionCount: 0,
 		lastActivityAt: Math.floor((channel.active || channel.created) / 1000),
 		online: [],
@@ -153,13 +155,14 @@ function projectGroups(
 	people: People,
 	now: number,
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
+	attention: Map<string, Outcome>,
 ): SessionSidebarGroup[] {
 	const mine: SidebarRow[] = [];
 	const inactive: SidebarRow[] = [];
 	const archived: SidebarRow[] = [];
 	const team = new Map<string, { name: string; rows: SidebarRow[]; archived: SidebarRow[] }>();
 	for (const channel of channels) {
-		const next = row(channel, hello.user, hello.host);
+		const next = row(channel, hello.user, hello.host, attention.get(channel.id));
 		const stored = channel.state === "archived";
 		if (channel.owner === hello.user) {
 			const idle = !channel.busy && now - (channel.active || channel.created) > INACTIVE_AFTER;
@@ -297,7 +300,12 @@ export function App() {
 			org: value.repo?.split("/")[0] || "",
 		})),
 	];
-	let groups = projectGroups(visible, hello, people, now, collapsed);
+	const { attention, pulse } = useAttention(
+		channels,
+		hello.user,
+		page === "channels" ? channel?.id : undefined,
+	);
+	let groups = projectGroups(visible, hello, people, now, collapsed, attention);
 
 	if (allProjects) {
 		const byProject = new Map<string, Listing[]>();
@@ -313,7 +321,9 @@ export function App() {
 			const rows = (byProject.get(value.id) || []).sort((a, b) =>
 				(b.active || b.created) - (a.active || a.created)
 				|| b.created - a.created || b.id.localeCompare(a.id)
-			).slice(0, RECENT_CHANNELS).map((value) => row(value, hello.user, hello.host));
+			).slice(0, RECENT_CHANNELS).map((value) =>
+				row(value, hello.user, hello.host, attention.get(value.id))
+			);
 			return {
 				id,
 				label: label(value, hello.host),
@@ -484,7 +494,8 @@ export function App() {
 					onLeftChange={setLeft}
 					leftWidth={width}
 					onLeftWidthChange={setWidth}
-					loading={status === "connecting"}
+					loading={status === "connecting" || pulse === "on"}
+					{...(pulse && glow.props)}
 					onDoubleClick={titlebar}
 					nav={
 						<Navigation

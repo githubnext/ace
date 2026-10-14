@@ -45,6 +45,7 @@ function link(record: catalog.Listing): () => Promise<void> {
 				if ("metadata" in call) return catalog.metadata(record.id, call.metadata);
 				if ("active" in call) return catalog.activity(record.id, call.active);
 				if ("busy" in call) return catalog.busy(record.id, call.busy);
+				if ("ran" in call) return catalog.ran(record.id, call.ran);
 				log("debug", "workspace.call", {
 					channel: record.id,
 					...("cancel" in call

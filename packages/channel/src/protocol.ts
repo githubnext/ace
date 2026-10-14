@@ -24,6 +24,17 @@ export type EntryId = number;
 
 export type Metadata = { name: string; summary: string; revision: number };
 
+/**
+ * The end of a run a person invoked. `stopped` means a participant aborted it; `author` is the
+ * participant whose input the run answered last.
+ */
+export type RunEnd = {
+	chat: ChatId;
+	at: number;
+	outcome: "done" | "failed" | "stopped";
+	author: string;
+};
+
 export type ChannelInfo = Metadata & {
 	id: string;
 	/** Directory of the project checkout lanes are created from. */

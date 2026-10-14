@@ -6,6 +6,7 @@ import type {
 	GithubKind,
 	ModelRef,
 	Request,
+	RunEnd,
 } from "@ace/channel/protocol";
 
 export const HOST_PROTOCOL = 9;
@@ -59,6 +60,8 @@ export type Listing = {
 	active?: number;
 	/** Live channel-wide run projection; absent on older hosts, never authoritative. */
 	busy?: boolean;
+	/** The latest invoked run's end; absent on older hosts and before a channel's first one. */
+	ran?: RunEnd;
 	state: ChannelState;
 	/** The hosting service's base URL, for a hosted channel; `host` is then its workspace. */
 	hosted?: string;

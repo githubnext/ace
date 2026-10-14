@@ -120,6 +120,11 @@ is one pi conversation in that Session.
   committed live-document changes maintain the aggregate and `onBusy` publishes only transitions.
   Streaming transcript watches are not needed for sidebar rows. Pi remains authoritative: the
   optional catalog and listing `busy` field is rebuildable, not a second run store or history format.
+- **Run ends are a listing hint for attention.** When a chat's run ends, the channel reads the
+  settlement pi commits with it (answered, stopped, or failed) and the newest human input the run
+  answered. Runs only agents invoked, such as subagents' chats, publish nothing. `onRun` projects
+  the latest end into the catalog record and listing as `ran`, carried over the workspace socket
+  for hosted channels. Losing it loses only a pending hint; pi keeps the runs.
 
 `packages/channel` must stay runtime-neutral: no `node:*`, `bun:*`, or Workers imports. The host
 injects storage, models, and the execution environment. This keeps hosted channels (a channel
@@ -444,7 +449,12 @@ channel stays listed while its host is asleep. The app shows a local channel who
 unreachable as offline, and reaches a hosted channel directly. Hosts find the directory through
 `ace directory <url>` and authenticate with the team's `ACE_SECRET`.
 
-Lobbies (presence, notifications) are not built.
+Lobbies (presence, notifications) are not built. Until then each app notices its own person's
+finished and failed runs from listings: it keeps the run ends it has shown or announced per host
+and participant in browser storage, starting from its first visit. A run end that arrives while
+another channel is open pulses the window's glow; one that arrives while the window is unfocused
+sends a desktop notification. The channel's row keeps a dot (finished) or attention mark (failed)
+until the person opens it in a focused window. Stopped runs need no attention.
 
 ## The team
 
