@@ -22,6 +22,14 @@ export function signedTool(command: string[]): void {
 	if (!result.success) throw new Error(`${command[0]} failed with exit code ${result.exitCode}`);
 }
 
+function log(message: string): void {
+	console.log(`${new Date().toISOString()} ${message}`);
+}
+
+function phase(name: string): void {
+	log(`==> ${name}`);
+}
+
 // Apple's ticket lookup intermittently drops connections (stapler exit 68) after notarization succeeds.
 async function staple(path: string): Promise<void> {
 	for (let attempt = 1;; attempt++) {
@@ -92,36 +100,48 @@ async function release(): Promise<void> {
 	const key = required("ACE_NOTARY_KEY");
 	const keyId = required("ACE_NOTARY_KEY_ID");
 	const issuer = required("ACE_NOTARY_ISSUER");
+	const auth = ["--key", key, "--key-id", keyId, "--issuer", issuer];
+	function notary(args: string[]) {
+		return Bun.spawnSync(["xcrun", "notarytool", ...args, ...auth, "--output-format", "json"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+	}
 	function notarize(path: string) {
-		const result = Bun.spawnSync([
-			"xcrun",
-			"notarytool",
-			"submit",
-			path,
-			"--key",
-			key,
-			"--key-id",
-			keyId,
-			"--issuer",
-			issuer,
-			"--wait",
-			"--timeout",
-			"20m",
-			"--output-format",
-			"json",
-		], { stdout: "pipe", stderr: "pipe" });
-		if (!result.success) {
-			throw new Error(`Notarization submission failed: ${result.stderr.toString()}`);
+		const submitted = notary(["submit", path]);
+		if (!submitted.success) {
+			throw new Error(`Notarization upload failed: ${submitted.stderr.toString()}`);
 		}
-		const submission = JSON.parse(result.stdout.toString()) as { id: string; status: string };
-		if (submission.status !== "Accepted") {
+		const { id } = JSON.parse(submitted.stdout.toString()) as { id: string };
+		log(`Notarization submitted: ${id}`);
+		// Credentials are named by environment variable so the printed commands are safe to share.
+		const check = [
+			`xcrun notarytool info ${id} --key "$ACE_NOTARY_KEY" --key-id "$ACE_NOTARY_KEY_ID" --issuer "$ACE_NOTARY_ISSUER"`,
+			`xcrun notarytool log ${id} --key "$ACE_NOTARY_KEY" --key-id "$ACE_NOTARY_KEY_ID" --issuer "$ACE_NOTARY_ISSUER"`,
+		].join("\n");
+		// The service keeps processing past the wait's timeout, so info decides the outcome.
+		notary(["wait", id, "--timeout", "20m"]);
+		const info = notary(["info", id]);
+		if (!info.success) {
 			throw new Error(
-				`Notarization ${submission.id} finished with status ${submission.status}. Retrieve its notarytool log before releasing.`,
+				`Notarization ${id} status is unavailable: ${info.stderr.toString()}\nCheck it later with:\n${check}`,
 			);
 		}
-		console.log(`Notarization accepted: ${submission.id}`);
+		const { status } = JSON.parse(info.stdout.toString()) as { status: string };
+		if (status === "In Progress") {
+			throw new Error(
+				`Notarization ${id} is still in progress after 20 minutes. Check it later with:\n${check}`,
+			);
+		}
+		if (status !== "Accepted") {
+			throw new Error(
+				`Notarization ${id} finished with status ${status}. Retrieve its log before releasing:\n${check}`,
+			);
+		}
+		log(`Notarization accepted: ${id}`);
 	}
 
+	phase("Build");
 	await build(channel);
 	const sdk = await sparkle();
 	const staging = join(root, ".tmp", `release-${crypto.randomUUID()}`);
@@ -149,12 +169,16 @@ async function release(): Promise<void> {
 		const name = channel === "stable" ? "Ace" : "Ace Canary";
 		const app = join(staging, `${name}.app`);
 		if (built !== `${name}.app`) renameSync(join(staging, built), app);
+		phase("App signing");
 		sign(app, identity, true);
 		const zip = join(staging, "notarize.zip");
 		run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, zip]);
+		phase("App notarization");
 		notarize(zip);
+		phase("App stapling and verification");
 		await staple(app);
 		run(["/usr/sbin/spctl", "--assess", "--type", "execute", app]);
+		phase("DMG");
 		const volume = join(staging, "volume");
 		mkdirSync(volume);
 		run(["/usr/bin/ditto", app, join(volume, `${name}.app`)]);
@@ -173,9 +197,12 @@ async function release(): Promise<void> {
 			dmg,
 		]);
 		run(["/usr/bin/codesign", "--force", "--sign", identity, "--timestamp", dmg]);
+		phase("DMG notarization");
 		notarize(dmg);
+		phase("DMG stapling and verification");
 		await staple(dmg);
 		run(["xcrun", "stapler", "validate", dmg]);
+		phase("Appcast");
 		const url = `${origin.href.replace(/\/$/, "")}/${channel}/macos-arm64/`;
 		signedTool([
 			join(sdk, "bin", "generate_appcast"),

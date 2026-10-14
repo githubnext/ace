@@ -156,6 +156,13 @@ The command returns immediately with the workflow URL and run ID. Use `bun deskt
 build. Downloads go under `apps/desktop/artifacts/ci/<run-id>/`; the command checks the DMG's
 SHA-256 against its release manifest and reports the source revision.
 
+The release step's log marks each phase (build, signing, notarization, stapling, DMG, appcast)
+with a timestamped `==>` line and records each notarization submission ID as soon as its upload
+finishes. Apple keeps processing a submission after the 20-minute wait times out; the failure
+then prints the `notarytool info` and `notarytool log` commands for checking it with the release
+credentials. `bun desktop ci status` shows only step names until the job finishes, because
+`gh run view --log` returns logs only for completed runs.
+
 Use `stable` instead of `canary` for the main app. Building does not publish; add `--publish`
 explicitly to build and publish a release. Manual builds may run at any time. A channel can use
 [native desktop inspection](desktop-tools.md) to examine the installed app on its execution host.
