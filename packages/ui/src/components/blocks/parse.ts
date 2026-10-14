@@ -9,7 +9,7 @@ import rust from "@shikijs/langs/rust";
 import shellscript from "@shikijs/langs/shellscript";
 import typescript from "@shikijs/langs/typescript";
 import tsx from "@shikijs/langs/tsx";
-import { type ComarkElement, type ComarkNode, createParse } from "comark";
+import { type ComarkElement, type ComarkNode, createParse, defineComarkPlugin } from "comark";
 import breaks from "comark/plugins/breaks";
 import highlight from "comark/plugins/highlight";
 import security from "comark/plugins/security";
@@ -50,7 +50,7 @@ import {
 type FontConfig = { font: string; codeFont: string; lineHeight: number; emojiSize: number };
 
 // Timeline text parse/cache version, included in layout.ts parse keys.
-const VERSION = 7;
+const VERSION = 8;
 const MENTION_FONT = "600 12px 'Inter Variable', sans-serif";
 const MENTION_PAD_START = 1;
 const MENTION_PAD_END = 6;
@@ -74,10 +74,56 @@ const COMPACT_FONTS: FontConfig = {
 	emojiSize: SMALL_EMOJI_SIZE,
 };
 
+type Link = { lastIndex: number; raw: string; text: string; url: string };
+
+const OPENERS: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+
+function count(text: string, char: string): number {
+	return text.split(char).length - 1;
+}
+
+function trailing(raw: string): boolean {
+	let char = raw.at(-1)!;
+	if (":.,;!?".includes(char)) return true;
+	let open = OPENERS[char];
+	return !!open && count(raw, char) > count(raw, open);
+}
+
+// linkify-it keeps a trailing colon and has no option to exclude sentence punctuation.
+function trim<T extends Link>(link: T): T {
+	let raw = link.raw;
+	while (trailing(raw)) raw = raw.slice(0, -1);
+	let cut = link.raw.length - raw.length;
+	if (!cut) return link;
+	link.lastIndex -= cut;
+	link.raw = raw;
+	link.text = link.text.slice(0, -cut);
+	link.url = link.url.slice(0, -cut);
+	return link;
+}
+
+// Chat text is not MDC: `{...}` after text is literal, not inline attributes, and bare
+// URLs end before sentence punctuation.
+const chat = defineComarkPlugin(() => ({
+	name: "chat",
+	markdownItPlugins: [md => {
+		md.inline.ruler.disable("comark_inline_props");
+		let { linkify } = md;
+		let match = linkify.match.bind(linkify);
+		let matchAtStart = linkify.matchAtStart.bind(linkify);
+		linkify.match = text => match(text)?.map(trim) || null;
+		linkify.matchAtStart = text => {
+			let link = matchAtStart(text);
+			return link && trim(link);
+		};
+	}],
+}));
+
 let parser = createParse({
 	autoClose: true,
 	html: false,
 	plugins: [
+		chat(),
 		security(),
 		highlight({
 			languages: [
