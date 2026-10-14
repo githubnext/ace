@@ -77,8 +77,9 @@
 	},
 	"scripts": {
 		"ace": "bun apps/host/src/cli.ts",
-		"ci": "dprint check && oxlint",
-		"fix": "dprint fmt && oxlint --fix",
+		"ci": "dprint check && bun run lint",
+		"fix": "dprint fmt && bun run lint --fix",
+		"lint": "git ls-files -z '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' | xargs -0 oxlint",
 		"types": "bun --filter '*' types",
 		"app": "bun --filter @ace/app",
 		"desktop": "bun --filter @ace/desktop"
