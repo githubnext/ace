@@ -113,9 +113,8 @@ credentials through Bun; it does not need an account-wide Cloudflare API token. 
 uses the GitHub CLI with repository contents-write permission; CI supplies its workflow token only
 to the publishing step.
 
-The initial canary uses the existing `luau-updates` bucket under its own `/ace` prefix, at
-`https://pub-5bdeb2efd19f42f09df9efad8b20c91e.r2.dev/ace`. Luau's feed and signing key are separate.
-Move to a custom download domain before wider stable distribution: Cloudflare's
+Releases currently publish under the bucket's `/ace` prefix through its R2 public development URL.
+Move to a custom download domain before wider distribution: Cloudflare's
 [public development URL](https://developers.cloudflare.com/r2/buckets/public-buckets/#public-development-url)
 is rate-limited and intended for development traffic.
 
@@ -173,10 +172,10 @@ Ace Helper's macOS launch constraint even when the Team ID stays the same.
 
 ## Credentials and first release
 
-Release credentials are backed up in **1Password → Dev → Ace desktop releases**. Both GitHub
-environments, `desktop-canary` and `desktop-stable`, are configured from that item. They share
-Nate's existing Developer ID identity and notarization key, and a dedicated Ace Sparkle key.
-The item contains the following values for rebuilding either environment:
+Release credentials are kept in the team's password manager, outside the repository. Both GitHub
+environments, `desktop-canary` and `desktop-stable`, are configured from them. They share one
+Developer ID identity and notarization key, and a dedicated Ace Sparkle key. Rebuilding either
+environment needs the following values:
 
 | Kind     | Name                       | Value                                                        |
 | -------- | -------------------------- | ------------------------------------------------------------ |
