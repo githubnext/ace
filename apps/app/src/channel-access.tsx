@@ -1,7 +1,19 @@
 import { type ReactNode, useState } from "react";
 
 import type { Listing } from "@ace/host/protocol";
-import { Button, toast, Tooltip, TooltipContent, TooltipTrigger } from "@ace/ui";
+import {
+	Button,
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	toast,
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@ace/ui";
 import { IconBot, IconMonitor } from "@ace/ui/icons";
 
 import { useDetails } from "./details";
@@ -51,11 +63,13 @@ function AccessToggle({ label, value, live, owner, pending, description, childre
 export function ChannelAccess({ channel, user }: { channel: Listing; user: string }) {
 	const { shared, sharedLive, desktop, desktopLive } = useDetails(channel.id);
 	const [sharing, setSharing] = useState(false);
+	const [confirming, setConfirming] = useState(false);
 	const [changingDesktop, setChangingDesktop] = useState(false);
 	const owner = channel.owner === user;
 
 	// Render only watch-confirmed values, never an optimistic permission grant.
 	function share() {
+		setConfirming(false);
 		setSharing(true);
 		host.channel(channel.id, { op: "share", author: user, shared: !shared }).catch(
 			(error: Error) =>
@@ -83,8 +97,8 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 				live={sharedLive}
 				owner={owner}
 				pending={sharing}
-				description="Allow collaborators to invoke agents. Turning this off leaves chat available and active runs continue."
-				onClick={share}
+				description="Allow collaborators to invoke agents, which run commands as you on this machine. Turning this off leaves chat available and active runs continue."
+				onClick={() => shared ? share() : setConfirming(true)}
 			>
 				<IconBot aria-hidden />
 			</AccessToggle>
@@ -99,6 +113,23 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 			>
 				<IconMonitor aria-hidden />
 			</AccessToggle>
+			<Dialog open={confirming} onOpenChange={setConfirming}>
+				<DialogContent className="gap-3 sm:max-w-80" showCloseButton={false}>
+					<DialogHeader>
+						<DialogTitle>Let collaborators invoke agents?</DialogTitle>
+						<DialogDescription>
+							Teammates can run commands as you on this machine.
+							{desktop && " Desktop tools are on, so they can also operate your apps."}
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={() => setConfirming(false)}>
+							Cancel
+						</Button>
+						<Button type="button" onClick={share}>Turn on</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

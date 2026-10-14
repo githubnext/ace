@@ -368,9 +368,14 @@ async function main() {
 				`${moved.name} now runs ${moved.hosted ? `at ${moved.hosted}` : "on this host"}`,
 			);
 		}
-		case "share":
-			await request(record.id, { op: "share", author: catalog.user, shared: rest[0] === "on" });
-			return;
+		case "share": {
+			const shared = rest[0] === "on";
+			await request(record.id, { op: "share", author: catalog.user, shared });
+			if (!shared) return;
+			return console.log(
+				`Sharing is on for ${record.name}. Teammates can run commands as you on this machine.`,
+			);
+		}
 		case "archive":
 			return void (await archive(record.id, true));
 		case "unarchive":

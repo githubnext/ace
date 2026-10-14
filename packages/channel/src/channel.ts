@@ -65,9 +65,12 @@ const SettingsDoc = defineDoc<Settings>({
 	kind: "ace.settings",
 	version: 2,
 	scope: "session",
-	initial: () => ({ shared: true, desktop: true }),
+	initial: () => ({ shared: false, desktop: true }),
 	migrate: (value) => ({ shared: value.shared as boolean, desktop: true }),
 });
+
+/** Channels created before new channels started unshared store no settings and stay shared. */
+const LEGACY: Settings = { shared: true, desktop: true };
 
 /** Inactivity is measured in hours, so activity is published at most this often. */
 const ACTIVITY_INTERVAL = 5 * 60_000;
@@ -168,6 +171,10 @@ export class Channel {
 			env: ({ cwd }) => options.env(cwd || options.project),
 			onReport: (error) => log("error", "harness.report", failure(error)),
 		}, context);
+		// Only a new channel stores its settings at creation; an existing one without them is legacy.
+		if (!await harness.conversation(ROOT_CONVERSATION_ID, context)) {
+			await harness.commit(async (tx) => void await tx.doc(SettingsDoc), context);
+		}
 		await harness.root(context, { agent: { model: options.model, cwd: options.project } });
 		const value = await harness.commit(async (tx) => {
 			const doc = await tx.doc(MetadataDoc);
@@ -184,7 +191,7 @@ export class Channel {
 			harness,
 			log,
 			value,
-			settings || SettingsDoc.definition.initial(),
+			settings || LEGACY,
 		);
 		channel.#changed(value);
 		// Scheduling has not resumed and no caller has this channel yet, so the initial snapshot
@@ -537,7 +544,10 @@ export class Channel {
 		}
 		if (typeof request.enabled !== "boolean") throw new Error("enabled must be a boolean");
 		await this.#harness.commit(async (tx) => {
-			(await tx.doc(SettingsDoc)).desktop = request.enabled;
+			const doc = await tx.doc(SettingsDoc);
+			// A legacy channel's first write would otherwise store `initial`'s unshared default.
+			doc.shared = this.#settings.shared;
+			doc.desktop = request.enabled;
 		}, context);
 	}
 
