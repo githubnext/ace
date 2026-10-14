@@ -284,11 +284,27 @@ hr.stream-token {
 	white-space: pre;
 }
 
-/* An unbreakable token wider than its line stays clipped to the block's measured width, as before
-   lines followed Pretext's breaks. */
+/* A mention, chip or emoji wider than its line is truncated to the block's measured width; its
+   title holds the full text. */
 .line-clip {
 	display: inline-block;
 	max-inline-size: 100%;
 	overflow: hidden;
+	text-overflow: ellipsis;
 	vertical-align: top;
+
+	& > :is(.mention, .document-reference) {
+		box-sizing: border-box;
+		max-inline-size: 100%;
+	}
+
+	& .mention-avatar {
+		flex: none;
+	}
+
+	& .chip-name {
+		min-inline-size: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 }
