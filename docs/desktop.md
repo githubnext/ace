@@ -16,11 +16,6 @@ channel in the selected project. Switching projects restores each project's sele
 Settings live in the account menu and Cmd+comma. Cmd+B toggles navigation; Cmd+Shift+B toggles the
 channel sidebar. Project paths are scoped to their host until repository-based identity lands.
 
-Cmd+Shift+A (View → Toggle Annotations) opens or closes Agentation's feedback toolbar in the
-desktop app. Its collapsed launcher stays hidden. Select an element, add a note, and copy the
-feedback into a channel's composer. Saved annotations remain available when the toolbar reopens.
-The desktop bundle includes Agentation's license at `Contents/Resources/app/web/agentation-license.txt`.
-
 ## Process and installation contract
 
 - The desktop connects to Ace Helper. Closing or quitting the desktop leaves hosting available.

@@ -18,7 +18,6 @@
 		"@ace/ui": "workspace:*",
 		"@xterm/addon-fit": "catalog:ui",
 		"@xterm/xterm": "catalog:ui",
-		"agentation": "catalog:ui",
 		"electrobun": "catalog:desktop",
 		"react": "catalog:ui",
 		"react-dom": "catalog:ui"
