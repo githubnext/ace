@@ -50,7 +50,7 @@ import {
 type FontConfig = { font: string; codeFont: string; lineHeight: number; emojiSize: number };
 
 // Timeline text parse/cache version, included in layout.ts parse keys.
-const VERSION = 8;
+const VERSION = 9;
 const MENTION_FONT = "600 12px 'Inter Variable', sans-serif";
 const MENTION_PAD_START = 1;
 const MENTION_PAD_END = 6;
@@ -102,12 +102,12 @@ function trim<T extends Link>(link: T): T {
 	return link;
 }
 
-// Chat text is not MDC: `{...}` after text is literal, not inline attributes, and bare
-// URLs end before sentence punctuation.
+// Chat text is not MDC: `{...}` after text is literal, not inline attributes, `[text]`
+// without a link target is literal, not a span, and bare URLs end before sentence punctuation.
 const chat = defineComarkPlugin(() => ({
 	name: "chat",
 	markdownItPlugins: [md => {
-		md.inline.ruler.disable("comark_inline_props");
+		md.inline.ruler.disable(["comark_inline_props", "comark_inline_span"]);
 		let { linkify } = md;
 		let match = linkify.match.bind(linkify);
 		let matchAtStart = linkify.matchAtStart.bind(linkify);
@@ -119,8 +119,10 @@ const chat = defineComarkPlugin(() => ({
 	}],
 }));
 
+// Auto-close appends guessed closers (`_`, `$`, `]`, `)`) to the last line, which alters
+// finished messages; streamed text shows unclosed markers until they arrive.
 let parser = createParse({
-	autoClose: true,
+	autoClose: false,
 	html: false,
 	plugins: [
 		chat(),
