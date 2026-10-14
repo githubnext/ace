@@ -241,12 +241,12 @@ both tickets were stapled and verified. The app extracted from the image passed 
 Both GitHub release environments contain the verified configuration.
 
 An Ace channel completed the first signed CI build on October 3, 2026:
-[canary 0.0.4, run 37088236918](https://github.com/githubnext/ace2/actions/runs/37088236918).
+[canary 0.0.4, run 37088236918](https://github.com/githubnext/ace/actions/runs/37088236918).
 Its agent invoked `bun desktop ci canary`, checked status, and downloaded the artifact through
 `bun desktop ci download`. The workflow built, signed, notarized, and verified the release;
 the download matched the requested source commit and DMG checksum. Publishing was off.
 
-The next [CI build, canary 0.0.5](https://github.com/githubnext/ace2/actions/runs/37088762958),
+The next [CI build, canary 0.0.5](https://github.com/githubnext/ace/actions/runs/37088762958),
 includes the yellow icon and chat usage display. Its agent downloaded and verified the artifact;
 both the app and disk image passed local Gatekeeper and stapled-ticket checks. It replaced 0.0.3
 at `/Applications/Ace Canary.app` after stopping Ace Helper. The new helper started from that
@@ -257,7 +257,7 @@ the project dashboard, and Updates settings showing 0.0.5. Opening the folder cr
 The feed was not yet published at that stage, so update checks reported a feed retrieval error.
 Verify a published notarized upgrade on another Mac before wider distribution.
 
-[Canary 0.0.6](https://github.com/githubnext/ace2/actions/runs/37135810035), from `76435b8`, defers
+[Canary 0.0.6](https://github.com/githubnext/ace/actions/runs/37135810035), from `76435b8`, defers
 provider setup until agent invocation and includes the context-usage ring. An Ace channel dispatched
 and downloaded the signed CI build. Both the app and DMG passed local Gatekeeper and stapled-ticket
 checks before replacing 0.0.5 in `/Applications`.
@@ -271,7 +271,7 @@ Settings showed 0.0.6 and the existing provider keys; the authenticated helper u
 ran from the installed bundle. Source UI checks also retained a failed dashboard agent draft through
 reload and successfully retried it after adding a real key, without recreating the channel or worker.
 
-[Canary 0.0.7](https://github.com/githubnext/ace2/actions/runs/37203388007) published the first
+[Canary 0.0.7](https://github.com/githubnext/ace/actions/runs/37203388007) published the first
 signed feed and public DMG. The installed 0.0.6 app found the update through Check for Updates.
 Packaged helper checks must also start with launchd's system-only PATH: Bun 1.4's default
 `Bun.which` lookup retains that startup PATH after the helper imports the login shell environment.
@@ -279,8 +279,8 @@ Pass the imported PATH explicitly when resolving developer tools. The 0.0.7 help
 false missing-GitHub-CLI error; a compiled helper with the fix read real issues and PRs using the
 same restricted startup environment and existing GitHub login.
 
-[Canary 0.0.8](https://github.com/githubnext/ace2/actions/runs/37204148484), from `607d91e`,
-published the helper tool lookup fix. [Canary 0.0.9](https://github.com/githubnext/ace2/actions/runs/37238501439),
+[Canary 0.0.8](https://github.com/githubnext/ace/actions/runs/37204148484), from `607d91e`,
+published the helper tool lookup fix. [Canary 0.0.9](https://github.com/githubnext/ace/actions/runs/37238501439),
 from `5b7e614`, adds persistent GitHub page caching and the shared project sidebar.
 
 The 0.0.9 checks, release dispatch, and artifact download ran through an Ace terminal. CI passed

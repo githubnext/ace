@@ -38,13 +38,13 @@ to change.
 
 ## Tracking and PRs
 
-- [GitHub issues](https://github.com/githubnext/ace2/issues) are the only tracker. Link and update
+- [GitHub issues](https://github.com/githubnext/ace/issues) are the only tracker. Link and update
   relevant issues with the work. Group related work in meta issues with sub-issues ordered by
   priority.
-- [Dogfooding](https://github.com/githubnext/ace2/issues/5) means everyone who works on Ace does
+- [Dogfooding](https://github.com/githubnext/ace/issues/5) means everyone who works on Ace does
   all Ace development in Ace. If Ace ships a surface (channels, diffs, terminals), use Ace's.
 - File bugs and missing capabilities observed while dogfooding, or update the matching issue,
-  and link them from the [dogfooding meta issue](https://github.com/githubnext/ace2/issues/5).
+  and link them from the [dogfooding meta issue](https://github.com/githubnext/ace/issues/5).
 - Open focused pull requests for changes. Keep independent work in separate PRs.
 - Do each unit of work in its own lane, and open its PR as described in [Lanes](#lanes).
 - PR bodies follow [the template](.github/pull_request_template.md), including when created with
