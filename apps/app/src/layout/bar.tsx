@@ -26,6 +26,7 @@ export function Bar({ children }: { children?: ReactNode }) {
 					variant="ghost"
 					size="icon-sm"
 					aria-label="Toggle channels sidebar"
+					aria-controls="sidebar"
 					aria-expanded={left.open}
 					className={lead}
 					onClick={() => left.setOpen((open) => !open)}

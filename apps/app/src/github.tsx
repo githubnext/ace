@@ -353,6 +353,7 @@ export function Github({ kind, project, connected, onCreate }: {
 						variant="ghost"
 						size="icon-sm"
 						aria-label={`Toggle ${NAMES[kind].toLowerCase()} sidebar`}
+						aria-controls="sidebar"
 						aria-expanded={left.open}
 						onClick={() => left.setOpen((value) => !value)}
 					>
