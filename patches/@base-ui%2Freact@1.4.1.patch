@@ -1,0 +1,44 @@
+diff --git a/esm/floating-ui-react/components/FloatingFocusManager.js b/esm/floating-ui-react/components/FloatingFocusManager.js
+index ade1fef235e5fd1f03336b8e2109279279961396..3e1e7c171a69363a9230dcc1bdd0153dcd033eba 100644
+--- a/esm/floating-ui-react/components/FloatingFocusManager.js
++++ b/esm/floating-ui-react/components/FloatingFocusManager.js
+@@ -509,7 +509,7 @@ export function FloatingFocusManager(props) {
+       onFocus: event => {
+         if (modal) {
+           const els = getTabbableContent();
+-          enqueueFocus(els[els.length - 1]);
++          enqueueFocus(els[els.length - 1], { sync: true });
+         } else if (portalContext?.portalNode) {
+           preventReturnFocusRef.current = false;
+           if (isOutsideEvent(event, portalContext.portalNode)) {
+@@ -525,7 +525,7 @@ export function FloatingFocusManager(props) {
+       ref: mergedAfterGuardRef,
+       onFocus: event => {
+         if (modal) {
+-          enqueueFocus(getTabbableContent()[0]);
++          enqueueFocus(getTabbableContent()[0], { sync: true });
+         } else if (portalContext?.portalNode) {
+           if (closeOnFocusOut) {
+             preventReturnFocusRef.current = true;
+diff --git a/floating-ui-react/components/FloatingFocusManager.js b/floating-ui-react/components/FloatingFocusManager.js
+index 7eec035161a69691c729ff8315d17f2ea26de2f5..e2ad15898ad708a68966c554545decce09475a20 100644
+--- a/floating-ui-react/components/FloatingFocusManager.js
++++ b/floating-ui-react/components/FloatingFocusManager.js
+@@ -515,7 +515,7 @@ function FloatingFocusManager(props) {
+       onFocus: event => {
+         if (modal) {
+           const els = getTabbableContent();
+-          (0, _enqueueFocus.enqueueFocus)(els[els.length - 1]);
++          (0, _enqueueFocus.enqueueFocus)(els[els.length - 1], { sync: true });
+         } else if (portalContext?.portalNode) {
+           preventReturnFocusRef.current = false;
+           if ((0, _tabbable.isOutsideEvent)(event, portalContext.portalNode)) {
+@@ -531,7 +531,7 @@ function FloatingFocusManager(props) {
+       ref: mergedAfterGuardRef,
+       onFocus: event => {
+         if (modal) {
+-          (0, _enqueueFocus.enqueueFocus)(getTabbableContent()[0]);
++          (0, _enqueueFocus.enqueueFocus)(getTabbableContent()[0], { sync: true });
+         } else if (portalContext?.portalNode) {
+           if (closeOnFocusOut) {
+             preventReturnFocusRef.current = true;
