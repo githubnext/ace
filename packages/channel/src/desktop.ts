@@ -117,29 +117,10 @@ export function desktop(execute: Desktop): Extension {
 						minItems: 1,
 						maxItems: 32,
 					})),
-				}, {
-					additionalProperties: false,
-					oneOf: [
-						{
-							required: ["text"],
-							not: {
-								anyOf: [{ required: ["format"] }, { required: ["path"] }, { required: ["paths"] }],
-							},
-						},
-						{
-							required: ["format", "path"],
-							properties: { format: { const: "image" } },
-							not: { anyOf: [{ required: ["text"] }, { required: ["paths"] }] },
-						},
-						{
-							required: ["format", "paths"],
-							properties: { format: { const: "files" } },
-							not: { anyOf: [{ required: ["text"] }, { required: ["path"] }] },
-						},
-					],
-				}),
+				}, { additionalProperties: false }),
 				replay: "unsafe",
 				executionMode: "sequential",
+				// OpenAI rejects top-level oneOf/anyOf/allOf/not, so the exclusive forms are enforced here.
 				execute: async ({ text, format, path, paths }, api, context) => {
 					if (
 						format === "image" && path !== undefined && text === undefined && paths === undefined
