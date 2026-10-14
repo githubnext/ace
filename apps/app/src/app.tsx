@@ -506,6 +506,7 @@ export function App() {
 					{page !== "dashboard" && current && (
 						<Sidebar
 							side="left"
+							id="sidebar"
 							className="-my-2 h-[calc(100%+1rem)]"
 							innerClassName="h-full min-h-0"
 						>

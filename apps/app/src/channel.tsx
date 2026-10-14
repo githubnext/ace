@@ -167,8 +167,6 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 		<Sidebar
 			side="right"
 			id="channel-details"
-			aria-hidden={!right.open}
-			inert={!right.open}
 			className="-my-2 h-[calc(100%+1rem)]"
 			innerClassName="h-full min-h-0"
 		>

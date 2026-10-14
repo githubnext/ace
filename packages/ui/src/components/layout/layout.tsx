@@ -8,7 +8,7 @@ import {
 	type Ref,
 	type SetStateAction,
 	use,
-	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -285,7 +285,9 @@ function Layout({
 	}, [width, minLeftWidth, maxLeftWidth, defaultLeftWidth, leftWidth, onLeftWidthChange]);
 
 	useSuppressMotion(shell);
-	useEffect(() => {
+	// A layout effect so the cleanup lifts inert from the main panel before a closing
+	// sidebar's layout effect hands focus to its toggle there.
+	useLayoutEffect(() => {
 		if (!leftCompact && !rightCompact) return;
 
 		let el = shell.current;
@@ -294,7 +296,6 @@ function Layout({
 		let items = Array.from(el.children).filter((item): item is HTMLElement =>
 			item instanceof HTMLElement
 		);
-		let prev = items.map(item => [item, item.inert] as const);
 		let active = new Set(
 			items.filter((item) => {
 				if (leftCompact && item.classList.contains("layout:left")) return true;
@@ -305,8 +306,10 @@ function Layout({
 
 		if (!active.size) return;
 
-		items.forEach(item => {
-			item.inert = !active.has(item);
+		// An open sidebar owns its inert prop; restoring a stale value would override it on close.
+		let prev = items.filter(item => !active.has(item)).map(item => [item, item.inert] as const);
+		prev.forEach(([item]) => {
+			item.inert = true;
 		});
 
 		return () => {
@@ -388,6 +391,14 @@ function Sidebar({ children, side, className, innerClassName, ref, ...props }: S
 
 	useClickOutside(node, compact, () => item.setOpen(false), SLOT);
 
+	// Runs before the browser drops focus from the newly inert subtree, so it can hand focus to
+	// the visible control that toggles this sidebar instead of the document body.
+	useLayoutEffect(() => {
+		let el = node.current;
+		if (item.open || !el?.contains(document.activeElement)) return;
+		document.querySelector<HTMLElement>(`[aria-controls="${el.id}"]`)?.focus();
+	}, [item.open]);
+
 	return (
 		<div
 			ref={(el) => {
@@ -399,6 +410,10 @@ function Sidebar({ children, side, className, innerClassName, ref, ...props }: S
 				"electrobun-webkit-app-region-no-drag",
 				className,
 			)}
+			// The desktop left track collapses to zero width but stays visible, so hiding the closed
+			// sidebar from focus and assistive technology can't rely on CSS visibility.
+			aria-hidden={!item.open}
+			inert={!item.open}
 			{...props}
 		>
 			{side === "left" && <LeftDivider />}
@@ -441,7 +456,7 @@ function LeftResize() {
 
 	// The sidebar is a fixed grid column only on desktop; below `sm` it's an
 	// overlay of fixed size, so dragging doesn't apply.
-	if (!width || !sm || !left.open) return null;
+	if (!width || !sm) return null;
 
 	function down(event: PointerEvent<HTMLButtonElement>) {
 		if (!width || event.button !== 0) return;
@@ -477,7 +492,12 @@ function LeftResize() {
 			onPointerUp={up}
 			onPointerCancel={up}
 			onDoubleClick={() => width.reset()}
-			className="group absolute inset-y-0 right-0 z-10 hidden w-3 cursor-col-resize touch-none select-none bg-transparent sm:block"
+			// Hidden rather than unmounted when closed, so a focused grip is still inside the sidebar
+			// when it hands focus to its toggle.
+			className={cn(
+				"group absolute inset-y-0 right-0 z-10 hidden w-3 cursor-col-resize touch-none select-none bg-transparent",
+				left.open && "sm:block",
+			)}
 		>
 			<span className="pointer-events-none absolute inset-y-0 right-0 w-px bg-primary opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
 		</button>
