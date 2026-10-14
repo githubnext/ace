@@ -102,7 +102,8 @@ switch names a base.
 
 Channel access settings live in pi's version 2 `ace.settings` session document. `shared` controls
 new collaborator agent invocations; `desktop` independently gates native desktop tools for every
-chat and participant in the channel. A missing document defaults both to enabled. pi migrates
+chat and participant in the channel. New channels store the document at creation with `shared:
+false`; an existing channel's missing document still means both are enabled. pi migrates
 version 1 documents on read, preserving `shared` (including `false`) and adding `desktop: true`
 for compatibility. The version 2 form is written on the next settings change. Neither migration
 nor changing a setting rewrites chats, entries, or name/summary revisions; these gates are not a
@@ -134,3 +135,10 @@ confirmed desktop refusals in the owner's chat, a subagent, and an active collab
 second chat; re-enabling allowed a real native application inventory while sharing remained off.
 All 175 original entries across both backups stayed byte-for-byte equivalent, both databases
 passed integrity checks, and the source backup checksums stayed unchanged.
+
+The October 14, 2026 unshared-default check created two channels with the previous build in an
+isolated `ACE_HOME`: one never changed (no stored settings) and one turned unshared. With the new
+build they reopened shared and unshared respectively, and the unshared channel's documents and
+revisions matched its backup. Turning desktop tools off on the channel without stored settings
+kept it shared across a worker restart. A new channel stored `shared: false` at creation, refused a
+teammate's agent invocation, and kept the setting across a restart.

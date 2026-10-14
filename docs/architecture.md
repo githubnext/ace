@@ -454,7 +454,9 @@ no separate accounts, invitations, roles, or team access controls. Every human a
 Tailscale login, so a person is the same participant on every host.
 
 The channel owner can turn collaborator agent invocation on or off with `ace share <channel> on|off`
-or the channel header's agent-access toggle; channels start shared. It prevents new collaborator
+or the channel header's agent-access toggle. New channels start unshared; channels created before
+that keep their stored setting, and those without one stay shared. Turning sharing on states that
+teammates can run commands as the owner on this host. Turning it off prevents new collaborator
 invocations; active work continues until stopped or killed, and teammates keep reading and posting
 human messages. The teammate composer holds an invoking draft instead of sending it while sharing
 is off.
