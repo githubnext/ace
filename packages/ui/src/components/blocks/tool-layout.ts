@@ -1,5 +1,5 @@
 import type { Tool } from "../../types";
-import { languages } from "../../lib/highlighter";
+import { languages, patchFile } from "../../lib/highlighter";
 import { SMALL_LINE_HEIGHT } from "./constants";
 import { diff as diffBlock } from "./diff";
 import { fonts as blockFonts } from "./parse";
@@ -57,8 +57,9 @@ function resultFrame(
 	}
 
 	if (!data.result) return { clipped: false, height: 0 };
-	if (isPatch(data.result)) {
-		let diff = diffBlock(data.result);
+	let file = patchFile(data.result);
+	if (file) {
+		let diff = diffBlock(data.result, false, file);
 		return { clipped: false, diff, height: diff.measure(width).height };
 	}
 
@@ -66,11 +67,6 @@ function resultFrame(
 	let full = lines * SMALL_LINE_HEIGHT + RESULT_PAD_Y * 2 + BORDER;
 	let clipped = isRead(data.name) && full > RESULT_MAX_HEIGHT && !resultExpanded;
 	return { clipped, height: clipped ? RESULT_MAX_HEIGHT : full };
-}
-
-function isPatch(result: string) {
-	return /^(diff --git\s|---\s)/m.test(result) && /\n\+\+\+\s/.test(result)
-		&& /\n@@\s/.test(result);
 }
 
 function loadingStatus(status: Status) {

@@ -8,6 +8,7 @@ import {
 	getSharedHighlighter,
 	getSingularPatch,
 	parseDiffFromFile,
+	parsePatchFiles,
 	registerCustomTheme,
 } from "@pierre/diffs";
 import { preloadDiffHTML, preloadFile } from "@pierre/diffs/ssr";
@@ -377,6 +378,44 @@ function parseDiff(patch: string, contents?: DiffContents): FileDiffMetadata | n
 	}
 }
 
+/** The patch's only file diff, or null when the text has anything the diff
+ *  renderer would drop: other files, or text before, between, or after hunks. */
+function patchFile(text: string): FileDiffMetadata | null {
+	if (!complete(text) || !isHunksOnly(text)) return null;
+	let [patch, other] = parsePatchFiles(text);
+	if (!patch || other || patch.patchMetadata) return null;
+	let [file, rest] = patch.files;
+	return file && !rest ? file : null;
+}
+
+/** Walks every line from the first hunk, consuming exactly the line counts each
+ *  hunk header declares, so trailing or interleaved output is caught. */
+function isHunksOnly(text: string) {
+	let start = text.search(/^@@ /m);
+	if (start < 0) return false;
+	let old = 0;
+	let next = 0;
+	for (let line of text.slice(start).replace(/\n$/, "").split("\n")) {
+		if (line.startsWith("\\")) continue;
+		if (old === 0 && next === 0) {
+			let header = line.match(/^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/);
+			if (!header) return false;
+			old = Number(header[1] || 1);
+			next = Number(header[2] || 1);
+			continue;
+		}
+		let mark = line[0];
+		if (mark === " " || mark === undefined) {
+			old--;
+			next--;
+		} else if (mark === "-") old--;
+		else if (mark === "+") next--;
+		else return false;
+		if (old < 0 || next < 0) return false;
+	}
+	return old === 0 && next === 0;
+}
+
 function highlightDiff(
 	patch: string,
 	file = parseDiff(patch),
@@ -414,6 +453,7 @@ export {
 	languages,
 	LIMIT,
 	parseDiff,
+	patchFile,
 	theme,
 };
 export type { DiffContents, DiffOptionsOverride, DiffStyle };
