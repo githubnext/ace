@@ -449,7 +449,6 @@ function lines(
 			items.push({
 				text,
 				font: bold ? `bold ${cfg.codeFont}` : cfg.codeFont,
-				break: "never",
 				extraWidth: INLINE_CODE_PADDING * 2,
 			});
 			ns.push({ kind: "code", text });

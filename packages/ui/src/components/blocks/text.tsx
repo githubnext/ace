@@ -36,6 +36,10 @@ function codeStyle(fonts: FontConfig): CSSProperties {
 		font: fonts.codeFont,
 		lineHeight: `${fonts.lineHeight}px`,
 		whiteSpace: "nowrap",
+		// Pretext charges `extraWidth` to every line fragment of a wrapped item, so each fragment
+		// draws its own padding.
+		boxDecorationBreak: "clone",
+		WebkitBoxDecorationBreak: "clone",
 	};
 }
 
@@ -60,6 +64,20 @@ function emojiStyle(fonts: FontConfig): CSSProperties {
 	};
 }
 
+/** The full text of an unbreakable token, shown when it is truncated. */
+function label(node: Line["nodes"][number]): string | undefined {
+	switch (node.kind) {
+		case "mention":
+			return "@" + node.name;
+		case "document":
+			return node.name;
+		case "plan":
+			return "plan.md";
+		case "emoji":
+			return `:${node.name}:`;
+	}
+}
+
 function avatarStyle(src: string): CSSProperties {
 	return { backgroundImage: `url(${JSON.stringify(src)})` };
 }
@@ -80,7 +98,7 @@ function LocalReference(props: ReferenceProps) {
 			{(props.kind === "document" || props.prefix) && (
 				<span className="document-reference-copy">&amp;</span>
 			)}
-			{props.kind === "plan" ? "plan.md" : props.name}
+			<span className="chip-name">{props.kind === "plan" ? "plan.md" : props.name}</span>
 		</button>
 	);
 }
@@ -244,6 +262,12 @@ function wrapsAt(line: Line, width: number): Wraps {
 	return wraps;
 }
 
+/** Wrap offsets inside an item, and whether its line also starts at the item. */
+function within(item: RichInlineItem, offsets: number[] | undefined) {
+	let lead = offsets?.[0] === source(item).offsets[0];
+	return { lead, offsets: lead ? offsets?.slice(1) : offsets };
+}
+
 /** Split `text` at wrap offsets, joining the pieces with forced line breaks. */
 function wrapText(text: string, offsets: number[] | undefined, key: string): ReactNode {
 	if (!offsets) return text;
@@ -381,7 +405,7 @@ function LineView({ line, fonts, width }: { line: Line; fonts: FontConfig; width
 								{node.avatar && (
 									<span className="mention-avatar" style={avatarStyle(node.avatar)} />
 								)}
-								{node.name}
+								<span className="chip-name">{node.name}</span>
 							</span>
 						);
 						break;
@@ -396,9 +420,16 @@ function LineView({ line, fonts, width }: { line: Line; fonts: FontConfig; width
 					case "plan":
 						el = <LocalReference kind="plan" prefix={node.reference.startsWith("&")} />;
 						break;
-					case "code":
-						el = <code style={cs}>{node.text}</code>;
-						break;
+					case "code": {
+						// A break at the item's start stays outside `<code>`, so it can't draw an empty box.
+						let wrap = within(line.items[i]!, at);
+						return (
+							<Fragment key={key}>
+								{wrap.lead && <Wrap />}
+								<code style={cs}>{wrapText(node.text, wrap.offsets, key)}</code>
+							</Fragment>
+						);
+					}
 					case "link":
 						return (
 							<a key={key} href={node.href} target="_blank" rel="noopener noreferrer">
@@ -411,7 +442,7 @@ function LineView({ line, fonts, width }: { line: Line; fonts: FontConfig; width
 				return (
 					<Fragment key={key}>
 						{at && <Wrap />}
-						{wraps.wide.has(i) ? <span className="line-clip">{el}</span> : el}
+						{wraps.wide.has(i) ? <span className="line-clip" title={label(node)}>{el}</span> : el}
 					</Fragment>
 				);
 			})}
@@ -506,8 +537,8 @@ function LineStream({ line, fonts, path, track, width }: {
 			{line.nodes.map((node, i) => {
 				let key = pathid(path, i);
 				let at = wraps.breaks.get(i);
-				let parts = (adorned: boolean) =>
-					streamParts(node.kind === "link" || node.kind === "text" ? node.text : "", at).map(
+				let parts = (text: string, offsets: number[] | undefined, adorned: boolean) =>
+					streamParts(text, offsets).map(
 						(part, j) =>
 							part === null
 								? <Wrap key={pathid(key, j)} />
@@ -526,7 +557,7 @@ function LineStream({ line, fonts, path, track, width }: {
 								{node.avatar && (
 									<span className="mention-avatar" style={avatarStyle(node.avatar)} />
 								)}
-								{node.name}
+								<span className="chip-name">{node.name}</span>
 							</span>,
 							key,
 							fresh(track, "@" + node.name),
@@ -555,28 +586,28 @@ function LineStream({ line, fonts, path, track, width }: {
 							fresh(track, node.reference),
 						);
 						break;
-					case "code":
-						el = (
-							<code style={cs}>
-								{pieces(node.text).map((part, j) =>
-									animate(part, pathid(key, j), fresh(track, part))
-								)}
-							</code>
+					case "code": {
+						let wrap = within(line.items[i]!, at);
+						return (
+							<Fragment key={key}>
+								{wrap.lead && <Wrap />}
+								<code style={cs}>{parts(node.text, wrap.offsets, false)}</code>
+							</Fragment>
 						);
-						break;
+					}
 					case "link":
 						return (
 							<a key={key} href={node.href} target="_blank" rel="noopener noreferrer">
-								{parts(false)}
+								{parts(node.text, at, false)}
 							</a>
 						);
 					case "text":
-						return <Fragment key={key}>{parts(true)}</Fragment>;
+						return <Fragment key={key}>{parts(node.text, at, true)}</Fragment>;
 				}
 				return (
 					<Fragment key={key}>
 						{at && <Wrap />}
-						{wraps.wide.has(i) ? <span className="line-clip">{el}</span> : el}
+						{wraps.wide.has(i) ? <span className="line-clip" title={label(node)}>{el}</span> : el}
 					</Fragment>
 				);
 			})}
