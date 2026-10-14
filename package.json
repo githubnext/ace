@@ -87,5 +87,8 @@
 		"@typescript/native-preview": "7.0.0-dev.20260304.1",
 		"dprint": "0.50.2",
 		"oxlint": "1.51.0"
+	},
+	"patchedDependencies": {
+		"@base-ui/react@1.4.1": "patches/@base-ui%2Freact@1.4.1.patch"
 	}
 }
