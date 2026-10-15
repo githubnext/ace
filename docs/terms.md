@@ -140,8 +140,8 @@ A host, and therefore its channels, that cannot be reached.
 **Here**:
 A person with a channel open in an Ace window right now: here in a chat while that chat is open,
 here in a channel while any of its views is, and here in a project while any of its channels is.
-It ends when the window closes or moves
-to another channel, or their host leaves the project's lobby. Here is never stored.
+It ends when the window closes or moves to another channel, or their host leaves the project's
+lobby. Here is never stored.
 _Avoid_: online (when you mean here), viewing, joined
 
 **Away**:
@@ -150,6 +150,6 @@ _Avoid_: idle (a dormant channel's avoided term), offline
 
 **Lifecycle event**:
 A lobby's ordered record that a channel was created, renamed, summarized, archived, resumed,
-moved, or deleted. Hosts emit them after publishing to the directory; they speed up listings but
-never replace them, since catalogs and listings stay authoritative.
+moved, or deleted, or that its run ended. Hosts emit them after publishing to the directory; they
+speed up listings but never replace them, since catalogs and listings stay authoritative.
 _Avoid_: channel event (a channel's own watch events)
