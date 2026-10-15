@@ -10,7 +10,14 @@ import {
 	MAX_SNAPSHOT,
 	type Snapshot,
 } from "@ace/channel/transfer";
-import { type Call, Link, type Reply, type WorkspaceMessage } from "@ace/channel/workspace";
+import {
+	type Call,
+	Link,
+	PING,
+	PONG,
+	type Reply,
+	type WorkspaceMessage,
+} from "@ace/channel/workspace";
 
 import { DurableSqlite } from "./storage";
 
@@ -85,6 +92,12 @@ export class HostedChannel extends DurableObject<Env> {
 	 */
 	#resident?: ReturnType<typeof setTimeout>;
 
+	constructor(ctx: DurableObjectState, env: Env) {
+		super(ctx, env);
+		// Answered by the runtime, so a hibernated object stays asleep while its workspace pings.
+		ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
+	}
+
 	/** Each hold is a fresh bounded timer, renewed until the busy-to-idle transition clears it. */
 	#reside(busy: boolean) {
 		clearTimeout(this.#resident);
@@ -119,7 +132,11 @@ export class HostedChannel extends DurableObject<Env> {
 	}
 
 	#attach(socket: WebSocket) {
-		this.#link.attach((call: Call) => socket.send(JSON.stringify(call)));
+		this.#link.attach(
+			(call: Call) => socket.send(JSON.stringify(call)),
+			// Hosts that predate pings have no timestamp and are treated as answering.
+			() => this.ctx.getWebSocketAutoResponseTimestamp(socket)?.getTime(),
+		);
 	}
 
 	#open(config: Config): Promise<Channel> {
