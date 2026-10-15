@@ -7,11 +7,13 @@ import {
 	DialogDescription,
 	DialogTitle,
 	Input,
+	Switch,
 	type Theme,
 	useTheme,
 } from "@ace/ui";
 import {
 	IconArrowDownToLine,
+	IconCloud,
 	IconKey,
 	IconLaptop,
 	IconPointer,
@@ -21,6 +23,7 @@ import {
 } from "@ace/ui/icons";
 import type { ProviderSettings, Settings as HostSettings } from "@ace/host/protocol";
 
+import { useCompute } from "./compute";
 import { desktop } from "./desktop";
 import { host } from "./host";
 import { HostStatus } from "./host-settings";
@@ -28,7 +31,7 @@ import { NativeStatus } from "./native-settings";
 import { Group, Problem, Row, Select, Status } from "./settings-layout";
 import { UpdateSettings } from "./updates";
 
-type Section = "general" | "providers" | "computer" | "host" | "updates";
+type Section = "general" | "providers" | "computer" | "host" | "updates" | "beta";
 
 type Info = { id: Section; label: string; description: string; icon: ComponentType<IconProps> };
 
@@ -65,6 +68,12 @@ const all: (Info & { desktop?: boolean })[] = [
 		description: "Keep Ace and Ace Helper up to date.",
 		icon: IconArrowDownToLine,
 		desktop: true,
+	},
+	{
+		id: "beta",
+		label: "Beta",
+		description: "Unfinished features to try. They may change or go away.",
+		icon: IconCloud,
 	},
 ];
 
@@ -297,6 +306,70 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 	);
 }
 
+function CloudCompute({ disabled }: { disabled: boolean }) {
+	const { compute: saved, error } = useCompute();
+	const [url, setUrl] = useState<string>();
+	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
+	const draft = url ?? saved?.url ?? "";
+	const locked = !saved || disabled || action.busy;
+
+	async function save(enabled: boolean, value: string) {
+		setAction({ busy: true });
+		try {
+			await host.request({ op: "preferences", compute: { enabled, url: value.trim() || null } });
+			setUrl(undefined);
+			setAction({});
+		} catch (error) {
+			setAction({ error: (error as Error).message });
+		}
+	}
+
+	return (
+		<Row
+			id="cloud-compute-label"
+			label="Cloud compute"
+			description="Offer Run in cloud when starting a channel in a GitHub project. Its agent works in a container on your team's compute service, authenticated with the team's ACE_SECRET. Each cloud channel is its own container."
+			footer={
+				<>
+					<form
+						className="flex flex-col gap-2 @md:flex-row"
+						onSubmit={(event) => {
+							event.preventDefault();
+							void save(!!saved?.enabled, draft);
+						}}
+					>
+						<Input
+							type="url"
+							spellCheck={false}
+							aria-label="Cloud compute service URL"
+							placeholder="https://ace-compute.example.workers.dev"
+							value={draft}
+							disabled={locked}
+							onChange={(event) => setUrl(event.target.value)}
+						/>
+						<Button
+							type="submit"
+							variant="outline"
+							disabled={locked || draft.trim() === (saved?.url || "")}
+						>
+							Save URL
+						</Button>
+					</form>
+					{error && <Problem>{error}</Problem>}
+					{action.error && <Problem>{action.error}</Problem>}
+				</>
+			}
+		>
+			<Switch
+				aria-labelledby="cloud-compute-label"
+				checked={!!saved?.enabled}
+				disabled={locked}
+				onCheckedChange={(enabled) => void save(enabled, draft)}
+			/>
+		</Row>
+	);
+}
+
 function Appearance() {
 	const { theme, set } = useTheme();
 	return (
@@ -469,6 +542,13 @@ export function Settings(
 						{visited.has("host") && (
 							<div hidden={section !== "host"}>
 								<HostStatus active={section === "host"} />
+							</div>
+						)}
+						{visited.has("beta") && (
+							<div hidden={section !== "beta"} className="flex flex-col gap-3">
+								<Group>
+									<CloudCompute disabled={offline} />
+								</Group>
 							</div>
 						)}
 						{desktop && visited.has("updates") && (

@@ -39,8 +39,10 @@ export type Listing = {
 	/** The latest invoked run's end, a hint for its author's attention; pi keeps the run itself. */
 	ran?: RunEnd;
 	archived?: boolean;
-	/** Base URL of the service hosting the channel; this host serves its workspace. */
+	/** Base URL of the service hosting the channel; this host serves its workspace unless `compute`. */
 	hosted?: string;
+	/** The hosting service is a cloud compute service, whose own container serves the workspace. */
+	compute?: true;
 	/**
 	 * A move in progress fences the channel: no worker starts and no client connects until the
 	 * move finishes or is resolved. `digest` names the snapshot an outbound move tried to activate.

@@ -7,6 +7,7 @@ import type { Server, ServerWebSocket } from "bun";
 import * as auth from "./auth";
 import * as catalog from "./catalog";
 import { Connection } from "./client";
+import * as compute from "./compute";
 import { config } from "./config";
 import { diagnostics } from "./diagnostics";
 import * as directory from "./directory";
@@ -28,6 +29,7 @@ import {
 	remove,
 } from "./manage";
 import * as peers from "./peers";
+import { compute as computeSettings } from "./preferences";
 import * as projects from "./projects";
 import {
 	channelProject,
@@ -46,6 +48,7 @@ import {
 	checkKey,
 	forgetKey,
 	removeKey,
+	setCompute,
 	setDirectory,
 	setKey,
 	setModel,
@@ -330,6 +333,8 @@ const localOps = new Set<HostRequest["op"]>([
 	"key-check",
 	"key-remove",
 	"preferences",
+	"compute",
+	"compute-start",
 	"update-prepare",
 	"update-cancel",
 	// A terminal is a shell as this host's user, so only its owner opens one.
@@ -479,7 +484,8 @@ async function handle(
 			await removeKey(request.provider);
 			return settingsChanged();
 		case "preferences":
-			await setModel(request.model);
+			if (request.model !== undefined) await setModel(request.model);
+			if (request.compute) setCompute(request.compute);
 			return settingsChanged();
 		case "key-store":
 			await storeKey(request.name, request.value);
@@ -497,14 +503,16 @@ async function handle(
 			}
 			return models();
 		case "create": {
-			const record = catalog.create(
-				await project(request.project),
-				request.model,
-				request.name || undefined,
-			);
+			const record = request.cloud
+				? await compute.create(request.project, request.model, request.name || undefined)
+				: catalog.create(await project(request.project), request.model, request.name || undefined);
 			await broadcast();
 			return record;
 		}
+		case "compute":
+			return computeSettings();
+		case "compute-start":
+			return compute.start(request.channel, (waiting) => send({ id, waiting }));
 		case "archive":
 			if (request.archived) terminals.closeChannel(request.channel);
 			await archive(request.channel, request.archived);
@@ -544,6 +552,9 @@ async function handle(
 			return broadcast();
 		case "terminal": {
 			if (!catalog.owns(request.channel)) throw new Error("Terminals open on the channel's host");
+			if (catalog.read(request.channel).compute) {
+				throw new Error("A cloud compute channel's shell is in its container, not on this host");
+			}
 			const { opened, attach } = await terminals.open(request);
 			client.terminals.get(opened.terminal)?.();
 			// After the reply, which is sent once this returns and its microtasks settle.

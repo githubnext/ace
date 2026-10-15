@@ -11,10 +11,10 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@ace/ui";
-import { IconChevronDown, IconCloud, IconHash, IconPlus } from "@ace/ui/icons";
+import { IconChevronDown, IconCloud, IconHash, IconLaptop, IconPlus } from "@ace/ui/icons";
 import type { Listing } from "@ace/host/protocol";
 
-import { here } from "./desktop";
+import { desktop, here } from "./desktop";
 import { InitGit } from "./open-project";
 import type { AppProject } from "./projects";
 
@@ -48,6 +48,22 @@ function adopt(project: AppProject): string {
 
 const MODES = [{ id: "ace", name: "Ace", placeholder: "Start a new channel" }];
 
+/** Where a new channel's agent works, offered while the cloud compute beta is on. */
+const PLACES = [
+	{
+		id: "local",
+		name: desktop ? "This Mac" : "This host",
+		description: "This checkout",
+		icon: IconLaptop,
+	},
+	{
+		id: "cloud",
+		name: "Run in cloud",
+		description: "A team compute container",
+		icon: IconCloud,
+	},
+];
+
 export function Dashboard(
 	{
 		project,
@@ -61,6 +77,7 @@ export function Dashboard(
 		onOpen,
 		onChannel,
 		onCreate,
+		cloud,
 	}: {
 		project: AppProject;
 		repos: SessionSidebarRepo[];
@@ -73,11 +90,14 @@ export function Dashboard(
 		onProject: (id: string) => void;
 		onOpen: () => void;
 		onChannel: (channel: Listing) => void;
-		onCreate: (text?: string, onCreated?: () => void) => Promise<void>;
+		onCreate: (text?: string, onCreated?: () => void, cloud?: boolean) => Promise<void>;
+		/** The cloud compute beta is on and this project has a GitHub repository. */
+		cloud?: boolean;
 	},
 ) {
 	const composer = useRef<ChatComposerHandle>(null);
 	const [busy, setBusy] = useState(false);
+	const [place, setPlace] = useState("local");
 	const [scope] = useState(() => adopt(project));
 	const needsGit = local && project.git === false;
 	const creatable = (local && !needsGit) || !!onSetup;
@@ -94,7 +114,7 @@ export function Dashboard(
 				const input = composer.current;
 				const doc = input?.get();
 				if (input && doc && serialize(doc) === text) input.clear();
-			});
+			}, cloud && place === "cloud");
 		} finally {
 			setBusy(false);
 		}
@@ -149,6 +169,9 @@ export function Dashboard(
 						scope={scope}
 						modes={MODES}
 						mode="ace"
+						agents={cloud ? PLACES : undefined}
+						agent={place}
+						onAgentChange={setPlace}
 						mic={false}
 						tools={false}
 						canAttach={false}

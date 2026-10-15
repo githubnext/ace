@@ -42,6 +42,9 @@ export function canonical(url: string): string {
 }
 
 function movable(record: catalog.Listing): void {
+	if (record.compute) {
+		throw new Error("A cloud compute channel's workspace is its container, so it cannot move");
+	}
 	if (record.owner !== catalog.user) throw new Error("Only this host's owner can move channels");
 	if (record.archived) throw new Error("Unarchive the channel before moving it");
 	if (record.moving?.digest) {

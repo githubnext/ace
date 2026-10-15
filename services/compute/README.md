@@ -15,8 +15,8 @@ before extending those boundaries.
 
 Use a Cloudflare account with Containers access, a running Docker engine, and an authenticated
 Wrangler CLI. The [configuration](wrangler.jsonc) deploys the `ace-compute-pilot` Worker, one
-`HostedChannel` Durable Object class, and one `Compute` class with a container binding. Launch
-only one workspace for this pilot. There is **no enforced deployment-wide instance cap**:
+`HostedChannel` Durable Object class, and one `Compute` class with a container binding. Each
+workspace is one container. There is **no enforced deployment-wide instance cap**:
 Wrangler rejects `max_instances` with the `durable_object` scheduling policy used here.
 
 From the repository root:
@@ -52,30 +52,38 @@ The controller serializes operations for each ID. Every POST has a JSON body, in
 when it takes no arguments. Errors return JSON with an `error` field, generally with HTTP 409;
 authentication failure is HTTP 401.
 
-| Method | Route                        | Body and result                                                                                                                                                                                                                                                                         |
-| ------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/workspaces/:id/init`       | `repository` is a GitHub HTTPS clone URL without credentials. `owner` contains Git author `name` and `email`. Optional `size` defaults to `standard-1`; optional `model` is the channel's `{ provider, modelId }`. Creates settings and a fresh hosted channel; does not start compute. |
-| POST   | `/workspaces/:id/start`      | `{}` or `{ "size": "standard-2" }`. Starts the container, restores the latest checkpoint when present, configures the runner, and makes the channel available.                                                                                                                          |
-| GET    | `/workspaces/:id/status`     | Returns container state, settings, checkpoint manifest, frozen state, and runner status. `/workspaces/:id` is equivalent.                                                                                                                                                               |
-| POST   | `/workspaces/:id/exec`       | `{ "command": "git status --short", "cwd": "." }`. Requires an idle channel, freezes admission, runs the administrative command, then reconnects and thaws. `cwd` defaults to `/workspace/project`; relative paths resolve beneath it. Returns `exitCode`, `output`, and `truncated`.   |
-| POST   | `/workspaces/:id/checkpoint` | `{}`. Requires an idle channel, freezes admission, disconnects and drains its workspace, saves a checkpoint, then reconnects and thaws the channel.                                                                                                                                     |
-| POST   | `/workspaces/:id/resize`     | `{ "size": "standard-2" }`. Checkpoints, destroys the container, starts the selected size, restores the files, then reconnects and thaws.                                                                                                                                               |
-| POST   | `/workspaces/:id/stop`       | `{}`. Checkpoints and destroys the container, then thaws the channel so chat remains accessible.                                                                                                                                                                                        |
-| POST   | `/workspaces/:id/resume`     | `{}`. Reconnects and thaws a frozen pilot whose startup completed. If startup is incomplete, retry `start` instead.                                                                                                                                                                     |
+| Method | Route                        | Body and result                                                                                                                                                                                                                                                                                                      |
+| ------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/workspaces/:id/init`       | `repository` is a GitHub HTTPS clone URL without credentials. `owner` is the channel's Ace user; `author` contains Git `name` and `email`. Optional `size` defaults to `standard-1`; optional `model` is the channel's `{ provider, modelId }`. Creates settings and a fresh hosted channel; does not start compute. |
+| POST   | `/workspaces/:id/start`      | `{}` or `{ "size": "standard-2" }`. Starts the container, restores the latest checkpoint when present, configures the runner, and makes the channel available.                                                                                                                                                       |
+| GET    | `/workspaces/:id/status`     | Returns container state, settings, checkpoint manifest, frozen state, and runner status. `/workspaces/:id` is equivalent.                                                                                                                                                                                            |
+| POST   | `/workspaces/:id/exec`       | `{ "command": "git status --short", "cwd": "." }`. Requires an idle channel, freezes admission, runs the administrative command, then reconnects and thaws. `cwd` defaults to `/workspace/project`; relative paths resolve beneath it. Returns `exitCode`, `output`, and `truncated`.                                |
+| POST   | `/workspaces/:id/checkpoint` | `{}`. Requires an idle channel, freezes admission, disconnects and drains its workspace, saves a checkpoint, then reconnects and thaws the channel.                                                                                                                                                                  |
+| POST   | `/workspaces/:id/resize`     | `{ "size": "standard-2" }`. Checkpoints, destroys the container, starts the selected size, restores the files, then reconnects and thaws.                                                                                                                                                                            |
+| POST   | `/workspaces/:id/stop`       | `{}`. Checkpoints and destroys the container, then thaws the channel so chat remains accessible.                                                                                                                                                                                                                     |
+| POST   | `/workspaces/:id/resume`     | `{}`. Reconnects and thaws a frozen pilot whose startup completed. If startup is incomplete, retry `start` instead.                                                                                                                                                                                                  |
 
 An initialization body has this shape:
 
 ```json
 {
 	"repository": "https://github.com/OWNER/REPOSITORY.git",
-	"owner": { "name": "Git author", "email": "person@example.com" },
+	"owner": "person@github",
+	"author": { "name": "Git author", "email": "person@example.com" },
+	"name": "brisk-harbor",
 	"size": "standard-1"
 }
 ```
 
+`owner` is the Ace user who owns the channel, as their host names them; `author` is the Git
+identity for commits in the container. Optional `name` and `prefix` default to the ID, and
+`named` says the name was chosen deliberately. A `start` that fails can be repeated.
+
+**Each cloud channel is its own container.** The desktop app's Run in cloud creates one workspace
+per channel, and nothing limits how many a team starts.
+
 The accepted sizes are `standard-1`, `standard-2`, `standard-3`, and `standard-4`. Resizing is
 a **restart with filesystem restoration**, so it requires an idle channel and stops processes.
-The current pilot also uses `owner.email` as the channel owner identity.
 
 The controller uses Cloudflare's [native container API](https://developers.cloudflare.com/containers/api/durable-object-container/).
 Consult the current [instance limits](https://developers.cloudflare.com/containers/platform/limits/)
@@ -129,8 +137,9 @@ has no checkpoint, it refuses to silently replace the lost workspace with a fres
 
 ## Boundaries and limitations
 
-- Lifecycle operations are manual HTTP calls. There is no desktop discovery, project picker
-  integration, or agent tool for starting or resizing this compute yet.
+- Apart from the app's Run in cloud, which calls `init` and `start`, lifecycle operations are
+  manual HTTP calls. Deleting a cloud channel in the app leaves its container and checkpoint;
+  call `stop` first. There is no agent tool for starting or resizing this compute yet.
 - The runner serves files and shell commands. Native desktop tools, browser tools, and image
   inspection are omitted. The existing hosted-channel restrictions, including cross-channel
   messaging, still apply.
@@ -144,8 +153,8 @@ has no checkpoint, it refuses to silently replace the lost workspace with a fres
 - Checkpoints are not secret scanning. Any secret deliberately or accidentally written into a
   tracked, untracked, or ignored project file is included, apart from excluded dependencies.
   Provision credentials outside `/workspace` and do not put authenticated URLs in Git config.
-- The image, archive limit, single-workspace operating scope, and manual recovery are
-  proof-of-concept choices. The single-workspace scope is an operator responsibility.
+- The image, archive limit, and manual recovery are proof-of-concept choices. Keeping the
+  number of running containers in check is an operator responsibility.
   Production scheduling, unattended recovery, backup retention, and multi-workspace ownership
   remain separate work. The next steps are [filesystem durability](https://github.com/githubnext/ace/issues/413)
   and [agent-visible sizing and resize requests](https://github.com/githubnext/ace/issues/414),

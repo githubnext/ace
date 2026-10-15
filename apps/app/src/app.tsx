@@ -37,6 +37,7 @@ import {
 import { chosen, deployed, remember } from "./address";
 import { glow, type Outcome, useAttention } from "./attention";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
+import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
 import { DeleteChannel } from "./delete-channel";
 import { Github, GithubSidebar } from "./github";
@@ -338,6 +339,7 @@ export function App() {
 		value && channelProject(value) === current.id
 	);
 	const connected = status === "open" && !!hello.host;
+	const { compute } = useCompute();
 	const local = current?.host === hello.host;
 	const needsGit = local && current?.git === false;
 	// GitHub projects can be cloned here; other folders exist only on the hosts that hold them.
@@ -500,15 +502,22 @@ export function App() {
 		text?: string,
 		onCreated?: () => void,
 		target = current,
+		cloud = false,
 	): Promise<void> {
 		if (!target || !connected || creating.current) return;
 		if (target.host !== hello.host) return startSetup(target, { text, onCreated });
 		creating.current = true;
 		try {
-			const value = await host.request<Pick<Listing, "id" | "project">>({
+			const value = await host.request<Pick<Listing, "id" | "name" | "project">>({
 				op: "create",
 				project: target.path,
+				...(cloud ? { cloud } : {}),
 			});
+			if (cloud) {
+				onCreated?.();
+				select({ ...value, host: hello.host, root: target.path, repo: target.repo });
+				return void startCompute(value, text);
+			}
 			if (text) {
 				try {
 					await host.channel(value.id, { op: "ask", author: hello.user, text });
@@ -529,6 +538,34 @@ export function App() {
 			});
 		} finally {
 			creating.current = false;
+		}
+	}
+
+	/** The agent is invoked only once its workspace is connected; a failed start keeps the text. */
+	async function startCompute(channel: Pick<Listing, "id" | "name">, text?: string) {
+		const title = `Starting ${channel.name} in the cloud…`;
+		const id = toast.loading(title);
+		try {
+			await host.startCompute(
+				channel.id,
+				(waiting) => toast.loading(title, { id, description: waiting ?? undefined }),
+			);
+			toast.success(`${channel.name} is running in the cloud`, { id, description: undefined });
+		} catch (error) {
+			if (text) setDraft({ channel: channel.id, text });
+			return toast.error(`Could not start ${channel.name} in the cloud`, {
+				id,
+				description: (error as Error).message,
+				duration: Infinity,
+				action: { label: "Try again", onClick: () => void startCompute(channel, text) },
+			});
+		}
+		if (!text) return;
+		try {
+			await host.channel(channel.id, { op: "ask", author: hello.user, text });
+		} catch (error) {
+			setDraft({ channel: channel.id, text });
+			toast.error("Could not invoke agent", { description: (error as Error).message });
 		}
 	}
 
@@ -732,7 +769,8 @@ export function App() {
 									onProject={chooseProject}
 									onOpen={() => void choose()}
 									onChannel={select}
-									onCreate={create}
+									onCreate={(text, onCreated, cloud) => create(text, onCreated, current, cloud)}
+									cloud={local && !!current.repo && !!compute?.enabled}
 								/>
 							)
 							: page === "issues" || page === "prs"

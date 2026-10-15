@@ -5,8 +5,9 @@ import { config } from "./config";
 import * as directory from "./directory";
 import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } from "./keys";
 import { models, parseModel } from "./manage";
-import { isModel, preference, savePreference } from "./preferences";
-import type { ProviderId, Settings } from "./protocol";
+import { canonical } from "./move";
+import { isModel, preference, saveCompute, savePreference } from "./preferences";
+import type { Compute, ProviderId, Settings } from "./protocol";
 
 const providers = new Map(
 	[
@@ -124,6 +125,13 @@ export async function setModel(model: ModelRef | null): Promise<void> {
 		}
 	}
 	savePreference(model);
+}
+
+export function setCompute({ enabled, url }: Compute): void {
+	if (typeof enabled !== "boolean") throw new Error("Turn cloud compute on or off");
+	const service = url?.trim() ? canonical(url.trim()) : null;
+	if (enabled && !service) throw new Error("Add the cloud compute service URL first");
+	saveCompute({ enabled, url: service });
 }
 
 function named(name: unknown): void {
