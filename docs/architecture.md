@@ -426,12 +426,15 @@ offline, and a call in flight when it drops is reported to the model as failed.
 ### Moving channels
 
 The owner moves an idle channel between its host and a hosting service with `ace move` or the
-channel's Move to menu. The channel keeps its ID, lanes, and workspace; only where pi runs changes.
+channel's Move to menu, which asks for confirmation first. The channel keeps its ID, lanes, and workspace; only where pi runs changes.
 The pi store travels as one snapshot (`@ace/channel/transfer`): an allowlist of pi's tables at the
 current schema, at most 32 MiB, with a SHA-256 digest that import verifies before it commits.
 Export refuses unfinished tasks or queued submissions, so a move never carries an active run.
 
-The host fences the channel's record with `moving` first: no worker starts and no client connects
+The host reads `ACE_SECRET` before anything else, since a keychain prompt can hold that read for
+as long as nobody answers it. Until then the channel stays usable; after a second the app's move
+notice says Ace Helper is waiting for keychain access, and after two minutes the move fails. The
+host then fences the channel's record with `moving`: no worker starts and no client connects
 through this host. A hosted channel keeps its workspace link until the service freezes it, so a run
 admitted before the freeze is refused rather than interrupted. A running worker stops admitting requests, lets admitted ones finish, and
 exits only if the channel is idle. The service's `POST /channels/:id/transfer` takes `import`

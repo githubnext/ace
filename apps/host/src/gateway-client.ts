@@ -24,6 +24,7 @@ type Pending = {
 	resolve(value: unknown): void;
 	reject(error: Error): void;
 	watch?: Watch;
+	waiting?(text: string | null): void;
 	/** The watch was accepted, so a later failure ends it instead of rejecting the request. */
 	accepted?: boolean;
 };
@@ -122,6 +123,7 @@ export class GatewayClient {
 		const pending = this.#pending.get(frame.id);
 		if (!pending) return;
 		if ("event" in frame) return pending.watch?.event(frame.event);
+		if ("waiting" in frame) return pending.waiting?.(frame.waiting);
 		// A watch keeps its entry so later events still reach it, until a failure ends it.
 		if (pending.watch && frame.ok) {
 			pending.accepted = true;
@@ -192,14 +194,23 @@ export class GatewayClient {
 		watch?: Watch,
 		trace?: string,
 	): Promise<T> {
+		return this.#request<T>(request, watch ? { watch } : {}, trace);
+	}
+
+	/** Move a channel, hearing what the move waits on, such as keychain access, before it answers. */
+	move(channel: string, target: string, waiting: (text: string | null) => void): Promise<void> {
+		return this.#request({ op: "move", channel, target }, { waiting });
+	}
+
+	#request<T>(
+		request: HostRequest,
+		observe: Pick<Pending, "watch" | "waiting">,
+		trace?: string,
+	): Promise<T> {
 		if (this.status !== "open") return Promise.reject(new Error("Not connected to the host"));
 		const id = this.#next++;
 		const promise = new Promise<T>((resolve, reject) =>
-			this.#pending.set(id, {
-				resolve: resolve as (value: unknown) => void,
-				reject,
-				...(watch ? { watch } : {}),
-			})
+			this.#pending.set(id, { resolve: resolve as (value: unknown) => void, reject, ...observe })
 		);
 		this.#socket?.send(JSON.stringify({ id, ...(trace ? { trace } : {}), ...request }));
 		return promise;
