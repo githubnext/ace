@@ -212,7 +212,8 @@ export function useTranscript(
 		if (!offline && error) setAttempt((value) => value + 1);
 	}
 	// A move ends watches at the old placement, and rewatching fails until it finishes; the
-	// listing's new placement is the signal to watch again, for every client.
+	// listing's placement, which names a move under way, changing when the move ends is the signal
+	// to watch again, for every client, even when a failed move leaves the channel where it was.
 	const [placed, setPlaced] = useState(placement);
 	if (placement !== placed) {
 		setPlaced(placement);

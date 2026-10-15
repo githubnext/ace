@@ -35,9 +35,17 @@ export function Conversation(
 	{ channel, channels, chat: id, user, draft, onDraftLoaded, onSettings, onOpen, onWork }: Props,
 ) {
 	const offline = channel.state === "offline";
-	const transcript = useTranscript(channel.id, id, offline, channel.hosted || channel.host);
-	// The watch retries once the host is back, so its error while offline is not the user's to retry.
-	const failed = !offline && transcript.error;
+	const placement = channel.hosted || channel.host;
+	const moving = channel.moving && `Moving to ${channel.moving}…`;
+	const transcript = useTranscript(
+		channel.id,
+		id,
+		offline,
+		channel.moving ? `${placement} → ${channel.moving}` : placement,
+	);
+	// The watch retries once the host is back or the move ends, so its error until then is not the
+	// user's to retry.
+	const failed = !offline && !moving && transcript.error;
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
@@ -136,7 +144,8 @@ export function Conversation(
 							<p>
 								{offline
 									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
-									: failed
+									: moving
+										|| failed
 										|| (stalled
 											? STALLED
 											: transcript.restarting
@@ -150,9 +159,9 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && (stalled || transcript.restarting) && (
+				{transcript.live && (stalled || moving || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
-						{stalled ? STALLED : "Channel is restarting…"}
+						{stalled ? STALLED : moving || "Channel is restarting…"}
 					</p>
 				)}
 				{transcript.live && (
@@ -166,7 +175,7 @@ export function Conversation(
 					currentEffort={chat?.effort}
 					busy={transcript.busy}
 					shared={transcript.shared}
-					ready={transcript.live && channel.state !== "archived"}
+					ready={transcript.live && !moving && channel.state !== "archived"}
 					draft={draft}
 					onDraftLoaded={onDraftLoaded}
 					onSettings={onSettings}
