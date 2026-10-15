@@ -133,8 +133,8 @@ function GridImage(
 }
 
 /**
- * Opens a timeline image at full size. The context menu replaces the webview's own, whose "Open
- * Image in New Window" has no window to open.
+ * Opens a timeline image at full size. Both the thumbnail and the preview replace the webview's
+ * context menu, whose "Open Image in New Window" has no window to open.
  */
 function ImageOpen(
 	{ src, alt, style, children }: {
@@ -146,6 +146,8 @@ function ImageOpen(
 ) {
 	let [open, setOpen] = useState(false);
 	let [actual, setActual] = useState(false);
+	// Only inline images can be read back without the source's CORS consent.
+	let inline = src.startsWith("data:");
 	let show = () => {
 		setActual(false);
 		setOpen(true);
@@ -167,29 +169,38 @@ function ImageOpen(
 						<IconExpand />
 						Open Image
 					</ContextMenuItem>
-					{/* Only inline images can be read back without the source's CORS consent. */}
-					{src.startsWith("data:") && (
-						<ContextMenuItem onClick={() => copy(src)}>
-							<IconCopy />
-							Copy Image
-						</ContextMenuItem>
-					)}
+					{inline && <CopyImage src={src} />}
 				</ContextMenuContent>
 			</ContextMenu>
 			<Dialog open={open} onOpenChange={setOpen}>
 				<DialogContent className="top-4 w-fit max-w-[calc(100vw-2rem)] p-0 [--dialog-top:1rem] sm:max-w-[calc(100vw-2rem)]">
 					<DialogTitle className="sr-only">{alt || "Image"}</DialogTitle>
-					<img
-						src={src}
-						alt={alt}
-						className={actual
-							? "max-w-none cursor-zoom-out"
-							: "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] cursor-zoom-in"}
-						onClick={() => setActual(!actual)}
-					/>
+					{/* Remote images have no items, so the menu stays closed and only the native one is suppressed. */}
+					<ContextMenu disabled={!inline}>
+						<ContextMenuTrigger
+							render={<img src={src} alt={alt} />}
+							className={actual
+								? "max-w-none cursor-zoom-out"
+								: "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] cursor-zoom-in"}
+							onClick={() => setActual(!actual)}
+							onContextMenu={(event) => event.preventDefault()}
+						/>
+						<ContextMenuContent className="w-36">
+							<CopyImage src={src} />
+						</ContextMenuContent>
+					</ContextMenu>
 				</DialogContent>
 			</Dialog>
 		</>
+	);
+}
+
+function CopyImage({ src }: { src: string }) {
+	return (
+		<ContextMenuItem onClick={() => copy(src)}>
+			<IconCopy />
+			Copy Image
+		</ContextMenuItem>
 	);
 }
 
