@@ -4,8 +4,9 @@ anchor: function workspace
 created: 2026-10-15T04:22:27Z
 norm: '1'
 sig: 836c462591c17f67
-body_hash: a323b4835ae6b68f
-raw_hash: 2a4ad7f7d1a7393e
+body_hash: 13920756001eac04
+raw_hash: c4f349675b4a04df
+vouched: 2026-10-15T06:08:18Z
 lines: 145-152
 ---
 
