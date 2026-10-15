@@ -145,6 +145,21 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 	};
 }
 
+/** Pins belong to the person, not the channel, so teammates never see them. */
+function pinnedGroup(
+	channels: Listing[],
+	pins: string[],
+	hello: Hello,
+	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
+	attention: Map<string, Outcome>,
+): SessionSidebarGroup {
+	const rows = pins.flatMap((id) => {
+		const channel = channels.find((value) => value.id === id && value.state !== "archived");
+		return channel ? [row(channel, hello.user, hello.host, attention.get(id))] : [];
+	});
+	return { id: "pinned", label: "Pinned", rows, collapsed: collapsed.pinned };
+}
+
 /** Teammates' archived channels stay folded until someone opens them. */
 const folded = (
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
@@ -163,6 +178,7 @@ function projectGroups(
 	now: number,
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
 	attention: Map<string, Outcome>,
+	pins: string[],
 ): SessionSidebarGroup[] {
 	const mine: SidebarRow[] = [];
 	const inactive: SidebarRow[] = [];
@@ -171,6 +187,7 @@ function projectGroups(
 	for (const channel of channels) {
 		const next = row(channel, hello.user, hello.host, attention.get(channel.id));
 		const stored = channel.state === "archived";
+		if (!stored && pins.includes(channel.id)) continue;
 		if (!stored && isInactive(channel, now)) {
 			inactive.push(next);
 			continue;
@@ -187,6 +204,7 @@ function projectGroups(
 		(stored ? owned.archived : owned.rows).push(next);
 	}
 	return [
+		pinnedGroup(channels, pins, hello, collapsed, attention),
 		{ id: "mine", label: "Channels", rows: mine, collapsed: collapsed.mine },
 		...[...team].sort(([, a], [, b]) => a.name.localeCompare(b.name)).flatMap((
 			[owner, { name, rows, archived }],
@@ -232,6 +250,7 @@ export function App() {
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
+	const [pins, setPins] = useLocalStorage<string[]>("ace:pinned-channels", []);
 	const [collapsed, setCollapsed] = useState<Record<SessionSidebarGroupId, boolean>>({
 		pinned: false,
 		mine: false,
@@ -315,12 +334,12 @@ export function App() {
 		hello.user,
 		page === "channels" ? channel?.id : undefined,
 	);
-	let groups = projectGroups(visible, hello, people, now, collapsed, attention);
+	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins);
 
 	if (allProjects) {
 		const byProject = new Map<string, Listing[]>();
 		for (const value of channels) {
-			if (value.state === "archived") continue;
+			if (value.state === "archived" || pins.includes(value.id)) continue;
 			const id = channelProject(value);
 			const rows = byProject.get(id);
 			if (rows) rows.push(value);
@@ -345,6 +364,7 @@ export function App() {
 					: undefined,
 			};
 		});
+		groups.unshift(pinnedGroup(channels, pins, hello, collapsed, attention));
 	}
 
 	function chooseProject(id: string) {
@@ -565,6 +585,8 @@ export function App() {
 											: undefined}
 										onMoveTargets={connected && !deployed ? moveTargets : undefined}
 										onMove={connected && !deployed ? move : undefined}
+										onPin={(item) => setPins((value) => [...value, item.uid])}
+										onUnpin={(item) => setPins((value) => value.filter((id) => id !== item.uid))}
 										onToggleGroup={(id) =>
 											setCollapsed((value) => ({ ...value, [id]: !folded(value, id) }))}
 										onArchive={(allProjects || local) && connected

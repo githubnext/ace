@@ -198,9 +198,9 @@ type RowActions = Pick<
 function actions(data: SidebarRow, props: RowActions): RowActions {
 	if (data.kind === "lobby") return { onRebuild: props.onRebuild };
 	let pins = { onPin: props.onPin, onUnpin: props.onUnpin };
+	// Archived channels leave every group but Archived, so a pin would never show.
 	if (data.lifecycle === "archived") {
 		return {
-			...pins,
 			onArchive: data.capabilities?.archive === false ? undefined : props.onArchive,
 			onDelete: data.capabilities?.delete === false ? undefined : props.onDelete,
 		};
@@ -332,6 +332,9 @@ export function SessionItem(
 	return (
 		<RowMenu
 			data={data}
+			pinned={pinned}
+			onPin={actionPin}
+			onUnpin={actionUnpin}
 			{...menu}
 		>
 			<div
