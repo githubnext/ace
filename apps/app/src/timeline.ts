@@ -1,3 +1,4 @@
+import type { QueuedMessage } from "@ace/channel/protocol";
 import type { Listing, People } from "@ace/host/protocol";
 import type { Event } from "@ace/ui";
 
@@ -31,6 +32,35 @@ export function authorName(
 	if (source) return `#${source.name}`;
 	if (author.startsWith("agent@")) return author;
 	return people[author] || author.split("@")[0]!;
+}
+
+/**
+ * People get withdrawn messages back as drafts. Another channel's agent has no composer, so its
+ * message stays withdrawn, and naming that channel tells whoever stopped where to follow up.
+ */
+function withdrawal(
+	messages: QueuedMessage[],
+	people: People,
+	channels: Map<string, Listing>,
+): string {
+	const names = (authors: string[]) =>
+		[...new Set(authors)].map((author) => authorName(author, people, channels)).join(", ");
+	const humans = messages.filter((message) => !message.author.startsWith("agent@"));
+	const agents = messages.filter((message) => message.author.startsWith("agent@"));
+	const lines = [];
+	if (humans.length) {
+		const many = humans.length > 1;
+		lines.push(
+			`Returned ${humans.length} queued ${many ? "messages" : "message"} to ${
+				names(humans.map((message) => message.author))
+			} as ${many ? "drafts" : "a draft"}.`,
+		);
+	}
+	if (agents.length) {
+		const count = agents.length === 1 ? "a queued message" : `${agents.length} queued messages`;
+		lines.push(`Withdrew ${count} from ${names(agents.map((message) => message.author))}.`);
+	}
+	return lines.join(" ");
 }
 
 function text(value: string): Event.Message.Content.Text {
@@ -139,6 +169,7 @@ export function toEvents(
 		}
 		if (item.error) content.push(text(`Run failed: ${item.error}`));
 		if (item.stopped) content.push(text("Stopped."));
+		if (item.withdrawn) content.push(text(withdrawal(item.withdrawn, people, channels)));
 		return {
 			...base,
 			sender: { kind: "agent", value: AGENT, display: item.model || "Agent" },

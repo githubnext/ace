@@ -191,6 +191,7 @@ export function Conversation(
 					ready={transcript.live && !transition && channel.state !== "archived"}
 					draft={draft}
 					onDraftLoaded={onDraftLoaded}
+					returned={transcript.returned}
 					onSettings={onSettings}
 					accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
 				/>

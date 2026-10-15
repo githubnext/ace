@@ -64,7 +64,7 @@ import type {
 	RunEnd,
 	Usage,
 } from "./protocol";
-import { queue } from "./queue";
+import { queue, withdrawn } from "./queue";
 import * as room from "./room";
 import { type Tabs, tabs } from "./tabs";
 
@@ -788,13 +788,22 @@ export class Channel {
 		if (stream.snapshot.run) send({ kind: "run", chat: conversation.id, state: "start" });
 		tools?.snapshot(stream.snapshot.tools);
 		if (view) {
-			send({ kind: "queue", chat: conversation.id, messages: queue(view.value) });
+			let messages = queue(view.value);
+			send({ kind: "queue", chat: conversation.id, messages });
 			let inbox = view.value.docs[InboxDoc.definition.kind];
 			view.start(async (value) => {
 				const next = value.docs[InboxDoc.definition.kind];
 				if (next === inbox) return;
 				inbox = next;
-				send({ kind: "queue", chat: conversation.id, messages: queue(value) });
+				const before = messages;
+				messages = queue(value);
+				const gone = await withdrawn(this.#harness, before, messages);
+				send({
+					kind: "queue",
+					chat: conversation.id,
+					messages,
+					...(gone.length ? { withdrawn: gone } : {}),
+				});
 			});
 		}
 		send({ kind: "live", chat: conversation.id });

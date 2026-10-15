@@ -11,7 +11,7 @@ import {
 	useLocalStorage,
 	useMedia,
 } from "@ace/ui";
-import type { Effort, ModelOption, ModelRef } from "@ace/channel/protocol";
+import type { Effort, ModelOption, ModelRef, QueuedMessage } from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
 
 import { host } from "./host";
@@ -35,6 +35,7 @@ export const EFFORTS: Record<Effort, string> = {
 	max: "Max",
 };
 const ACE = /(^|\s)@ace\b/i;
+const LEADING = /^\s*@ace\b/i;
 const UNPICKED: { model?: string; effort?: Effort } = {};
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
@@ -53,6 +54,8 @@ type Props = {
 	ready: boolean;
 	draft?: string;
 	onDraftLoaded: () => void;
+	/** Messages withdrawn from the chat's queue; the user's own come back into the draft. */
+	returned: QueuedMessage[];
 	onSettings?: () => void;
 	accessory?: ReactNode;
 };
@@ -111,6 +114,7 @@ export function Composer(
 		ready,
 		draft,
 		onDraftLoaded,
+		returned,
 		onSettings,
 		accessory,
 	}: Props,
@@ -131,6 +135,38 @@ export function Composer(
 		composer.current?.set(ACE.test(draft) ? draft : `@ace ${draft}`);
 		onDraftLoaded();
 	}, [draft, onDraftLoaded]);
+	// Each withdrawn message returns once, ahead of whatever the user has typed since.
+	const restored = useRef(new Set<number>());
+	useEffect(() => {
+		const mine = returned.filter((message) =>
+			message.author === user && !restored.current.has(message.submission)
+		);
+		if (!mine.length) return;
+		for (const message of mine) restored.current.add(message.submission);
+		const doc = composer.current?.get();
+		// One leading mention invokes the whole draft; an empty Ace-mode composer holds only that.
+		const text = [...mine.map((message) => message.text), doc ? serialize(doc) : ""]
+			.map((part) => part.replace(LEADING, "").trim()).filter(Boolean).join("\n\n");
+		composer.current?.set(`@ace ${text}`);
+		const images = mine.flatMap((message) => message.images || []);
+		if (images.length) {
+			setAttached((current) => [
+				...current,
+				...images.map((image, index) => ({
+					id: crypto.randomUUID(),
+					name: `Image ${index + 1}`,
+					type: image.mimeType,
+					preview: `data:${image.mimeType};base64,${image.data}`,
+				})),
+			]);
+		}
+		toast(
+			mine.length === 1
+				? "Stopped before your queued message ran"
+				: `Stopped before ${mine.length} of your queued messages ran`,
+			{ description: `${mine.length === 1 ? "It's" : "They're"} back in the composer.` },
+		);
+	}, [returned, user]);
 	// An offline channel can't answer; the conversation already says so, so don't blame providers.
 	const offline = channel.state === "offline";
 	useEffect(() => {

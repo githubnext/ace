@@ -211,8 +211,12 @@ export type Request =
 	};
 
 export type Event =
-	/** The complete current message queue, sent on attachment and every committed change. */
-	| { kind: "queue"; chat: ChatId; messages: QueuedMessage[] }
+	/**
+	 * The complete current message queue, sent on attachment and every committed change.
+	 * `withdrawn` lists the invoked messages this change removed without running them, as Stop
+	 * does; pi keeps no copy, so they are sent once, live, for their authors to get back.
+	 */
+	| { kind: "queue"; chat: ChatId; messages: QueuedMessage[]; withdrawn?: QueuedMessage[] }
 	/** A human message; `invoked` when it asked the chat's agent to run. */
 	| {
 		kind: "message";

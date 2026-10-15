@@ -90,6 +90,13 @@ is one pi conversation in that Session.
   committed changes, including passive human writes but excluding internal writes. The app shows
   these messages above the composer until pi consumes or withdraws them; reconnect reads pi again.
   There is no additional queue store or change to admission and steering behavior.
+- **Stop returns queued messages to their authors.** pi's abort withdraws every queued invoked
+  message, settles it `unanswered`, and keeps none of its content, so nothing runs after Stop. The
+  queue event of that change carries them as `withdrawn`, once and live, and each author's app
+  puts its own back into that chat's saved draft, ahead of any unsent text, with a notice; the
+  timeline says whose were returned. Another channel's agent has no composer: its message stays
+  withdrawn, and the notice names that channel. An author whose app isn't watching the chat at
+  Stop does not get the draft back.
 - **Handoffs stop shell commands.** While another channel's agent's invoked message waits in a
   chat's inbox, that chat's shell commands stop, and new ones don't start, each with a result
   naming the sender. Pi then places the message as a steer after the tool round, so the run
