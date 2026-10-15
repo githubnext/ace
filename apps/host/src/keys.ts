@@ -77,8 +77,11 @@ export async function key(name: string): Promise<string | undefined> {
 /** A read slower than this waited on something, usually a macOS prompt. */
 const PROMPT = 50;
 
-/** Each name's last finished status read, and whether it waited on a prompt. */
-const known = new Map<string, { status: CredentialStatus; prompted: boolean }>();
+/** A finished keychain read for Settings. Values stay in Ace Helper; Settings shows only status. */
+type Read = { value?: string; error?: string; prompted?: boolean };
+
+/** Each name's last finished Settings read. */
+const known = new Map<string, Read>();
 /** When Ace Helper last saved or removed each name; a read started before then is stale. */
 const changed = new Map<string, number>();
 
@@ -103,51 +106,88 @@ export function overriding(name: string): string | undefined {
 	return env(`ACE_${name}`) ? `ACE_${name}` : env(name) ? name : undefined;
 }
 
-export async function credential(name: string): Promise<CredentialStatus> {
-	const override = overriding(name);
-	try {
-		const stored = !!await keychain(name);
-		return { source: override ? "environment" : stored ? "keychain" : "missing", stored, override };
-	} catch (error) {
-		return {
-			source: override ? "environment" : "unavailable",
-			stored: null,
-			override,
-			error: (error as Error).message,
-		};
-	}
+/**
+ * Settings reads one name at a time: model availability asks for about 40 names, and reading them
+ * together could raise a prompt for each at once.
+ */
+const queued = new Map<string, Promise<Read>>();
+let line: Promise<unknown> = Promise.resolve();
+/** Settles once the read at the head of the line has waited longer than a read without a prompt. */
+let stuck = Promise.withResolvers<undefined>();
+/** The name whose read is at the head of the line. */
+let head: string | undefined;
+
+function look(name: string): Promise<Read> {
+	let read = queued.get(name);
+	if (read) return read;
+	read = line.then(async () => {
+		head = name;
+		const started = performance.now();
+		let prompted = false;
+		const timer = setTimeout(() => {
+			prompted = true;
+			stuck.resolve(undefined);
+		}, PROMPT);
+		const result: Read = await keychain(name).then(
+			(value) => ({ value }),
+			(error: Error) => ({ error: error.message }),
+		);
+		clearTimeout(timer);
+		head = undefined;
+		if (prompted) stuck = Promise.withResolvers();
+		result.prompted = prompted;
+		if (started > (changed.get(name) ?? 0)) known.set(name, result);
+		return result;
+	}).finally(() => queued.delete(name));
+	queued.set(name, read);
+	line = read;
+	return read;
 }
 
 /**
- * `credential` for Settings, which must not wait on a keychain prompt: a read still under way after
- * a moment answers with the last finished read, marked `waiting`, and a later call picks up its
- * result. Settings polls while it waits, so after a prompted read only `fresh` reads again, or each
- * poll would raise another prompt.
+ * A keychain read for Settings, which must not wait on a prompt: undefined while the line is held
+ * by a prompt, and a later call picks up the result. Settings polls while it waits, so after a
+ * prompted read only `fresh` reads again, or each poll would raise another prompt.
+ */
+function peek(name: string, fresh?: boolean): Promise<Read | undefined> {
+	const last = known.get(name);
+	if (last?.prompted && !fresh && !queued.has(name)) return Promise.resolve(last);
+	return Promise.race([look(name), stuck.promise]);
+}
+
+function describe({ value, error }: Read, override?: string): CredentialStatus {
+	if (error) {
+		return { source: override ? "environment" : "unavailable", stored: null, override, error };
+	}
+	return {
+		source: override ? "environment" : value ? "keychain" : "missing",
+		stored: !!value,
+		override,
+	};
+}
+
+/**
+ * A credential's status for Settings: the last finished read while the line waits on a prompt,
+ * marked `waiting` when that prompt is for this name or nothing has been read yet.
  */
 export async function latest(name: string, fresh?: boolean): Promise<CredentialStatus> {
-	const last = known.get(name);
-	if (last?.prompted && !fresh && !reading.has(name)) return last.status;
-	const started = performance.now();
-	const read = credential(name).then((status) => {
-		if (started > (changed.get(name) ?? 0)) {
-			known.set(name, { status, prompted: performance.now() - started > PROMPT });
-		}
-		return status;
-	});
-	const status = await Promise.race([read, Bun.sleep(PROMPT)]);
-	if (status) return status;
 	const override = overriding(name);
+	const read = await peek(name, fresh);
+	if (read) return describe(read, override);
+	const last = known.get(name);
+	if (last && head !== name) return describe(last, override);
 	return {
-		...last?.status ?? { source: override ? "environment" : "unavailable", stored: null, override },
+		...last
+			? describe(last, override)
+			: { source: override ? "environment" : "unavailable", stored: null, override },
 		waiting: KEYCHAIN_WAITING,
 	};
 }
 
-/** pi-ai's built-in providers, resolving credentials through Ace. */
-export function models(): MutableModels {
+function catalog(lookup: (name: string) => Promise<string | undefined>): MutableModels {
 	return builtinModels({
 		authContext: {
-			env: key,
+			env: lookup,
 			async fileExists(path) {
 				try {
 					await access(path.startsWith("~") ? homedir() + path.slice(1) : path);
@@ -158,4 +198,27 @@ export function models(): MutableModels {
 			},
 		},
 	});
+}
+
+/** pi-ai's built-in providers, resolving credentials through Ace. */
+export function models(): MutableModels {
+	return catalog(key);
+}
+
+/**
+ * `models` for Settings: a name whose read waits on a prompt keeps its last finished value, and
+ * `waiting` reports that some did. Agents keep using `models`, which waits for each read.
+ */
+export function settled(fresh?: boolean): { models: MutableModels; waiting(): boolean } {
+	let waiting = false;
+	return {
+		models: catalog(async (name) => {
+			const found = env(`ACE_${name}`) ?? env(name);
+			if (found) return found;
+			const read = await peek(name, fresh);
+			if (!read) waiting = true;
+			return (read ?? known.get(name))?.value;
+		}),
+		waiting: () => waiting,
+	};
 }

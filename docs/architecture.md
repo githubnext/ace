@@ -200,7 +200,11 @@ variables out of the environment; only the key lookup can read them.
 Workers resolve Keychain credentials on each model request, so adding, replacing, or removing a
 key through the app or CLI takes effect without restarting workers. Keychain access errors are
 distinct from missing keys. Settings exposes provider status and environment overrides, never
-stored key values; it validates new keys against the provider before saving them.
+stored key values; it validates new keys against the provider before saving them. Settings never
+waits on a keychain prompt: it reads keychain names one at a time, so the names model availability
+asks for raise at most one prompt at a time, and while a read waits it shows each key's last
+finished read, marked as waiting for keychain access, and polls until the read lands. A key whose
+read waited on a prompt is read again only on Refresh. Workers keep waiting for each read.
 
 The default model for a chat's first agent run is a nonsecret preference in `settings.json` under
 `~/Library/Application Support/Ace` on macOS, or `$XDG_CONFIG_HOME/ace` on Linux. The app and CLI
