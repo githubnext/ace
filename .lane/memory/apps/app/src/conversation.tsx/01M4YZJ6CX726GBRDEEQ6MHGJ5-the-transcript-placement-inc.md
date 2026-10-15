@@ -4,8 +4,9 @@ anchor: const transcript
 created: 2026-10-15T05:11:37Z
 norm: '1'
 sig: 60c22dcb5a62f055
-body_hash: 89c8a40bfabe8a1c
-raw_hash: f352c7936fac377d
+body_hash: b4f8c93233925da6
+raw_hash: 65ded502d67083d8
+vouched: 2026-10-15T12:44:23Z
 lines: 40-45
 ---
 
