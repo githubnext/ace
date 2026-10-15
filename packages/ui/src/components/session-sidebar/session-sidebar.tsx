@@ -90,6 +90,7 @@ export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children
 	/** Rows whose capabilities allow moving list these destinations under "Move to:". */
 	onMoveTargets?: (row: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (row: SidebarRow, target: MoveTarget) => Promise<void>;
+	onCompute?: (row: SidebarRow, action: "start" | "stop") => void;
 	onToggleGroup?: (id: SessionSidebarGroupId) => void;
 	onNewSession?: () => void;
 	/** When provided, a "…" menu button appears offering "Continue a pull request…". */
@@ -392,6 +393,7 @@ function GroupRows({
 	onRename,
 	onMoveTargets,
 	onMove,
+	onCompute,
 }: {
 	rows: SidebarRow[];
 	pinned: boolean;
@@ -408,6 +410,7 @@ function GroupRows({
 	onRename?: (row: SidebarRow) => void;
 	onMoveTargets?: (row: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (row: SidebarRow, target: MoveTarget) => Promise<void>;
+	onCompute?: (row: SidebarRow, action: "start" | "stop") => void;
 }) {
 	let selected = (row: SidebarRow) => isSidebarRowSelected(row, selectedUid);
 
@@ -442,6 +445,7 @@ function GroupRows({
 							onRename={onRename}
 							onMoveTargets={onMoveTargets}
 							onMove={onMove}
+							onCompute={onCompute}
 							// SessionItem is not memoized, and selecting still needs row identity.
 							// Keep this local until SessionItem grows a dedicated onSelect prop.
 							onClick={() => onSelect?.(row)}
@@ -474,6 +478,7 @@ function Group({
 	onRename,
 	onMoveTargets,
 	onMove,
+	onCompute,
 }: {
 	group: SessionSidebarGroup;
 	selectedUid?: SidebarRow["uid"];
@@ -488,6 +493,7 @@ function Group({
 	onRename?: (row: SidebarRow) => void;
 	onMoveTargets?: (row: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (row: SidebarRow, target: MoveTarget) => Promise<void>;
+	onCompute?: (row: SidebarRow, action: "start" | "stop") => void;
 	onArchiveInactive?: () => void;
 	onToggleGroup?: (id: SessionSidebarGroupId) => void;
 	onNewSession?: () => void;
@@ -564,6 +570,7 @@ function Group({
 			onRename={onRename}
 			onMoveTargets={onMoveTargets}
 			onMove={onMove}
+			onCompute={onCompute}
 		/>
 	);
 	let panelClassName = cn(
@@ -891,6 +898,7 @@ export function SessionSidebar(
 		onRename,
 		onMoveTargets,
 		onMove,
+		onCompute,
 		onToggleGroup,
 		onNewSession,
 		onContinuePr,
@@ -966,6 +974,7 @@ export function SessionSidebar(
 		onRename,
 		onMoveTargets,
 		onMove,
+		onCompute,
 		onToggleGroup,
 		onNewSession,
 		onContinuePr,

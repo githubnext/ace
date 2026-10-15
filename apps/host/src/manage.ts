@@ -187,8 +187,19 @@ async function hold(id: string): Promise<void> {
  * branches stay in the project. Lanes `lane new` created stay too, for `lane prune` or `lane rm`.
  */
 export async function remove(id: string): Promise<void> {
-	const { project, hosted } = catalog.read(id);
-	if (hosted) {
+	const { project, hosted, compute } = catalog.read(id);
+	if (compute) {
+		// The service's DELETE also deletes the channel and ends its run, which a frozen channel
+		// (a failed start) would refuse to the host's own kill.
+		const response = await fetch(`${hosted}/workspaces/${id}`, {
+			method: "DELETE",
+			headers: await hostedAuth(),
+		});
+		if (!response.ok) {
+			const reason = await refusal(response, "Cloud compute");
+			throw new Error(`${reason} The channel and its cloud workspace were kept.`);
+		}
+	} else if (hosted) {
 		await kill(id);
 		const response = await fetch(`${hosted}/channels/${id}`, {
 			method: "DELETE",

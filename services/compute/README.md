@@ -62,6 +62,7 @@ authentication failure is HTTP 401.
 | POST   | `/workspaces/:id/resize`     | `{ "size": "standard-2" }`. Checkpoints, destroys the container, starts the selected size, restores the files, then reconnects and thaws.                                                                                                                                                                            |
 | POST   | `/workspaces/:id/stop`       | `{}`. Checkpoints and destroys the container, then thaws the channel so chat remains accessible.                                                                                                                                                                                                                     |
 | POST   | `/workspaces/:id/resume`     | `{}`. Reconnects and thaws a frozen pilot whose startup completed. If startup is incomplete, retry `start` instead.                                                                                                                                                                                                  |
+| DELETE | `/workspaces/:id`            | Destroys the container without a checkpoint, deletes the hosted channel and its pi state, then the stored settings and checkpoint. Returns `{ "deleted": true }`, including when nothing remains to delete.                                                                                                          |
 
 An initialization body has this shape:
 
@@ -137,9 +138,9 @@ has no checkpoint, it refuses to silently replace the lost workspace with a fres
 
 ## Boundaries and limitations
 
-- Apart from the app's Run in cloud, which calls `init` and `start`, lifecycle operations are
-  manual HTTP calls. Deleting a cloud channel in the app leaves its container and checkpoint;
-  call `stop` first. There is no agent tool for starting or resizing this compute yet.
+- The app's Run in cloud calls `init` and `start`; a cloud channel's menu offers Stop compute
+  and Start compute, and deleting the channel calls `DELETE`. Other lifecycle operations are
+  manual HTTP calls. There is no agent tool for starting or resizing this compute yet.
 - The runner serves files and shell commands. Native desktop tools, browser tools, and image
   inspection are omitted. The existing hosted-channel restrictions, including cross-channel
   messaging, still apply.

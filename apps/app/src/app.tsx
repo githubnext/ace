@@ -138,7 +138,9 @@ function row(
 			rename: channel.owner === user && channel.state !== "offline",
 			archive: channel.host === host,
 			delete: channel.host === host,
-			move: channel.owner === user && channel.host === host && channel.state !== "archived",
+			move: channel.owner === user && channel.host === host && channel.state !== "archived"
+				&& !channel.compute,
+			compute: !!channel.compute && channel.host === host,
 		},
 		connection: channel.state === "running"
 			? "connected"
@@ -569,6 +571,21 @@ export function App() {
 		}
 	}
 
+	async function stopCompute(channel: Pick<Listing, "id" | "name">) {
+		const id = toast.loading(`Stopping ${channel.name}'s cloud workspace…`, {
+			description: "Saving a checkpoint first",
+		});
+		try {
+			await host.request({ op: "compute-stop", channel: channel.id });
+			toast.success(`${channel.name}'s cloud workspace stopped`, { id, description: undefined });
+		} catch (error) {
+			toast.error(`Could not stop ${channel.name}'s cloud workspace`, {
+				id,
+				description: (error as Error).message,
+			});
+		}
+	}
+
 	async function change(request: HostRequest) {
 		try {
 			await host.request(request);
@@ -710,6 +727,13 @@ export function App() {
 											: undefined}
 										onArchiveInactive={!allProjects && local && connected
 											? () => void archiveInactive(current.path)
+											: undefined}
+										onCompute={connected
+											? (item, action) =>
+												void (action === "stop" ? stopCompute : startCompute)({
+													id: item.uid,
+													name: item.name,
+												})
 											: undefined}
 										onDelete={!allProjects && local && connected
 											? (item) => setDeleting({ id: item.uid, name: item.name })

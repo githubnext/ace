@@ -18,7 +18,9 @@ import {
 	IconPencil as Pencil,
 	IconPin as Pin,
 	IconPinOff as PinSlash,
+	IconPlay as Play,
 	IconRotate as Rebuild,
+	IconStop as Stop,
 	IconTrash as Trash,
 } from "../../icons";
 
@@ -58,6 +60,7 @@ type RowMenuProps = ActionProps & {
 	onRebuild?: (data: SidebarRow) => void;
 	onMoveTargets?: (data: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (data: SidebarRow, target: MoveTarget) => Promise<void>;
+	onCompute?: (data: SidebarRow, action: "start" | "stop") => void;
 	children: ReactNode;
 };
 
@@ -209,6 +212,7 @@ export function RowMenu(
 		onRebuild,
 		onMoveTargets,
 		onMove,
+		onCompute,
 		children,
 	}: RowMenuProps,
 ) {
@@ -259,6 +263,11 @@ export function RowMenu(
 	function del(event: MouseEvent<HTMLElement>) {
 		stop(event);
 		onDelete?.(data);
+	}
+
+	function compute(event: MouseEvent<HTMLElement>, action: "start" | "stop") {
+		stop(event);
+		onCompute?.(data, action);
 	}
 
 	function rebuild(event: MouseEvent<HTMLElement>) {
@@ -344,6 +353,28 @@ export function RowMenu(
 								</ContextMenu.Group>
 								{movable && (
 									<MoveSection destinations={destinations} moving={moving} onMove={move} />
+								)}
+								{onCompute && (
+									<>
+										<ContextMenu.Separator className={MENU_SEPARATOR} />
+										<ContextMenu.Group>
+											<ContextMenu.Item
+												className={MENU_ITEM}
+												onClick={(event) => compute(event, "stop")}
+											>
+												<Stop className="size-3.5" />
+												Stop compute
+											</ContextMenu.Item>
+											<ContextMenu.Item
+												className={MENU_ITEM}
+												onClick={(event) => compute(event, "start")}
+											>
+												<Play className="size-3.5" />
+												Start compute
+											</ContextMenu.Item>
+										</ContextMenu.Group>
+										<ContextMenu.Separator className={MENU_SEPARATOR} />
+									</>
 								)}
 								<ContextMenu.Item
 									className={MENU_ITEM_DESTRUCTIVE_FULL}
