@@ -1,6 +1,9 @@
 import type { QueuedMessage } from "@ace/channel/protocol";
 
-export function MessageQueue({ messages }: { messages: QueuedMessage[] }) {
+/** Authors are Tailscale logins, named as the timeline names them. */
+export function MessageQueue(
+	{ messages, people }: { messages: QueuedMessage[]; people: Record<string, string> },
+) {
 	if (!messages.length) return null;
 	return (
 		<section
@@ -17,7 +20,9 @@ export function MessageQueue({ messages }: { messages: QueuedMessage[] }) {
 				{messages.map((message) => (
 					<li key={message.submission} className="px-3 py-2">
 						<div className="mb-1 flex min-w-0 items-center gap-2 text-muted-foreground">
-							<span className="truncate font-medium">{message.author}</span>
+							<span className="truncate font-medium">
+								{people[message.author] || message.author.split("@")[0]}
+							</span>
 							<span className="shrink-0">{message.invoked ? "@ace" : "Chat"}</span>
 						</div>
 						{message.text && (
