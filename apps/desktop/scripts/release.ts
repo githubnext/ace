@@ -31,14 +31,14 @@ function phase(name: string): void {
 }
 
 // Apple's ticket lookup intermittently drops connections (stapler exit 68) after notarization succeeds.
-async function staple(path: string): Promise<void> {
+async function stapler(action: "staple" | "validate", path: string): Promise<void> {
 	for (let attempt = 1;; attempt++) {
 		try {
-			return run(["xcrun", "stapler", "staple", path]);
+			return run(["xcrun", "stapler", action, path]);
 		} catch (error) {
 			if (attempt === 5) throw error;
 			const seconds = 20 * 2 ** (attempt - 1);
-			console.log(`Stapling attempt ${attempt} failed; retrying in ${seconds}s`);
+			console.log(`stapler ${action} attempt ${attempt} failed; retrying in ${seconds}s`);
 			await Bun.sleep(seconds * 1000);
 		}
 	}
@@ -176,7 +176,7 @@ async function release(): Promise<void> {
 		phase("App notarization");
 		notarize(zip);
 		phase("App stapling and verification");
-		await staple(app);
+		await stapler("staple", app);
 		run(["/usr/sbin/spctl", "--assess", "--type", "execute", app]);
 		phase("DMG");
 		const volume = join(staging, "volume");
@@ -200,8 +200,8 @@ async function release(): Promise<void> {
 		phase("DMG notarization");
 		notarize(dmg);
 		phase("DMG stapling and verification");
-		await staple(dmg);
-		run(["xcrun", "stapler", "validate", dmg]);
+		await stapler("staple", dmg);
+		await stapler("validate", dmg);
 		phase("Appcast");
 		const url = `${origin.href.replace(/\/$/, "")}/${channel}/macos-arm64/`;
 		signedTool([
