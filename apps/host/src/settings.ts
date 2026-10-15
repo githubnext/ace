@@ -1,7 +1,8 @@
 import type { ModelRef } from "@ace/channel/protocol";
 
 import { config } from "./config";
-import { credential, forget, key, store } from "./keys";
+import * as directory from "./directory";
+import { credential, forget, key, overriding, store } from "./keys";
 import { models, parseModel } from "./manage";
 import { isModel, preference, savePreference } from "./preferences";
 import type { ProviderId, Settings } from "./protocol";
@@ -75,14 +76,14 @@ async function check(id: ProviderId, value: string): Promise<void> {
 	throw new Error(`${selected.name} could not check the key (HTTP ${response.status}). Try again.`);
 }
 
+function isValue(value: unknown): value is string {
+	return typeof value === "string" && !!value.trim() && value.length <= 4096
+		&& !/[\r\n]/.test(value) && !value.includes("\0");
+}
+
 export async function setKey(id: ProviderId, value: string): Promise<void> {
 	const selected = provider(id);
-	if (
-		typeof value !== "string" || !value.trim() || value.length > 4096 || /[\r\n]/.test(value)
-		|| value.includes("\0")
-	) {
-		throw new Error("Enter a valid API key");
-	}
+	if (!isValue(value)) throw new Error("Enter a valid API key");
 	value = value.trim();
 	await check(id, value);
 	try {
@@ -123,4 +124,58 @@ export async function setModel(model: ModelRef | null): Promise<void> {
 		}
 	}
 	savePreference(model);
+}
+
+function named(name: unknown): void {
+	if (typeof name !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(name)) {
+		throw new Error("Name a key such as OPENAI_API_KEY");
+	}
+}
+
+/**
+ * Keychain items saved through Ace Helper, so it can read them later without a macOS prompt: an
+ * item saved by another program, such as a CLI's Bun or `security`, asks before Ace Helper reads it.
+ */
+export async function storeKey(name: string, value: string): Promise<void> {
+	named(name);
+	if (!isValue(value)) throw new Error(`Enter a valid ${name}`);
+	try {
+		await store(name, value.trim());
+	} catch {
+		throw new Error(
+			`Could not save ${name}. Unlock the keychain and allow Ace Helper, then retry.`,
+		);
+	}
+}
+
+export async function forgetKey(name: string): Promise<boolean> {
+	named(name);
+	try {
+		return await forget(name);
+	} catch {
+		throw new Error(
+			`Could not remove ${name}. Unlock the keychain and allow Ace Helper, then retry.`,
+		);
+	}
+}
+
+/**
+ * Join the team's directory, or leave it when `url` is null. A new secret replaces the saved
+ * ACE_SECRET only after the directory accepts it; without one, the saved secret must work.
+ */
+export async function setDirectory(url: string | null, secret?: string): Promise<void> {
+	if (url === null) return directory.configure(undefined);
+	const base = directory.canonical(url);
+	if (secret !== undefined && !isValue(secret)) throw new Error("Enter the team's shared secret");
+	const override = secret !== undefined && overriding("ACE_SECRET");
+	if (override) {
+		throw new Error(
+			`${override} in Ace Helper's environment takes priority over a saved secret. Remove it and restart Ace Helper first.`,
+		);
+	}
+	const value = secret?.trim() || await key("ACE_SECRET");
+	if (!value) throw new Error("Enter the team's shared secret");
+	await directory.check(base, value);
+	if (secret !== undefined) await storeKey("ACE_SECRET", value);
+	await directory.configure(base);
 }

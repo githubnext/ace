@@ -44,9 +44,11 @@ const HELP = `ace — channels on this host
   ace desktop <channel> on|off                   let the channel's agents use native desktop tools
   ace models
   ace model [provider/id|auto]                   show or set the model for a chat's first agent run
-  ace key set <NAME>                             store a key in the OS keychain, read from stdin
+  ace key set <NAME>                             store a key in the OS keychain, read from stdin;
+                                                 a running host saves it so it can read it unprompted
   ace key rm <NAME>
-  ace directory [<url> | off]                    the team's directory, which lists every host's channels
+  ace directory [<url> | off]                    the team's directory, which lists every host's channels;
+                                                 a running host checks it with ACE_SECRET first
   ace web [<url> | off]                          the deployed web app your devices may use with this host
   ace serve [--port 4140]                         serve the app and its WebSocket gateway
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
@@ -155,6 +157,14 @@ function gateway(): Promise<GatewayClient> {
 
 function local<T>(request: HostRequest): Promise<T> {
 	return loopback.local<T>(request, Number(flags.port || config.port));
+}
+
+/**
+ * macOS asks before a host reads a keychain item another program saved, so this host's running
+ * gateway (Ace Helper or ace serve) saves and removes keys, and joins the directory, for the CLI.
+ */
+async function isHostRunning(): Promise<boolean> {
+	return (await health(Number(flags.port || config.port)))?.home === config.home;
 }
 
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
@@ -276,7 +286,9 @@ async function main() {
 			return;
 		}
 		case "directory": {
-			if (ref) directory.configure(ref === "off" ? undefined : ref);
+			const url = ref === "off" ? null : ref;
+			if (ref && await isHostRunning()) await local({ op: "directory-set", url });
+			else if (ref) await directory.configure(url || undefined);
 			return console.log(directory.url() ?? "No directory");
 		}
 		case "web": {
@@ -309,16 +321,23 @@ async function main() {
 			if (!name || !/^[A-Z][A-Z0-9_]*$/.test(name)) {
 				throw new Error("ace key set|rm <NAME>, such as OPENAI_API_KEY");
 			}
+			const running = await isHostRunning();
 			if (ref === "rm") {
-				return console.log(await forget(name) ? `Removed ${name}` : `No ${name} in the keychain`);
+				const removed = running
+					? await local<boolean>({ op: "key-forget", name })
+					: await forget(name);
+				return console.log(removed ? `Removed ${name}` : `No ${name} in the keychain`);
 			}
 			if (ref !== "set") throw new Error("ace key set|rm <NAME>");
 			// From stdin so the key stays out of shell history and the process list.
 			if (process.stdin.isTTY) process.stderr.write(`${name} (end with Ctrl-D): `);
 			const value = (await new Response(Bun.stdin.stream()).text()).trim();
 			if (!value) throw new Error("No key on stdin");
-			await store(name, value);
-			return console.log(`Stored ${name} in the keychain`);
+			if (running) await local({ op: "key-store", name, value });
+			else await store(name, value);
+			return console.log(
+				`Stored ${name} in the keychain${running ? " through the running host" : ""}`,
+			);
 		}
 	}
 

@@ -71,8 +71,13 @@ export async function forget(name: string): Promise<boolean> {
 	return Bun.secrets.delete({ service: config.keychain, name });
 }
 
+/** The environment variable that supplies `name` ahead of the keychain, if any. */
+export function overriding(name: string): string | undefined {
+	return env(`ACE_${name}`) ? `ACE_${name}` : env(name) ? name : undefined;
+}
+
 export async function credential(name: string): Promise<CredentialStatus> {
-	const override = env(`ACE_${name}`) ? `ACE_${name}` : env(name) ? name : undefined;
+	const override = overriding(name);
 	try {
 		const stored = !!await keychain(name);
 		return { source: override ? "environment" : stored ? "keychain" : "missing", stored, override };

@@ -9,7 +9,7 @@ import type {
 	RunEnd,
 } from "@ace/channel/protocol";
 
-export const HOST_PROTOCOL = 9;
+export const HOST_PROTOCOL = 10;
 
 /** A watch's `closed` reason when the channel's worker or hosting service ended it, as a restart does. */
 export const CHANNEL_CLOSED = "The channel closed the connection";
@@ -36,7 +36,8 @@ export type Diagnostics = {
 		name?: string;
 		error?: string;
 	};
-	directory: { url?: string; synced?: number; error?: string };
+	/** `secret` is the team's ACE_SECRET, which also authenticates hosted channels. */
+	directory: { url?: string; synced?: number; error?: string; secret: CredentialStatus };
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
 };
@@ -184,6 +185,14 @@ export type HostRequest =
 	| { op: "key-check"; provider: ProviderId }
 	| { op: "key-remove"; provider: ProviderId }
 	| { op: "preferences"; model: ModelRef | null }
+	/**
+	 * Only this host's loopback clients save or remove keychain items and join or leave the
+	 * directory: Ace Helper saves them so it can read them back without a macOS prompt.
+	 */
+	| { op: "key-store"; name: string; value: string }
+	| { op: "key-forget"; name: string }
+	/** Join after the directory accepts the URL and secret, or keep the saved secret; null leaves. */
+	| { op: "directory-set"; url: string | null; secret?: string }
 	/** Quiesce this helper before replacing its application, or recover a canceled update. */
 	| { op: "update-prepare" }
 	| { op: "update-cancel" }

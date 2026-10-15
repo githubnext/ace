@@ -455,7 +455,10 @@ whole channel set on each change and every 30 seconds, then reads everyone's. It
 only: channel traffic goes to the channel's host over the tailnet, or to the hosted channel. So a
 channel stays listed while its host is asleep. The app shows a local channel whose host is
 unreachable as offline, and reaches a hosted channel directly. Hosts find the directory through
-`ace directory <url>` and authenticate with the team's `ACE_SECRET`.
+Settings or `ace directory <url>` and authenticate with the team's `ACE_SECRET`. A running host
+checks a new URL and secret against the directory before saving them, and it saves Keychain items
+for the CLI too: macOS lets the program that saved an item read it without asking, so a secret
+saved by another program would make Ace Helper wait on a Keychain prompt.
 
 Lobbies (presence, notifications) are not built. Until then each app notices its own person's
 finished and failed runs from listings: it keeps the run ends it has shown or announced per host
