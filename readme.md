@@ -61,14 +61,17 @@ Press Cmd+O in the desktop to open a folder as a project. Opening a project need
 and creates no channel. Dashboard and Channels share the project picker; start a channel from
 the project's dashboard or sidebar. Each project remembers its selected channel.
 
-Settings → This Mac shows Git, shell,
-Tailscale, and directory status, plus Start, Stop, and Restart controls for Ace Helper. Quitting
-the UI leaves hosting available. Stopping the helper takes local channels offline and suspends
+Settings → This Mac shows Git, shell, and Tailscale status, joins the
+[team directory](#team-directory), and has Start, Stop, and Restart controls for Ace Helper.
+Quitting the UI leaves hosting available. Stopping the helper takes local channels offline and suspends
 their work; restarting it and reopening a channel resumes that work.
 
 Development desktop builds use their own catalog, settings, and Keychain service (`ace-dev`).
 The installed stable app and CLI use `ace`. Build with Bun 1.4 or later; the packaged UI uses
 Electrobun's compatible bundled runtime, and Ace Helper carries its own compiled runtime.
+
+If `bun desktop dev` or `build` exits silently, macOS killed Electrobun's downloaded CLI for an invalid
+signature. Re-sign it once with `codesign --force -s - apps/desktop/node_modules/electrobun/bin/electrobun`.
 
 Start Tailscale to collaborate: the host shares its channels over the tailnet, and the app shows
 teammates' channels. Local work can run without Tailscale; remote collaboration uses the tailnet.
@@ -92,22 +95,30 @@ printf %s "$SECRET" | bun ace key set ACE_SECRET          # the value in .dev.va
 bun ace new --hosted http://localhost:8787 --project ~/code/my-repo
 ```
 
-The team's directory lists every host's channels, so they stay visible while their host sleeps.
-Run `services/directory` the same way (`bun --filter @ace/directory dev --port 8788`), then point
-each host at it with `bun ace directory http://localhost:8788`.
+### Team directory
 
-To deploy both to your Cloudflare account, give the Workers and every host the same secret:
+The team's directory lists every host's channels, so they stay visible while their host sleeps.
+Whoever sets up the team deploys it once from a checkout; everyone else joins from the app.
+
+To try it locally, run `services/directory` the same way
+(`bun --filter @ace/directory dev --port 8788`) and point each host at `http://localhost:8788`.
+
+To deploy both services to your Cloudflare account, give the Workers the same secret:
 
 ```sh
 SECRET=$(openssl rand -hex 32)
-printf %s "$SECRET" | bun ace key set ACE_SECRET
 for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf %s "$SECRET" | bunx wrangler secret put ACE_SECRET); done
 (cd services/channel && bunx wrangler secret put ANTHROPIC_API_KEY)   # and any other model keys
-bun ace directory https://ace-directory.<your-subdomain>.workers.dev
 ```
 
-If `bun desktop dev` or `build` exits silently, macOS killed Electrobun's downloaded CLI for an invalid
-signature. Re-sign it once with `codesign --force -s - apps/desktop/node_modules/electrobun/bin/electrobun`.
+Share the directory's URL (`https://ace-directory.<your-subdomain>.workers.dev`) and the secret
+with teammates privately. Every host, including yours, joins in Settings → This Mac → Team
+directory: Ace Helper checks the URL and secret against the directory, then saves the secret to
+the Keychain. Change or leave the directory, or remove the saved secret, in the same place.
+
+From a checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>`
+does the same. While Ace Helper or `ace serve` runs, both go through it: macOS asks before a signed
+Ace Helper reads a Keychain item another program, such as `bun` or `security`, saved.
 
 ## Documentation
 

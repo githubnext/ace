@@ -37,7 +37,16 @@ import {
 	type People,
 } from "./protocol";
 import { type Machine, self, whois } from "./tailnet";
-import { checkKey, removeKey, setKey, setModel, settings } from "./settings";
+import {
+	checkKey,
+	forgetKey,
+	removeKey,
+	setDirectory,
+	setKey,
+	setModel,
+	settings,
+	storeKey,
+} from "./settings";
 import { resume, shutdown } from "./shutdown";
 import * as terminals from "./terminals";
 import * as web from "./web";
@@ -239,6 +248,7 @@ async function remote(client: Client, host: string): Promise<GatewayClient> {
 const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete"]);
 const windowOps = new Set<HostRequest["op"]>(["window", "windows", "tab-rename", "tab-result"]);
 const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
+const keychainOps = new Set<HostRequest["op"]>(["key-store", "key-forget", "directory-set"]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
 	"project-open",
@@ -277,6 +287,9 @@ async function handle(
 	}
 	if (moveOps.has(request.op) && (!client.local || client.user !== catalog.user)) {
 		throw new Error("Only this host's owner can move channels, from its local app");
+	}
+	if (keychainOps.has(request.op) && (!client.local || client.user !== catalog.user)) {
+		throw new Error("Only this host's owner can change its credentials, from its local app");
 	}
 	if (localOps.has(request.op) && (client.peer || client.user !== catalog.user)) {
 		throw new Error("This action is only available from this host's local app");
@@ -399,6 +412,16 @@ async function handle(
 		case "preferences":
 			await setModel(request.model);
 			return settingsChanged();
+		case "key-store":
+			await storeKey(request.name, request.value);
+			return settingsChanged();
+		case "key-forget": {
+			const removed = await forgetKey(request.name);
+			settingsChanged();
+			return removed;
+		}
+		case "directory-set":
+			return setDirectory(request.url, request.secret);
 		case "models":
 			if (request.host && request.host !== name && !client.peer) {
 				return (await remote(client, request.host)).request({ op: "models" });

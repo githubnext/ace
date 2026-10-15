@@ -5,6 +5,7 @@ import type { HelperAction, HelperState } from "@ace/desktop/protocol";
 import type { Diagnostics } from "@ace/host/protocol";
 
 import { desktop } from "./desktop";
+import { TeamDirectory } from "./directory-settings";
 import { host } from "./host";
 import { Disclosure, Group, Problem, Row, Status } from "./settings-layout";
 
@@ -178,14 +179,9 @@ export function HostStatus({ active }: { active: boolean }) {
 								}. Teammates reach this host over Tailscale; restart Ace Helper after connecting or changing it.`}
 								footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
 							/>
-							<Row
-								label="Team directory"
-								description={checked.directory.url
-									? checked.directory.synced
-										? `Last synced ${new Date(checked.directory.synced).toLocaleTimeString()}`
-										: "Waiting for the first sync…"
-									: "Not configured"}
-								footer={checked.directory.error && <Problem>{checked.directory.error}</Problem>}
+							<TeamDirectory
+								directory={checked.directory}
+								onChange={() => setRetry((value) => value + 1)}
 							/>
 						</Group>
 						<Group title="Tools">

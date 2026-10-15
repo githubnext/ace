@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 
 import * as directory from "./directory";
 import { shell as environment } from "./environment";
+import { credential } from "./keys";
 import type { Diagnostics } from "./protocol";
 import * as tailnet from "./tailnet";
 
@@ -37,9 +38,15 @@ async function shell(): Promise<Diagnostics["tools"][number]> {
 }
 
 export async function diagnostics(): Promise<Diagnostics> {
-	const [tools, tailscale] = await Promise.all([
+	const [tools, tailscale, secret] = await Promise.all([
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(),
+		credential("ACE_SECRET"),
 	]);
-	return { tools, tailscale, directory: directory.status(), shell: { ...environment } };
+	return {
+		tools,
+		tailscale,
+		directory: { ...directory.status(), secret },
+		shell: { ...environment },
+	};
 }

@@ -138,9 +138,9 @@ and Ace's grouped permission in macOS background-item settings.
   creation, project switching, and a real Anthropic shell-tool reply. Fixed a render loop by
   caching object snapshots in the shared local-storage hook.
 - Follow-up work is tracked in the [dogfooding](https://github.com/githubnext/ace/issues/5) and
-  [desktop distribution](https://github.com/githubnext/ace/issues/7) meta issues. Team directory
-  configuration and providers beyond Anthropic/OpenAI still use the CLI; directory status in
-  Settings is read-only.
+  [desktop distribution](https://github.com/githubnext/ace/issues/7) meta issues. Providers beyond
+  Anthropic/OpenAI still use the CLI. This Mac joins, changes, and leaves the team directory and
+  saves its secret; deploying the directory stays a CLI step.
 
 ## UI testing
 
