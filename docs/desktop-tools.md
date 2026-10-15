@@ -20,12 +20,12 @@ CGEvent programs bypass the tools' snapshot and exact-target checks even without
 
 Native desktop tools require macOS 15 or later. Ace embeds the native library from
 [desktop-tools](https://github.com/githubnext/desktop-tools), which carries Peekaboo's bridge and
-Ace's patches; there is no separate Peekaboo installation or permission grant. In Ace Settings, open This Mac and enable
+Ace's patches; there is no separate Peekaboo installation or permission grant. In Ace Settings, open Computer use and enable
 Accessibility and Screen Recording. macOS grants those permissions to Ace on that machine.
 Keyboard and pointer event delivery also require Event Synthesizing, which Ace reports and requests separately.
 Clicking Accessibility controls, selecting text, and replacing field values use Accessibility permission.
 Literal insertion temporarily uses the clipboard. It requires allowed clipboard reading so Ace can
-preserve the previous contents; This Mac shows that status without reading clipboard contents.
+preserve the previous contents; Computer use shows that status without reading clipboard contents.
 Explicit clipboard reads use the same permission. On macOS versions with per-app clipboard controls, allow Ace in System Settings before reading or inserting. Clipboard-only tools require no Accessibility, screen capture, or input permission.
 
 Keep Ace open on the machine running the tools. Closing its window is fine, but quitting Ace
