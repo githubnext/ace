@@ -128,8 +128,10 @@ export function Composer(
 		composer.current?.set(ACE.test(draft) ? draft : `@ace ${draft}`);
 		onDraftLoaded();
 	}, [draft, onDraftLoaded]);
+	// An offline channel can't answer; the conversation already says so, so don't blame providers.
+	const offline = channel.state === "offline";
 	useEffect(() => {
-		if (status !== "open" || mode !== "ace") return;
+		if (status !== "open" || mode !== "ace" || offline) return;
 		let active = true;
 		// Ask the channel itself: a hosted channel uses the service's credentials, not its workspace's.
 		host.channel<ModelOption[]>(channel.id, { op: "models" }).then(
@@ -147,7 +149,7 @@ export function Composer(
 		return () => {
 			active = false;
 		};
-	}, [channel.id, mode, status, settingsVersion]);
+	}, [channel.id, mode, status, settingsVersion, offline]);
 	const [{ model: picked, effort: pickedEffort }, changePick] = useLocalStorage(
 		`ace:pick:${scope}/${id}`,
 		UNPICKED,
@@ -268,7 +270,7 @@ export function Composer(
 			/>
 			{refused
 				? <Refusal mode={mode} onChat={toChat} />
-				: mode === "ace" && models?.length === 0 && (
+				: mode === "ace" && !offline && models?.length === 0 && (
 					<Notice
 						action={onSettings && (
 							<Button size="sm" variant="ghost" onClick={onSettings}>Provider settings</Button>
