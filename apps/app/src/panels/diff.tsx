@@ -12,7 +12,11 @@ type Loaded = { stamp: string; patch?: string; signature?: string; error?: strin
 
 const POLL = 2000;
 const LIMIT = 4;
-const GROUPS = { committed: "Committed", uncommitted: "Uncommitted", untracked: "Untracked" };
+export const GROUPS = {
+	committed: "Committed",
+	uncommitted: "Uncommitted",
+	untracked: "Untracked",
+};
 
 function group(change: Change) {
 	return change.state && GROUPS[change.state];

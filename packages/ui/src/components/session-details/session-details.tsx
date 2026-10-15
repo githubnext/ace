@@ -39,11 +39,13 @@ export type DetailsSubagent = {
 };
 export type DetailsLink = { url: string; label: string; kind: "issue" | "pull" | "web" };
 export type DetailsFact = { label: string; value: string; title?: string };
+/** One group's totals, such as committed or untracked files; ungrouped totals omit `group`. */
+export type DetailsChanges = { group?: string; adds: number; dels: number; files: number };
 
 export type SessionDetailsViewProps = {
 	summary?: string;
-	/** Line totals for the chat's work; absent until first checked. */
-	changes?: { adds: number; dels: number; files: number };
+	/** Totals for the chat's work, one per group the Diff shows; absent until first checked. */
+	changes?: DetailsChanges[];
 	branch?: string;
 	/** `null` once looked up and none exists; absent while unknown or unavailable. */
 	pull?: DetailsPull | null;
@@ -112,22 +114,18 @@ function External(
 	);
 }
 
-function Changes(
-	{ changes, onDiff }: {
-		changes: NonNullable<SessionDetailsViewProps["changes"]>;
-		onDiff?: () => void;
-	},
-) {
-	const label = `Changes: ${changes.files} ${
-		changes.files === 1 ? "file" : "files"
-	}, ${changes.adds} additions, ${changes.dels} deletions`;
+function Changes({ changes, onDiff }: { changes: DetailsChanges; onDiff?: () => void }) {
+	const name = changes.group || "Changes";
+	const files = `${changes.files.toLocaleString()} ${changes.files === 1 ? "file" : "files"}`;
+	const label = `${name}: ${files}, ${changes.adds} additions, ${changes.dels} deletions`;
 	const content = (
 		<>
 			<IconFileDiff className={cn(GLYPH, "text-muted-foreground")} aria-hidden />
-			<span className="min-w-0 truncate">Changes</span>
+			<span className="min-w-0 truncate">{name}</span>
 			<span className="ml-auto flex shrink-0 gap-1.5 font-medium tabular-nums">
-				<span className="text-success">+{changes.adds}</span>
-				<span className="text-destructive">-{changes.dels}</span>
+				{changes.group && <span className="font-normal text-muted-foreground">{files}</span>}
+				<span className="text-success">+{changes.adds.toLocaleString()}</span>
+				<span className="text-destructive">-{changes.dels.toLocaleString()}</span>
 			</span>
 		</>
 	);
@@ -239,7 +237,9 @@ export function SessionDetailsView(
 
 			{(changes || branch || pull !== undefined) && (
 				<section className="flex min-w-0 flex-col gap-1 border-t pt-3">
-					{changes && <Changes changes={changes} onDiff={onDiff} />}
+					{changes?.map((value) => (
+						<Changes key={value.group || ""} changes={value} onDiff={onDiff} />
+					))}
 					{branch && (
 						<div className={ROW} title={branch}>
 							<IconBranch className={cn(GLYPH, "text-muted-foreground")} aria-hidden />
