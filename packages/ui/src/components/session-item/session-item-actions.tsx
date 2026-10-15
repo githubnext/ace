@@ -43,7 +43,7 @@ type SessionActionsProps = ActionProps & {
 	data: SidebarRow;
 };
 
-type RowMenuProps = {
+type RowMenuProps = ActionProps & {
 	data: SidebarRow;
 	onRename?: (data: SidebarRow) => void;
 	onFork?: (data: SidebarRow) => void;
@@ -193,6 +193,9 @@ function MoveSection(
 export function RowMenu(
 	{
 		data,
+		pinned,
+		onPin,
+		onUnpin,
 		onRename,
 		onFork,
 		onInfo,
@@ -216,6 +219,13 @@ export function RowMenu(
 	let movable = onMoveTargets && onMove;
 
 	let leave = data.member ? onLeave : undefined;
+	let canPin = canTogglePin({ pinned, onPin, onUnpin });
+
+	function pin(event: MouseEvent<HTMLElement>) {
+		stop(event);
+		if (pinned) onUnpin?.(data);
+		else onPin?.(data);
+	}
 
 	function rename(event: MouseEvent<HTMLElement>) {
 		stop(event);
@@ -303,6 +313,12 @@ export function RowMenu(
 						{!lobby && !archived && (
 							<>
 								<ContextMenu.Group>
+									{canPin && (
+										<ContextMenu.Item className={MENU_ITEM} onClick={pin}>
+											{pinned ? <PinSlash className="size-3.5" /> : <Pin className="size-3.5" />}
+											{pinned ? "Unpin channel" : "Pin channel"}
+										</ContextMenu.Item>
+									)}
 									<ContextMenu.Item className={MENU_ITEM} disabled={!onRename} onClick={rename}>
 										<Pencil className="size-3.5" />
 										Rename channel
