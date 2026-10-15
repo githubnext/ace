@@ -21,6 +21,8 @@ type Peer = { machine: Machine; client: GatewayClient; github?: string };
 /** One listing connection per online peer, kept only while the peer answers. */
 const hosts = new Map<string, Peer>();
 const listeners = new Set<() => void>();
+/** Each peer's channels as it last answered, listed as offline while the peer is unreachable. */
+const remembered = new Map<string, Listing[]>();
 
 function emit() {
 	for (const listener of listeners) listener();
@@ -58,6 +60,7 @@ async function discover(signal: AbortSignal) {
 				});
 				status = client.status;
 			}
+			if (client.status === "open") remembered.set(name, client.channels);
 			emit();
 		});
 		hosts.set(name, host);
@@ -83,6 +86,13 @@ export function watch(onChange: () => void) {
 export function listings(): Listing[] {
 	return [...hosts.values()].flatMap(({ client }) =>
 		client.status === "open" ? client.channels : []
+	);
+}
+
+/** Channels of peers that answered before but are unreachable now. */
+export function unreachable(): Listing[] {
+	return [...remembered].flatMap(([name, channels]) =>
+		hosts.get(name)?.client.status === "open" ? [] : channels
 	);
 }
 
