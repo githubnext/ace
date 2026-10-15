@@ -156,7 +156,7 @@ export class Channel {
 		const registry = createRegistry();
 		registry.install(logging(log));
 		registry.install(CodingTools);
-		const handoffs = new Handoffs();
+		const handoffs = new Handoffs(options.directory);
 		registry.install(handoffs.extension);
 		const execute = options.desktop;
 		if (execute) {

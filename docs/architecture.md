@@ -131,7 +131,10 @@ is one pi conversation in that Session.
   agent names a randomly named channel and keeps a short summary as work progresses, preserving
   deliberate names unless asked to rename. Metadata lives in a pi session document and is
   projected into host listings. Watch events update open clients; the details sidebar shows the
-  full summary. Lane paths and branch prefixes keep the channel's original name.
+  full summary. Lane paths and branch prefixes keep the channel's original name, and so does the
+  `agent@<prefix>` author of messages its agent sends other channels. The app, the agents that
+  receive them, and handoff results name that sender by its current name, `#name`, when they read
+  it; stored authors never change.
 - **Busy is a live listing projection.** A channel is busy while any chat, including a child chat,
   has a run in pi's `LiveDoc`. Opening takes an initial snapshot before scheduling resumes;
   committed live-document changes maintain the aggregate and `onBusy` publishes only transitions.

@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord";
-import { type AssistantMessage, Type } from "@earendil-works/pi-ai";
+import { type AssistantMessage, type Message, type TextContent, Type } from "@earendil-works/pi-ai";
 import {
 	AssistantEntry,
 	configure,
@@ -7,6 +7,8 @@ import {
 	defineTool,
 	type EntryId,
 	type Extension,
+	GenerationTask,
+	hook,
 	type ToolExecutionApi,
 } from "@earendil-works/pi-durable";
 
@@ -86,16 +88,60 @@ export type Directory = {
 	list(context: Context): Promise<{
 		id: string;
 		name: string;
+		/** The channel's original name, which its agent's messages are authored `agent@<prefix>` by. */
+		prefix: string;
 		project: string;
 		summary?: string;
 	}[]>;
 	deliver(delivery: Delivery, context: Context): Promise<void>;
 };
 
+/**
+ * Other channels' current names, as `#name`, keyed by the author their agents' messages carry. That
+ * author keeps the name a channel was created with, which nobody knows it by after a rename.
+ */
+export async function senders(
+	directory: Directory,
+	context: Context,
+): Promise<Map<string, string>> {
+	const channels = await directory.list(context);
+	return new Map(channels.map((channel) => [`agent@${channel.prefix}`, `#${channel.name}`]));
+}
+
+/** Names the author of another channel's message as people see it, leaving the stored entry alone. */
+function rename(message: Message, names: Map<string, string>): Message {
+	if (message.role !== "user") return message;
+	const { author } = room.input(message.content);
+	const name = names.get(author);
+	if (!name) return message;
+	const swap = (text: string) => name + text.slice(author.length);
+	const { content } = message;
+	if (typeof content === "string") return { ...message, content: swap(content) };
+	const first = content.findIndex((block) => block.type === "text");
+	const block = content[first] as TextContent;
+	return {
+		...message,
+		content: content.with(first, { ...block, text: swap(block.text) }),
+	};
+}
+
 /** Agents in different channels coordinate only by messaging each other's chats. */
 export function messaging(directory: Directory): Extension {
 	return defineExtension({
 		name: "ace-messaging",
+		hooks: [
+			hook(GenerationTask, {
+				async beforeRequest(request, _api, context) {
+					const { messages } = request;
+					const agents = messages.some((message) =>
+						message.role === "user" && room.isAgent(room.input(message.content).author)
+					);
+					if (!agents) return;
+					const names = await senders(directory, context);
+					return { messages: messages.map((message) => rename(message, names)) };
+				},
+			}),
+		],
 		tools: [
 			defineTool({
 				name: "channels",
@@ -132,7 +178,8 @@ export function messaging(directory: Directory): Extension {
 					const channels = await directory.list(context);
 					// Names can change after delivery; a recovered call must keep its original destination.
 					const saved = await api.memo<string>("channel", context);
-					const ref = saved || args.channel;
+					// Messages from other channels name them `#name`.
+					const ref = saved || args.channel.replace(/^#/, "");
 					let target = channels.find((channel) => channel.id === ref);
 					if (!target && !saved) {
 						const matches = channels.filter((channel) => channel.name === ref);

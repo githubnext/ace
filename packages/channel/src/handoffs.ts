@@ -1,3 +1,4 @@
+import type { Context } from "@earendil-works/chord";
 import { withCancel } from "@earendil-works/chord/context";
 import {
 	type ConversationId,
@@ -9,6 +10,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { createBashTool } from "@earendil-works/pi-durable/tools";
 
+import { type Directory, senders } from "./agents";
 import * as room from "./room";
 
 /** Marks a shell result that a queued handoff stopped or skipped. */
@@ -30,6 +32,17 @@ export class Handoffs {
 	#queued = new Map<ConversationId, string>();
 	#running = new Map<ConversationId, Set<(author: string) => void>>();
 
+	#directory: Directory;
+
+	constructor(directory: Directory) {
+		this.#directory = directory;
+	}
+
+	/** Read when the result is written, since the sender's author keeps its original name. */
+	async #sender(author: string, context: Context): Promise<string> {
+		return (await senders(this.#directory, context)).get(author) || author;
+	}
+
 	inbox(chat: ConversationId, state: InboxState | null | undefined) {
 		const author = (state?.items || []).flatMap((item) =>
 			item.mode === "write" ? [] : [room.input(item.content).author]
@@ -47,7 +60,11 @@ export class Handoffs {
 				execute: async (args, api, context) => {
 					const chat = api.conversationId;
 					const queued = this.#queued.get(chat);
-					if (queued) return result(`Not run: ${queued} sent a message to this chat.`);
+					if (queued) {
+						return result(
+							`Not run: ${await this.#sender(queued, context)} sent a message to this chat.`,
+						);
+					}
 					const { context: command, cancel } = withCancel(context);
 					let by: string | undefined;
 					const stop = (author: string) => {
@@ -61,7 +78,9 @@ export class Handoffs {
 						return await tool.execute(args, api, command);
 					} catch (error) {
 						if (!by || context.abortSignal?.aborted) throw error;
-						return result(`Stopped: ${by} sent a message to this chat.`);
+						return result(
+							`Stopped: ${await this.#sender(by, context)} sent a message to this chat.`,
+						);
 					} finally {
 						running.delete(stop);
 						if (!running.size) this.#running.delete(chat);
