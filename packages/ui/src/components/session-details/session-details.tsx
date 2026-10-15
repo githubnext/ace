@@ -52,6 +52,8 @@ export type SessionDetailsViewProps = {
 	subagents?: DetailsSubagent[];
 	links?: DetailsLink[];
 	facts?: DetailsFact[];
+	/** A line under the facts, such as what the channel depends on. */
+	note?: string;
 	onDiff?: () => void;
 	onClose: () => void;
 };
@@ -206,6 +208,7 @@ export function SessionDetailsView(
 		subagents,
 		links,
 		facts,
+		note,
 		onDiff,
 		onClose,
 	}: SessionDetailsViewProps,
@@ -317,6 +320,7 @@ export function SessionDetailsView(
 							</div>
 						))}
 					</dl>
+					{note && <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{note}</p>}
 				</Section>
 			)}
 		</aside>

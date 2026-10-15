@@ -20,7 +20,8 @@ workspace. Hosted describes where the channel runs; Ace does not operate a hosti
 
 **Workspace**:
 The host that runs a hosted channel's tools, from lanes on its own disk. It connects out to the
-channel. Not a project or a checkout.
+channel. While it is offline, the channel's tools wait for it; chat and model-only runs continue.
+Not a project or a checkout.
 
 **Project**:
 A named set of one or more repositories or local folders that a team works on. Many hosts can

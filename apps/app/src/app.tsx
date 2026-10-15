@@ -127,6 +127,7 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 		createdAt: Math.floor(channel.created / 1000),
 		lifecycle: channel.state === "archived" ? "archived" : "live",
 		private: false,
+		hosted: !!channel.hosted,
 		mine: channel.owner === user,
 		member: true,
 		capabilities: {

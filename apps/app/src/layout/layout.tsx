@@ -90,6 +90,8 @@ type Props = {
 	/** Where the layout persists: one per channel. */
 	id: string;
 	name: string;
+	/** The Chat tab's icon, which marks where the channel runs. */
+	icon?: Icon;
 	/** The chat new Diff and Terminal tabs show. */
 	chat: number;
 	/** Whether the chat's lane has changes, once known. */
@@ -134,6 +136,7 @@ function title(uid: string, name: string, data: Content, count = 1, total = 1) {
 function item(
 	uid: string,
 	name: string,
+	icon: Icon,
 	data: Content = fallback(uid),
 	count?: number,
 	total?: number,
@@ -143,11 +146,11 @@ function item(
 		name: title(uid, name, data, count, total),
 		kind: data.type,
 		chat: uid === CHAT,
-		icon: ICONS[data.type],
+		icon: uid === CHAT ? icon : ICONS[data.type],
 	};
 }
 
-function list(tabs: string[], name: string, meta: Meta) {
+function list(tabs: string[], name: string, icon: Icon, meta: Meta) {
 	const totals = new Map<Kind, number>();
 	for (const uid of tabs) {
 		if (uid === CHAT) continue;
@@ -160,7 +163,7 @@ function list(tabs: string[], name: string, meta: Meta) {
 		const value = meta[uid] || fallback(uid);
 		const count = uid === CHAT ? 1 : (counts.get(value.type) || 0) + 1;
 		counts.set(value.type, count);
-		return [uid, item(uid, name, value, count, totals.get(value.type))];
+		return [uid, item(uid, name, icon, value, count, totals.get(value.type))];
 	}));
 }
 
@@ -659,7 +662,7 @@ function Pane(props: PaneProps) {
 	);
 }
 
-function useLayout({ id, name, chat, changed, onTabClose, opener }: Props) {
+function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, opener }: Props) {
 	const [data] = useState(() => read(id));
 	const [api] = useState(() => Split.create(data.state, { min: minimum }));
 	const [meta, setMeta] = useState<Meta>(data.meta);
@@ -673,9 +676,11 @@ function useLayout({ id, name, chat, changed, onTabClose, opener }: Props) {
 	);
 	const fit = { width: box.width, height: box.height, min: minimum } satisfies Split.Fit;
 	const dnd = useDnd(api, flat, fit);
-	const items = list(view.tabs, name, meta);
+	const items = list(view.tabs, name, icon, meta);
 	const ghost = dnd.drag;
-	const drag = ghost ? items.get(ghost.uid) || item(ghost.uid, name, meta[ghost.uid]) : undefined;
+	const drag = ghost
+		? items.get(ghost.uid) || item(ghost.uid, name, icon, meta[ghost.uid])
+		: undefined;
 
 	useEffect(() => {
 		write(id, state, meta, diff);

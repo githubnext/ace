@@ -7,6 +7,7 @@ import { Badge } from "../../ui/badge";
 import type { SidebarRow } from "./session-item.types";
 import {
 	IconArchive as Archive,
+	IconCloud,
 	IconHand as HandWave,
 	IconHash,
 	IconLock,
@@ -99,6 +100,7 @@ function resolveIcon(data: SidebarRow) {
 		);
 	}
 	if (data.private) return <IconLock aria-label="Private channel" />;
+	if (data.hosted) return <IconCloud aria-label="Hosted channel" />;
 	return <IconHash aria-label="Channel" />;
 }
 
