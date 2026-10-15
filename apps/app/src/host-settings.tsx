@@ -192,7 +192,11 @@ export function HostStatus({ active }: { active: boolean }) {
 								label="Tailscale"
 								description={`${tailnet[checked.tailscale.state]}${
 									checked.tailscale.name ? ` as ${checked.tailscale.name}` : ""
-								}. Teammates reach this host over Tailscale; restart Ace Helper after connecting or changing it.`}
+								}. ${
+									checked.tailscale.loopback
+										? "This host runs loopback-only, so teammates can't reach it and it stays out of the team directory."
+										: "Teammates reach this host over Tailscale; restart Ace Helper after connecting or changing it."
+								}`}
 								footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
 							/>
 							<TeamDirectory

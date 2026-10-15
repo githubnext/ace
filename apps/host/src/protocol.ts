@@ -37,6 +37,8 @@ export type Diagnostics = {
 		state: "missing" | "offline" | "running" | "error";
 		name?: string;
 		error?: string;
+		/** Served with ace serve --loopback: no tailnet listener, peers, or directory entry. */
+		loopback?: boolean;
 	};
 	/**
 	 * `error` is the last directory sync's failure and `failed` when it happened; a successful sync

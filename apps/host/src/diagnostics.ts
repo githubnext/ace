@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 
+import { config } from "./config";
 import * as directory from "./directory";
 import { shell as environment } from "./environment";
 import { latest } from "./keys";
@@ -50,7 +51,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 	]);
 	return {
 		tools,
-		tailscale,
+		tailscale: config.loopback ? { ...tailscale, loopback: true } : tailscale,
 		directory: { ...directory.status(), secret: await secret },
 		shell: { ...environment },
 	};

@@ -22,6 +22,8 @@ export const config = {
 	helper: false,
 	/** Ace Helper's app version, reported by /health so a conflict can name the build on the port. */
 	version: undefined as string | undefined,
+	/** Set by ace serve --loopback; the host stays off the tailnet and the team directory. */
+	loopback: false,
 	worker: [
 		process.execPath,
 		"--no-env-file",

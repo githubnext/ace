@@ -521,6 +521,8 @@ team's existing trust and do not define another way for a participant to join th
 Each host's gateway serves its owner's app over loopback. Its tailnet listeners name each caller
 with `tailscale whois` and accept peer hosts or the owner's browser from an allowed origin.
 Teammates use their own host to reach shared channels. Local-only settings remain on loopback.
+`ace serve --loopback`, which `bun desktop dev` uses, has no tailnet listeners, peers, or directory
+entry, since another host on the same machine would publish under its tailnet name.
 Hosts find online, untagged peers through `tailscale status`. A host shows its app every peer's
 channels and proxies their requests; the peer that runs a channel stamps every author. Only a
 channel's host creates it; only the host's owner, from any of their machines, archives, deletes,

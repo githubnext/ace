@@ -757,8 +757,13 @@ async function listen(port: number): Promise<Server<Client>> {
 	}
 }
 
-export async function serve(port: number): Promise<never> {
+/**
+ * `loopback` keeps a disposable host off the team: no tailnet listener, peer discovery, or directory
+ * entry. A second host on this machine would otherwise publish under the machine's tailnet name.
+ */
+export async function serve(port: number, loopback = false): Promise<never> {
 	config.port = port;
+	config.loopback = loopback;
 	// Channel workers and agent shells reach this listener for the owner's windows.
 	process.env.ACE_PORT = String(port);
 	// Hosted channels run tools in this process.
@@ -805,17 +810,29 @@ export async function serve(port: number): Promise<never> {
 	process.on("SIGTERM", () => void stop());
 	process.on("SIGINT", () => void stop());
 	console.log(`Ace on http://${server.hostname}:${server.port}`);
-	const machine = await self();
+	if (loopback) {
+		log("info", "host.tailnet", { loopback: true });
+		console.log(
+			"Loopback only: not listening on the tailnet, finding peers, or publishing to the directory",
+		);
+	}
+	const machine = loopback ? undefined : await self();
 	if (closing) return new Promise(() => {});
 	if (machine) name = machine.name;
 	const address = machine ? { address: machine.address } : {};
-	const publish = directory.watch(
+	const publish = loopback ? undefined : directory.watch(
 		() => ({ name, login: catalog.user, github: github.login(peopleChanged), ...address }),
 		local,
 		() => void ownersChanged(),
 	);
-	log("info", "host.tailnet", machine ? { name, address: machine.address } : { tailscale: false });
-	cleanup.push(publish.stop);
+	if (publish) {
+		log(
+			"info",
+			"host.tailnet",
+			machine ? { name, address: machine.address } : { tailscale: false },
+		);
+		cleanup.push(publish.stop);
+	}
 	if (machine) {
 		servers.push(team(machine, { port, secure: false }));
 		console.log(`Sharing with the tailnet on ${machine.address}:${port} as ${machine.login}`);
@@ -827,7 +844,7 @@ export async function serve(port: number): Promise<never> {
 			servers.push(team(machine, listener, tls));
 			console.log(`and https://${machine.dns}:${listener.port}`);
 		}
-	} else {
+	} else if (!loopback) {
 		console.log("Tailscale is not running; channels stay on this machine");
 	}
 	mkdirSync(join(catalog.home, "channels"), { recursive: true });
@@ -838,7 +855,7 @@ export async function serve(port: number): Promise<never> {
 		if (file?.endsWith("channel.json")) {
 			void projectsChanged();
 			workspace.sync();
-			void publish.sync();
+			void publish?.sync();
 		}
 	});
 	cleanup.push(() => watcher.close());

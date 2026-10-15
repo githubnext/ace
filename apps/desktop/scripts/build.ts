@@ -117,6 +117,9 @@ async function dev(): Promise<void> {
 		"--no-env-file",
 		join(root, "..", "host", "src", "cli.ts"),
 		"serve",
+		// Its port is this checkout's, so teammates couldn't reach it, and a directory entry under
+		// this machine's name would replace the installed Ace's.
+		"--loopback",
 	], { env, stdio: ["ignore", "inherit", "inherit"] });
 	try {
 		const deadline = Date.now() + 30_000;
