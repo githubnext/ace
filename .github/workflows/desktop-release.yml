@@ -40,12 +40,24 @@ jobs:
       ACE_NOTARY_ISSUER: ${{ vars.ACE_NOTARY_ISSUER }}
       ACE_RELEASE_CHANNEL: ${{ inputs.channel }}
       ACE_RELEASE_REVISION: ${{ inputs.revision || github.sha }}
+      # Sparkle orders canary builds by this run number; it increases across every dispatch.
+      ACE_BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - name: Validate source revision
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ ! "$ACE_RELEASE_REVISION" =~ ^[a-f0-9]{40}$ ]]; then
             echo "::error::The release revision must be a full commit SHA."
             exit 1
+          fi
+          # The environment admits only runs from main, but the revision input could name any commit.
+          if [[ "$ACE_RELEASE_CHANNEL" == stable ]]; then
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$ACE_RELEASE_REVISION...main" --jq .status)
+            if [[ "$status" != identical && "$status" != ahead ]]; then
+              echo "::error::Stable releases build only commits on main, which does not contain $ACE_RELEASE_REVISION ($status)."
+              exit 1
+            fi
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

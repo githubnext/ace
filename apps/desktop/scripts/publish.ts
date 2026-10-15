@@ -8,9 +8,13 @@ import { root } from "./build";
 import { publishGithub } from "./github-release";
 import { type Release, required, signedTool } from "./release";
 import { sparkle } from "./downloads";
+import { bundlePattern, order } from "./version";
 
 const output = join(root, "artifacts", "sparkle");
 const release = await Bun.file(join(output, "release.json")).json() as Release;
+if (!bundlePattern.test(release.version)) {
+	throw new Error("The release manifest's version is not orderable");
+}
 const bucket = required("ACE_UPDATE_BUCKET");
 const account = required("CLOUDFLARE_ACCOUNT_ID");
 const storage = new S3Client({
@@ -39,7 +43,10 @@ if (remote.ok) {
 		match[1]
 	);
 	if (
-		!versions.length || versions.some((version) => Bun.semver.order(version, release.version) > 0)
+		!versions.length
+		|| versions.some((version) =>
+			!bundlePattern.test(version) || order(version, release.version) > 0
+		)
 	) {
 		throw new Error("Refusing to replace a newer or unrecognized release feed");
 	}
@@ -74,7 +81,9 @@ const current = await fetch(`${release.url}${release.archive}?check=${crypto.ran
 });
 if (current.ok) {
 	if (digest(await current.arrayBuffer()) !== release.sha256) {
-		throw new Error("That release version already exists with different bytes. Bump the version.");
+		throw new Error(
+			"That release version already exists with different bytes. Release a new build.",
+		);
 	}
 } else if (current.status === 404) {
 	await upload(
@@ -103,5 +112,5 @@ if (!published.ok || await published.text() !== await Bun.file(feed).text()) {
 	throw new Error("The published feed could not be verified. Check the bucket's cache rules.");
 }
 console.log(
-	`Published Ace ${release.version} to ${release.channel}: ${release.url}${release.archive}`,
+	`Published Ace ${release.display} (${release.version}) to ${release.channel}: ${release.url}${release.archive}`,
 );

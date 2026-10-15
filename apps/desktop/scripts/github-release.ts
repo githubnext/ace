@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 
 import { root } from "./build";
 import { archiveName, prefix, type Release } from "./release";
+import { bundlePattern, order } from "./version";
 
 type GithubRelease = {
 	id: number;
@@ -30,16 +31,12 @@ function gh(args: string[], missing = false): string | undefined {
 
 const version = (tag: string) => tag.slice(tag.lastIndexOf("-v") + 2);
 
-function compare(a: string, b: string): number {
-	const [x, y] = [a.split(".").map(Number), b.split(".").map(Number)];
-	return x[0]! - y[0]! || x[1]! - y[1]! || x[2]! - y[2]!;
-}
-
 export async function publishGithub(directory: string): Promise<void> {
 	const release = await Bun.file(join(directory, "release.json")).json() as Release;
 	if (
 		!/^(canary|stable)$/.test(release.channel)
-		|| !/^\d+\.\d+\.\d+$/.test(release.version)
+		|| !bundlePattern.test(release.version)
+		|| !/^\d+\.\d+\.\d+(\+[a-f0-9]{7})?$/.test(release.display)
 		|| !/^[a-f0-9]{40}$/.test(release.revision)
 		|| release.archive !== archiveName(release.channel, release.version)
 	) throw new Error("Invalid desktop release manifest");
@@ -51,9 +48,10 @@ export async function publishGithub(directory: string): Promise<void> {
 		|| gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])!;
 	const tags = `desktop-${prefix(release.channel)}v`;
 	const tag = `${tags}${release.version}`;
+	// Matches About Ace; a canary's display version repeats when one commit is built twice.
 	const title = release.channel === "stable"
-		? `Ace ${release.version}`
-		: `Ace Canary ${release.version}`;
+		? `Ace ${release.display}`
+		: `Ace Canary ${release.display} (${release.version})`;
 	const endpoint = `repos/${repo}`;
 	const prerelease = release.channel === "canary";
 	const ref = gh(["api", `${endpoint}/git/ref/tags/${tag}`], true);
@@ -80,8 +78,8 @@ export async function publishGithub(directory: string): Promise<void> {
 		) throw new Error(`${tag} does not match the requested release`);
 	} else {
 		const previous = releases
-			.filter((item) => !item.draft && compare(version(item.tag_name), release.version) < 0)
-			.sort((a, b) => compare(version(b.tag_name), version(a.tag_name)))[0];
+			.filter((item) => !item.draft && order(version(item.tag_name), release.version) < 0)
+			.sort((a, b) => order(version(b.tag_name), version(a.tag_name)))[0];
 		const changes = JSON.parse(
 			gh([
 				"api",

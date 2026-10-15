@@ -2,10 +2,10 @@ import { createHash, createPrivateKey, createPublicKey } from "node:crypto";
 import { mkdirSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { version } from "../package.json";
 import { build, root } from "./build";
 import { sign } from "./sign";
 import { run, sparkle } from "./downloads";
+import { current } from "./version";
 
 export function required(name: string): string {
 	const value = process.env[name];
@@ -45,7 +45,9 @@ async function stapler(action: "staple" | "validate", path: string): Promise<voi
 }
 
 export type Release = {
+	/** The bundle version Sparkle orders by; it also names the archive and tag. */
 	version: string;
+	display: string;
 	revision: string;
 	channel: string;
 	archive: string;
@@ -62,9 +64,7 @@ export const archiveName = (channel: string, version: string) =>
 async function release(): Promise<void> {
 	const channel = process.argv[2] || "canary";
 	if (channel !== "canary" && channel !== "stable") throw new Error("Choose canary or stable");
-	if (!/^\d+\.\d+\.\d+$/.test(version)) {
-		throw new Error("Use an incrementing x.y.z desktop version");
-	}
+	const { bundle: version, display } = current(channel);
 	const changes = Bun.spawnSync(["git", "status", "--porcelain"], { cwd: root });
 	if (!changes.success || changes.stdout.length) {
 		throw new Error("Commit the lane's changes before making a release");
@@ -225,7 +225,7 @@ async function release(): Promise<void> {
 		writeFileSync(
 			join(output, "release.json"),
 			JSON.stringify(
-				{ version, revision, channel, archive: filename, url, sha256 } satisfies Release,
+				{ version, display, revision, channel, archive: filename, url, sha256 } satisfies Release,
 				null,
 				"\t",
 			),
