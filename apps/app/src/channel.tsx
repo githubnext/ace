@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import type { Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo, Listing } from "@ace/host/protocol";
 import {
+	type DetailsChanges,
 	type DetailsFact,
 	type DetailsLink,
 	type DetailsSubagent,
@@ -17,7 +18,7 @@ import { Conversation } from "./conversation";
 import { forget, publish, useDetails } from "./details";
 import { host } from "./host";
 import { CHAT, Layout } from "./layout/layout";
-import { Diff } from "./panels/diff";
+import { Diff, GROUPS } from "./panels/diff";
 import { Terminal } from "./panels/terminal";
 import type { Item } from "./transcript";
 
@@ -165,12 +166,23 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy, right.open);
 	const totals = useMemo(() => {
 		if (!changes) return;
-		const sum = { adds: 0, dels: 0, files: changes.files.length };
+		// Totaled per group as the Diff does, so uncommitted and untracked files never inflate the
+		// committed work a pull request would show.
+		const groups = new Map<string | undefined, DetailsChanges>();
+		const add = (group: string | undefined, adds: number, dels: number, files: number) => {
+			let sum = groups.get(group);
+			if (!sum) {
+				groups.set(group, sum = { ...(group ? { group } : {}), adds: 0, dels: 0, files: 0 });
+			}
+			sum.adds += adds;
+			sum.dels += dels;
+			sum.files += files;
+		};
 		for (const file of changes.files) {
-			sum.adds += file.adds;
-			sum.dels += file.dels;
+			add(file.state && GROUPS[file.state], file.adds, file.dels, 1);
 		}
-		return sum;
+		for (const { files } of changes.dirs || []) add(GROUPS.untracked, 0, 0, files);
+		return groups.size ? [...groups.values()] : [{ adds: 0, dels: 0, files: 0 }];
 	}, [changes]);
 	const mentioned = useMemo(() => items && links(items, channel.repo), [items, channel.repo]);
 	const agents = useMemo(() => items && subagents(items, busy), [items, busy]);
