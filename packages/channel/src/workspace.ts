@@ -43,6 +43,16 @@ export type Reply =
 	| { call: CallId; output: string }
 	| { call: CallId; result: Result<unknown, Failure> };
 
+/**
+ * The workspace host pings so the channel can tell a frozen or unreachable host from a quiet one.
+ * The channel answers without waking, so pings must stay these exact frames.
+ */
+export const PING = '{"ping":true}';
+export const PONG = '{"pong":true}';
+export const PING_INTERVAL = 5_000;
+/** Missing three pings means the workspace stopped answering, on either side of the socket. */
+export const STALE = 3 * PING_INTERVAL;
+
 type Failure = {
 	name: "FileError" | "ExecutionError";
 	code: string;
@@ -140,6 +150,9 @@ function isAction(call: Extract<Call, { method: string }>): call is ToolCall {
 /** The channel's side: one connection to the workspace, shared by every chat's environment. */
 export class Link {
 	#send?: (call: Call) => void;
+	/** When the workspace last pinged; undefined for hosts that predate pings. */
+	#heard?: () => number | undefined;
+	#watch?: ReturnType<typeof setInterval>;
 	#generation: string;
 	#next = 1;
 	#pending = new Map<
@@ -153,22 +166,50 @@ export class Link {
 	}
 
 	/** Attach the workspace's connection, replacing any earlier one. */
-	attach(send: (call: Call) => void): void {
+	attach(send: (call: Call) => void, heard?: () => number | undefined): void {
 		this.detach();
 		this.#send = send;
+		this.#heard = heard;
 	}
 
 	/** Calls in flight fail; pi reports interrupted tools to the model. */
 	detach(): void {
 		this.#send = undefined;
-		for (const pending of this.#pending.values()) {
-			pending.resolve(err(new FileError("unknown", "The workspace disconnected")));
-		}
-		this.#pending.clear();
+		this.#heard = undefined;
+		this.#fail("The workspace disconnected");
 	}
 
 	get attached(): boolean {
 		return !!this.#send;
+	}
+
+	/** A frozen or unreachable host keeps its socket open, so attachment alone does not mean it answers. */
+	#unreachable(): string | undefined {
+		if (!this.#send) return "The workspace is offline";
+		const last = this.#heard?.();
+		if (last !== undefined && Date.now() - last >= STALE) return "The workspace is not responding";
+	}
+
+	#fail(message: string): void {
+		clearInterval(this.#watch);
+		this.#watch = undefined;
+		const calls = [...this.#pending];
+		this.#pending.clear();
+		for (const [call, pending] of calls) {
+			// A host that resumes stops work whose caller has given up on it.
+			try {
+				this.#send?.({ cancel: call });
+			} catch {}
+			pending.resolve(err(new FileError("unknown", message)));
+		}
+	}
+
+	/** Calls already sent to a host that then stops answering would otherwise wait for it to return. */
+	#check(): void {
+		if (!this.#pending.size) {
+			clearInterval(this.#watch);
+			this.#watch = undefined;
+		} else if (this.#unreachable()) this.#fail("The workspace stopped responding");
 	}
 
 	receive(reply: Reply): void {
@@ -188,10 +229,11 @@ export class Link {
 		output?: (text: string) => void,
 	): Promise<Result<unknown, Error>> {
 		const send = this.#send;
-		if (!send) {
+		const message = this.#unreachable();
+		if (!send || message) {
 			const error = method === "exec" || method === "desktop" || method === "browser"
-				? new ExecutionError("unknown", "The workspace is offline")
-				: new FileError("unknown", "The workspace is offline");
+				? new ExecutionError("unknown", message!)
+				: new FileError("unknown", message!);
 			return Promise.resolve(err(error));
 		}
 		const call = `${this.#generation}:${this.#next++}`;
@@ -223,6 +265,7 @@ export class Link {
 				},
 				output,
 			});
+			if (this.#heard) this.#watch ??= setInterval(() => this.#check(), PING_INTERVAL);
 			try {
 				send({ call, method, cwd, args: args.map(encode) });
 			} catch (error) {
@@ -251,7 +294,8 @@ export class Link {
 		action: boolean,
 		context: Context,
 	): Promise<DesktopResult> {
-		if (action && !this.#send) return actionFailure(tool, "refused", "The workspace is offline");
+		const unreachable = action && this.#unreachable();
+		if (unreachable) return actionFailure(tool, "refused", unreachable);
 		if (action && context.abortSignal?.aborted) {
 			return actionFailure(
 				tool,

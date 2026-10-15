@@ -1,6 +1,6 @@
 import type { Context } from "@earendil-works/chord";
 import type { PromptSection } from "@earendil-works/pi-durable";
-import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
+import type { ExecutionEnv, FileError } from "@earendil-works/pi-durable/env";
 
 /** Instruction files at the checkout root, in the order agents conventionally read them. */
 const INSTRUCTIONS = ["AGENTS.md", "CLAUDE.md"];
@@ -8,13 +8,21 @@ const SKILLS = [".agents/skills", ".claude/skills"];
 const RULES = ".claude/rules";
 const LIMIT = 32_000;
 
+/**
+ * Only a missing file means "none". Any other failure, such as an unreachable workspace, throws, so
+ * pi keeps the instructions it last showed and reports why instead of dropping them.
+ */
+function absent(error: FileError): undefined {
+	if (!["not_found", "not_directory", "is_directory"].includes(error.code)) throw error;
+}
+
 async function read(
 	env: ExecutionEnv,
 	path: string,
 	context: Context,
 ): Promise<string | undefined> {
 	const result = await env.readTextFile(`${env.cwd}/${path}`, context);
-	if (!result.ok) return;
+	if (!result.ok) return absent(result.error);
 	const text = result.value.trim();
 	return text.length > LIMIT
 		? `${text.slice(0, LIMIT)}\n… (truncated; read ${path} for the rest)`
@@ -23,7 +31,9 @@ async function read(
 
 async function list(env: ExecutionEnv, path: string, context: Context) {
 	const result = await env.listDir(`${env.cwd}/${path}`, context);
-	return result.ok ? result.value : [];
+	if (result.ok) return result.value;
+	absent(result.error);
+	return [];
 }
 
 /** The YAML front matter's flat `key: value` lines, which is all skills and rules use. */

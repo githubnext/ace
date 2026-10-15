@@ -1,7 +1,14 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 
-import { serve, type WorkspaceMessage } from "@ace/channel/workspace";
+import {
+	PING,
+	PING_INTERVAL,
+	PONG,
+	serve,
+	STALE,
+	type WorkspaceMessage,
+} from "@ace/channel/workspace";
 
 import * as catalog from "./catalog";
 import { hostedSocket } from "./client";
@@ -25,6 +32,7 @@ function link(record: catalog.Listing): () => Promise<void> {
 	let socket: WebSocket | undefined;
 	let wait = 1000;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	let pinger: ReturnType<typeof setInterval> | undefined;
 	let stopCalls: (() => Promise<void>) | undefined;
 	catalog.busy(record.id, false);
 	const connect = async () => {
@@ -40,8 +48,37 @@ function link(record: catalog.Listing): () => Promise<void> {
 				if (connected.readyState === WebSocket.OPEN) connected.send(JSON.stringify(reply));
 			}, { desktop, browser, images });
 			stopCalls = () => handle.close();
+			const lost = (code: number, reason: string) => {
+				if (socket !== connected) return;
+				clearInterval(pinger);
+				void handle.close();
+				log("warn", "workspace.drop", { channel: record.id, code, reason, stopped });
+				// A stopped link may already have been replaced after unarchiving the channel.
+				if (stopped) return;
+				socket = undefined;
+				connectedChannels.delete(record.id);
+				if (catalog.owns(record.id)) catalog.busy(record.id, false);
+				timer = setTimeout(connect, wait);
+			};
+			// Services that predate pings never answer, so only a service that has answered can go stale.
+			// Counting unanswered pings, not elapsed time, keeps a host resuming from sleep connected.
+			let missed: number | undefined;
+			const ping = () => {
+				if (missed !== undefined && missed++ >= STALE / PING_INTERVAL) {
+					// A socket whose network vanished may never report closing.
+					connected.close();
+					return lost(1006, "stale");
+				}
+				connected.send(PING);
+			};
+			ping();
+			pinger = setInterval(ping, PING_INTERVAL);
 			socket.addEventListener("message", ({ data }) => {
 				if (stopped || socket !== connected) return;
+				if (data === PONG) {
+					missed = 0;
+					return;
+				}
 				const call = JSON.parse(String(data)) as WorkspaceMessage;
 				if ("metadata" in call) return catalog.metadata(record.id, call.metadata);
 				if ("active" in call) return catalog.activity(record.id, call.active);
@@ -55,16 +92,7 @@ function link(record: catalog.Listing): () => Promise<void> {
 				});
 				handle(call);
 			});
-			socket.addEventListener("close", ({ code, reason }) => {
-				void handle.close();
-				log("warn", "workspace.drop", { channel: record.id, code, reason, stopped });
-				// A stopped link may already have been replaced after unarchiving the channel.
-				if (stopped) return;
-				socket = undefined;
-				connectedChannels.delete(record.id);
-				if (catalog.owns(record.id)) catalog.busy(record.id, false);
-				timer = setTimeout(connect, wait);
-			});
+			socket.addEventListener("close", ({ code, reason }) => lost(code, reason));
 		} catch (error) {
 			if (stopped) return;
 			log("warn", "workspace.failed", { channel: record.id, retry: wait, ...failure(error) });
@@ -79,6 +107,7 @@ function link(record: catalog.Listing): () => Promise<void> {
 		// Removal may already have deleted the catalog before its watcher stops the link.
 		if (catalog.owns(record.id)) catalog.busy(record.id, false);
 		clearTimeout(timer);
+		clearInterval(pinger);
 		socket?.close();
 		await stopCalls?.();
 		await Promise.all([...envs.values()].map((found) => found.cleanup(BACKGROUND_CONTEXT)));
