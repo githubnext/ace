@@ -149,6 +149,12 @@ export async function clone(repo: string, path: string): Promise<void> {
 			`GitHub needs credentials to clone ${repo}. Set up Git credentials on this host, for example with gh auth setup-git, then try again.`,
 		);
 	}
+	// GitHub answers "not found" for private repositories the credentials can't read.
+	if (/Repository not found/i.test(error)) {
+		throw new Error(
+			`GitHub didn't find ${repo} for this host's Git credentials. Check the name, and that the signed-in account has access; a pending invitation must be accepted first.\n${detail}`,
+		);
+	}
 	throw new Error(detail || `Could not clone ${repo}.`);
 }
 
