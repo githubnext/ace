@@ -133,6 +133,9 @@ export function toEvents(
 					text(`The channel restarted while ${call.name} ran, so it may have partially run.`),
 				);
 			}
+			if (call.result?.handoff) {
+				content.push(text(`Stopped ${call.name} for a message from another channel.`));
+			}
 		}
 		if (item.error) content.push(text(`Run failed: ${item.error}`));
 		if (item.stopped) content.push(text("Stopped."));

@@ -10,7 +10,13 @@ export type Tool = {
 	call: string;
 	name: string;
 	args: unknown;
-	result?: { error: boolean; text: string; images?: Image[]; interrupted?: boolean };
+	result?: {
+		error: boolean;
+		text: string;
+		images?: Image[];
+		interrupted?: boolean;
+		handoff?: boolean;
+	};
 	/** The running call's live output tail, until its result replaces it. */
 	progress?: { text: string; truncated?: boolean };
 };
@@ -145,6 +151,7 @@ export function apply(state: Transcript, event: Event): Transcript {
 											text: event.text,
 											...(event.images ? { images: event.images } : {}),
 											...(event.interrupted ? { interrupted: true } : {}),
+											...(event.handoff ? { handoff: true } : {}),
 										},
 									}
 									: tool

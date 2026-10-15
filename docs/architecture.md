@@ -87,6 +87,12 @@ is one pi conversation in that Session.
   committed changes, including passive human writes but excluding internal writes. The app shows
   these messages above the composer until pi consumes or withdraws them; reconnect reads pi again.
   There is no additional queue store or change to admission and steering behavior.
+- **Handoffs stop shell commands.** While another channel's agent's invoked message waits in a
+  chat's inbox, that chat's shell commands stop, and new ones don't start, each with a result
+  naming the sender. Pi then places the message as a steer after the tool round, so the run
+  continues with it and reruns nothing. Other tools may be mid-change and are left to finish; a
+  person's messages never interrupt, since they have Stop. Agents wait for another channel by
+  ending their run, not by polling in the shell.
 - **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
   of each running call's output from pi's live tool slots, at most every half second per watch,
   each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable
