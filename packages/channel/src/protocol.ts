@@ -75,12 +75,18 @@ export type Change = {
 	dels: number;
 	/** The worktree file's version, independent of its diff's line counts. */
 	version: string;
+	/**
+	 * Committed on the checkout's branch since its base, or only on disk. A file can be listed
+	 * once committed and again uncommitted. Older hosts omit it and list each file once against
+	 * the base.
+	 */
+	state?: "committed" | "uncommitted" | "untracked";
 };
 
 /**
  * What a chat's work changed: its lane's commits since it forked from the lane's base, as a pull
- * request into that base would show them, plus uncommitted and untracked files. A chat without a
- * lane shows the checkout against HEAD.
+ * request into that base would show them, then uncommitted and untracked files. A chat without a
+ * lane has no committed changes.
  */
 export type Changes = {
 	lane?: string;
@@ -90,6 +96,8 @@ export type Changes = {
 	base: string;
 	head: string;
 	files: Change[];
+	/** Untracked directories too large to list file by file. */
+	dirs?: { dir: string; files: number }[];
 };
 
 /** GitHub views are read through the host; they are not durable channel state. */
@@ -188,8 +196,8 @@ export type Request =
 	/** Resolve once the answer to a submission is placed: "done", or "unanswered" when stopped or killed. */
 	| { op: "wait"; submission: number }
 	| { op: "changes"; chat?: ChatId }
-	/** One file's unified diff, against the same base as `changes`. */
-	| { op: "patch"; chat?: ChatId; file: string }
+	/** One listed file's unified diff; without `state`, its worktree against the base. */
+	| { op: "patch"; chat?: ChatId; file: string; state?: Change["state"] }
 	/** Replay the chat's transcript, then stream its events until the connection closes. */
 	| {
 		op: "watch";

@@ -10,6 +10,10 @@ type DiffViewFile = {
 	dels: number;
 	pending?: boolean;
 	error?: string;
+	/** Files sharing a group are totaled together, apart from other groups. */
+	group?: string;
+	/** Shown instead of line counts for an entry without a diff, such as a summarized directory. */
+	note?: string;
 };
 
 type DiffViewMode = "unified" | "split";
@@ -39,7 +43,7 @@ type DiffViewProps = {
 	onCreatePr?: () => void;
 	onCreateDraftPr?: () => void;
 	onManualCreatePr?: () => void;
-	onFileOpen?: (file: string) => void;
+	onFileOpen?: (file: DiffViewFile) => void;
 	className?: string;
 };
 
