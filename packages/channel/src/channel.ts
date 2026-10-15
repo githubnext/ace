@@ -14,6 +14,7 @@ import {
 	type EntryRecord,
 	Harness,
 	InboxDoc,
+	type InboxState,
 	LiveDoc,
 	type LiveState,
 	ROOT_CONVERSATION_ID,
@@ -44,6 +45,7 @@ import {
 import { instructions } from "./context";
 import { changes, patch } from "./changes";
 import { type Desktop, desktop } from "./desktop";
+import { HANDOFF, Handoffs } from "./handoffs";
 import { type Images, images } from "./images";
 import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
@@ -154,6 +156,8 @@ export class Channel {
 		const registry = createRegistry();
 		registry.install(logging(log));
 		registry.install(CodingTools);
+		const handoffs = new Handoffs();
+		registry.install(handoffs.extension);
 		const execute = options.desktop;
 		if (execute) {
 			registry.install(desktop(async (request, context) => {
@@ -222,6 +226,13 @@ export class Channel {
 				if (change.record.kind === SettingsDoc.definition.kind) {
 					channel.#settings = change.value as Settings;
 					channel.#broadcast();
+					continue;
+				}
+				if (change.record.kind === InboxDoc.definition.kind) {
+					const { scope } = change.record;
+					if (scope.kind === "conversation") {
+						handoffs.inbox(scope.conversationId, change.value as InboxState | null);
+					}
 					continue;
 				}
 				if (change.record.kind !== LiveDoc.definition.kind) continue;
@@ -909,6 +920,7 @@ function events(entry: EntryRecord): Event[] {
 		const stopped = codes.includes("aborted");
 		// pi reports this only when recovery finds an unsafe call that a previous worker started.
 		const interrupted = codes.includes("interrupted");
+		const handoff = codes.includes(HANDOFF);
 		const images = room.images(message);
 		return [{
 			kind: "result",
@@ -919,6 +931,7 @@ function events(entry: EntryRecord): Event[] {
 			...(images ? { images } : {}),
 			...(stopped ? { stopped: true } : {}),
 			...(interrupted ? { interrupted: true } : {}),
+			...(handoff ? { handoff: true } : {}),
 		}];
 	}
 	return [];

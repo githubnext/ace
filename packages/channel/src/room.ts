@@ -134,6 +134,10 @@ export function section(room: Room): PromptSection {
 				"Each human message starts with its author's name and a colon. You see every message, but",
 				"you act only when someone invokes you; answer the person who did. Write replies as plain",
 				"text without a name prefix: the channel shows who wrote each message.",
+				"",
+				"To wait for another channel's agent, say in this chat what you are waiting for and end your",
+				"run; its message with invoke set wakes you. Never wait for another channel in a shell sleep or",
+				"polling loop: an invoked message stops your running shell commands anyway.",
 				...(summary
 					? [
 						"",

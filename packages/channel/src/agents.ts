@@ -115,7 +115,7 @@ export function messaging(directory: Directory): Extension {
 			defineTool({
 				name: "message",
 				description:
-					"Post a message to another channel's chat. Set invoke to start that chat's agent on it; otherwise people and the agent there only see it. Delivery does not wait for an answer.",
+					"Post a message to another channel's chat. Set invoke to start that chat's agent on it, which also stops any shell command that agent is running so it reads your message next; otherwise people and the agent there only see it. Delivery does not wait for an answer: to get one, ask that agent to message this channel with invoke set when it is ready, say in your chat what you are waiting for, and end your run.",
 				parameters: Type.Object({
 					channel: Type.String({
 						description: "Channel id or unique name; use the id when names repeat",

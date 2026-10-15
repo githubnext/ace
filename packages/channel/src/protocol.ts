@@ -252,7 +252,11 @@ export type Event =
 	 * `truncated` when earlier output is not shown. Not stored: only pi's live state backs it.
 	 */
 	| { kind: "progress"; chat: ChatId; call: string; text: string; truncated?: boolean }
-	/** `interrupted` when the channel restarted while the tool ran, so it may have partially run. */
+	/**
+	 * `interrupted` when the channel restarted while the tool ran, so it may have partially run.
+	 * `handoff` when another channel's agent's message stopped the shell command or kept it from
+	 * starting.
+	 */
 	| {
 		kind: "result";
 		chat: ChatId;
@@ -262,6 +266,7 @@ export type Event =
 		images?: Image[];
 		stopped?: boolean;
 		interrupted?: boolean;
+		handoff?: boolean;
 	}
 	/**
 	 * A fast model's one-line description of a group of consecutive tool calls, sent on attachment
