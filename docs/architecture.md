@@ -275,7 +275,9 @@ Stopping unregisters login hosting until the user enables it again. An authentic
 host can serve the UI, but the desktop does not manage that process as Ace Helper.
 
 Git, shell, Tailscale, and directory diagnostics come from the host through the same local-only
-boundary as provider settings. The project picker selects a local folder; project creation
+boundary as provider settings. They never wait on a keychain prompt: the team secret's state is
+the host's last finished read, marked as waiting for keychain access while one read is under way,
+and Settings polls until that read lands. The project picker selects a local folder; project creation
 errors remain in the form so the person can fix the path or provider setup.
 
 Agents inspect and operate native windows through an injected desktop capability. The desktop embeds

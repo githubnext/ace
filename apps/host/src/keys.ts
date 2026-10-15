@@ -48,27 +48,54 @@ function set(value: string | undefined): string | undefined {
 	return value?.trim() ? value : undefined;
 }
 
-async function keychain(name: string): Promise<string | undefined> {
-	try {
-		// Resolve each request so running workers observe replacement and removal immediately.
-		return set(await Bun.secrets.get({ service: config.keychain, name }) ?? undefined);
-	} catch {
-		throw new Error(
-			`Cannot access ${name} in the keychain. Unlock it and allow Ace Helper, then retry.`,
-		);
-	}
+/** What a keychain read waits on once it takes longer than a read without a macOS prompt. */
+export const KEYCHAIN_WAITING = "Ace Helper is waiting for keychain access";
+
+/** A macOS prompt holds a read until someone answers it, so concurrent readers share one prompt. */
+const reading = new Map<string, Promise<string | undefined>>();
+
+function keychain(name: string): Promise<string | undefined> {
+	let read = reading.get(name);
+	if (read) return read;
+	// Resolve each request so running workers observe replacement and removal immediately.
+	read = Bun.secrets.get({ service: config.keychain, name }).then(
+		(value) => set(value ?? undefined),
+		() => {
+			throw new Error(
+				`Cannot access ${name} in the keychain. Unlock it and allow Ace Helper, then retry.`,
+			);
+		},
+	).finally(() => reading.delete(name));
+	reading.set(name, read);
+	return read;
 }
 
 export async function key(name: string): Promise<string | undefined> {
 	return env(`ACE_${name}`) ?? env(name) ?? await keychain(name);
 }
 
-export function store(name: string, value: string): Promise<void> {
-	return Bun.secrets.set({ service: config.keychain, name, value });
+/** A read slower than this waited on something, usually a macOS prompt. */
+const PROMPT = 50;
+
+/** Each name's last finished status read, and whether it waited on a prompt. */
+const known = new Map<string, { status: CredentialStatus; prompted: boolean }>();
+/** When Ace Helper last saved or removed each name; a read started before then is stale. */
+const changed = new Map<string, number>();
+
+function change(name: string): void {
+	known.delete(name);
+	changed.set(name, performance.now());
+}
+
+export async function store(name: string, value: string): Promise<void> {
+	await Bun.secrets.set({ service: config.keychain, name, value });
+	change(name);
 }
 
 export async function forget(name: string): Promise<boolean> {
-	return Bun.secrets.delete({ service: config.keychain, name });
+	const removed = await Bun.secrets.delete({ service: config.keychain, name });
+	change(name);
+	return removed;
 }
 
 /** The environment variable that supplies `name` ahead of the keychain, if any. */
@@ -89,6 +116,31 @@ export async function credential(name: string): Promise<CredentialStatus> {
 			error: (error as Error).message,
 		};
 	}
+}
+
+/**
+ * `credential` for Settings, which must not wait on a keychain prompt: a read still under way after
+ * a moment answers with the last finished read, marked `waiting`, and a later call picks up its
+ * result. Settings polls while it waits, so after a prompted read only `fresh` reads again, or each
+ * poll would raise another prompt.
+ */
+export async function latest(name: string, fresh?: boolean): Promise<CredentialStatus> {
+	const last = known.get(name);
+	if (last?.prompted && !fresh && !reading.has(name)) return last.status;
+	const started = performance.now();
+	const read = credential(name).then((status) => {
+		if (started > (changed.get(name) ?? 0)) {
+			known.set(name, { status, prompted: performance.now() - started > PROMPT });
+		}
+		return status;
+	});
+	const status = await Promise.race([read, Bun.sleep(PROMPT)]);
+	if (status) return status;
+	const override = overriding(name);
+	return {
+		...last?.status ?? { source: override ? "environment" : "unavailable", stored: null, override },
+		waiting: KEYCHAIN_WAITING,
+	};
 }
 
 /** pi-ai's built-in providers, resolving credentials through Ace. */

@@ -275,6 +275,7 @@ export function TeamDirectory(
 								</div>
 							</div>
 						)}
+						{directory.secret.waiting && <Status>{directory.secret.waiting}…</Status>}
 						{directory.secret.error && <Problem>{directory.secret.error}</Problem>}
 						{results("secret")}
 					</>
