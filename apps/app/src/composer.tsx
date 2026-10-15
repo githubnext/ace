@@ -134,7 +134,9 @@ export function Composer(
 	// An offline channel can't answer; the conversation already says so, so don't blame providers.
 	const offline = channel.state === "offline";
 	useEffect(() => {
-		if (status !== "open" || mode !== "ace" || offline) return;
+		// A chat that can't load can't answer either; asking again once it loads is how a refused
+		// channel's models recover, such as after a cloud workspace starts or Try again.
+		if (status !== "open" || mode !== "ace" || offline || !ready) return;
 		let active = true;
 		// Ask the channel itself: a hosted channel uses the service's credentials, not its workspace's.
 		host.channel<ModelOption[]>(channel.id, { op: "models" }).then(
@@ -152,7 +154,7 @@ export function Composer(
 		return () => {
 			active = false;
 		};
-	}, [channel.id, mode, status, settingsVersion, offline]);
+	}, [channel.id, mode, status, settingsVersion, offline, ready]);
 	const [{ model: picked, effort: pickedEffort }, changePick] = useLocalStorage(
 		`ace:pick:${scope}/${id}`,
 		UNPICKED,
