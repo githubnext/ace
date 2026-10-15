@@ -46,6 +46,8 @@ type Props = {
 	current?: ModelRef;
 	currentEffort?: Effort;
 	busy: boolean;
+	/** What a pending send waits on, as its submit control's label. */
+	waiting: string;
 	/** Whether teammates may invoke agents; absent while unknown. */
 	shared?: boolean;
 	ready: boolean;
@@ -104,6 +106,7 @@ export function Composer(
 		current,
 		currentEffort,
 		busy,
+		waiting,
 		shared,
 		ready,
 		draft,
@@ -262,6 +265,7 @@ export function Composer(
 				onAttachmentsChange={setAttached}
 				busy={busy}
 				submitBusy={pending}
+				submitLabel={waiting}
 				canStop={busy}
 				onStop={() => void host.channel(channel.id, { op: "stop", chat: id })}
 				canSend={ready && status === "open" && !pending && !refused}

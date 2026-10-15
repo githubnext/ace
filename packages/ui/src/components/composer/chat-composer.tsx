@@ -197,6 +197,8 @@ type Props = {
 	busy?: boolean;
 	/** Whether the submit control should show a loading state. */
 	submitBusy?: boolean;
+	/** The loading submit control's label, naming what submission waits on. */
+	submitLabel?: string;
 	/** Whether the Stop control should be shown. Defaults to `busy`. */
 	canStop?: boolean;
 	/** Whether attachments can be added. Defaults to `true`. */
@@ -612,6 +614,7 @@ function useComposer({
 	onTextChange,
 	busy = false,
 	submitBusy = false,
+	submitLabel,
 	canStop,
 	canAttach = true,
 	editing = false,
@@ -1122,6 +1125,7 @@ function useComposer({
 		canSend,
 		busy,
 		submitBusy,
+		submitLabel,
 		onStop,
 		onTerminalExpand,
 		accessory,
@@ -1629,6 +1633,7 @@ function ComposerSend({ state }: { state: ComposerState }) {
 		ace,
 		recording,
 		submitBusy,
+		submitLabel,
 		planning,
 		setRecording,
 		send,
@@ -1642,6 +1647,7 @@ function ComposerSend({ state }: { state: ComposerState }) {
 			recording={mic && recording}
 			editing={edit}
 			busy={submitBusy}
+			busyLabel={submitLabel}
 			plan={planning}
 			className="relative z-10"
 			onRecord={mic
