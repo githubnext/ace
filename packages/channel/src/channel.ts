@@ -299,7 +299,7 @@ export class Channel {
 			case "patch": {
 				const { cwd, lane } = await this.#place(request.chat);
 				const { env, project } = this.#options;
-				return patch(env(cwd), cwd, project, lane?.base, request.file, context);
+				return patch(env(cwd), cwd, project, lane?.base, request.file, request.state, context);
 			}
 			case "wait": {
 				const submission = await this.#harness.submission(

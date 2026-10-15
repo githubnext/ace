@@ -204,7 +204,7 @@ export function Channel({ channel, user, remote, draft, onDraftLoaded, onSetting
 		run.busy = true;
 		host.channel<Changes>(channel.id, { op: "changes", chat }).then(
 			(changes) => {
-				setChanged(changes.files.length > 0);
+				setChanged(changes.files.length > 0 || !!changes.dirs);
 				publish(channel.id, { changes });
 			},
 			() => {},

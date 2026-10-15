@@ -12,9 +12,19 @@ type Loaded = { stamp: string; patch?: string; signature?: string; error?: strin
 
 const POLL = 2000;
 const LIMIT = 4;
+const GROUPS = { committed: "Committed", uncommitted: "Uncommitted", untracked: "Untracked" };
+
+function group(change: Change) {
+	return change.state && GROUPS[change.state];
+}
+
+/** The same identity DiffView gives a grouped file. */
+function key(file: string, group: string | undefined) {
+	return group ? `${group}/${file}` : file;
+}
 
 function stamp(change: Change, changes: Changes) {
-	return `${changes.cwd}\0${changes.base}\0${
+	return `${changes.cwd}\0${changes.base}\0${changes.head}\0${
 		change.from || ""
 	}\0${change.version}\0${change.adds},${change.dels},${change.binary}`;
 }
@@ -24,8 +34,11 @@ function same(a: Changes | undefined, b: Changes) {
 		return false;
 	}
 	if (a.files.length !== b.files.length) return false;
+	if (JSON.stringify(a.dirs) !== JSON.stringify(b.dirs)) return false;
 	return a.files.every((change, i) =>
-		change.file === b.files[i]!.file && stamp(change, a) === stamp(b.files[i]!, b)
+		change.file === b.files[i]!.file
+		&& change.state === b.files[i]!.state
+		&& stamp(change, a) === stamp(b.files[i]!, b)
 	);
 }
 
@@ -96,27 +109,30 @@ export function Diff({ channel, chat, active }: Props) {
 	useEffect(() => {
 		if (!changes || status !== "open") return;
 		const wanted = changes.files.filter((change) =>
-			!change.binary && loaded.get(change.file)?.stamp !== stamp(change, changes)
+			!change.binary
+			&& loaded.get(key(change.file, group(change)))?.stamp !== stamp(change, changes)
 		);
-		const index = wanted.findIndex((change) => change.file === first);
+		const index = wanted.findIndex((change) => key(change.file, group(change)) === first);
 		if (index > 0) wanted.unshift(...wanted.splice(index, 1));
 
 		for (const change of wanted) {
 			if (inflight.current.size >= LIMIT) return;
+			const id = key(change.file, group(change));
 			const version = stamp(change, changes);
-			const key = `${change.file}\0${version}`;
-			if (inflight.current.has(key)) continue;
-			inflight.current.add(key);
-			host.channel<string>(channel, { op: "patch", chat, file: change.file }).then(
+			const request = `${id}\0${version}`;
+			if (inflight.current.has(request)) continue;
+			inflight.current.add(request);
+			const { file, state } = change;
+			host.channel<string>(channel, { op: "patch", chat, file, ...(state ? { state } : {}) }).then(
 				(patch) => ({ stamp: version, patch, signature: signature(patch) }),
 				(error: Error) =>
 					// A dropped connection isn't the file's failure; it reloads once reconnected.
 					host.status === "open" ? { stamp: version, error: error.message } : undefined,
 			).then((value) => {
-				inflight.current.delete(key);
+				inflight.current.delete(request);
 				setLoaded((current) => {
 					const next = new Map(current);
-					if (value) next.set(change.file, value);
+					if (value) next.set(id, value);
 					return next;
 				});
 			});
@@ -126,10 +142,11 @@ export function Diff({ channel, chat, active }: Props) {
 	const files = useMemo(
 		() => {
 			if (!changes) return [];
-			return changes.files.map((change): DiffViewFile => {
-				const value = loaded.get(change.file);
+			const files = changes.files.map((change): DiffViewFile => {
+				const value = loaded.get(key(change.file, group(change)));
 				const current = value?.stamp === stamp(change, changes) ? value : undefined;
 				return {
+					group: group(change),
 					file: change.file,
 					from: change.from,
 					binary: change.binary,
@@ -141,17 +158,28 @@ export function Diff({ channel, chat, active }: Props) {
 					pending: !change.binary && !current,
 				};
 			});
+			for (const { dir, files: count } of changes.dirs || []) {
+				files.push({
+					group: GROUPS.untracked,
+					file: dir,
+					adds: 0,
+					dels: 0,
+					note: `${count.toLocaleString()} files`,
+				});
+			}
+			return files;
 		},
 		[changes, loaded],
 	);
 
-	function open(file: string) {
-		setFirst(file);
+	function open(file: DiffViewFile) {
+		const id = key(file.file, file.group);
+		setFirst(id);
 		// Reopening a file that failed retries it.
-		if (!loaded.get(file)?.error) return;
+		if (!loaded.get(id)?.error) return;
 		setLoaded((current) => {
 			const next = new Map(current);
-			next.delete(file);
+			next.delete(id);
 			return next;
 		});
 	}

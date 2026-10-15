@@ -5,6 +5,7 @@ import { git, quote } from "./git";
 import type { Change, Changes } from "./protocol";
 
 const FILES = 500;
+const TREE = 100;
 const PATCH = 512 * 1024;
 type Stat = Omit<Change, "version">;
 
@@ -71,22 +72,52 @@ function numstat(text: string): Stat[] {
 	return out;
 }
 
-async function untracked(env: ExecutionEnv, cwd: string, context: Context): Promise<Stat[]> {
-	const files = (await read(env, cwd, "ls-files --others --exclude-standard -z", context))
-		.split("\0").filter(Boolean).slice(0, FILES);
-	return Promise.all(files.map(async (file) => {
-		// --no-index exits 1 when the files differ, which they always do here.
-		const stat = await read(
-			env,
-			cwd,
-			`diff --no-index --numstat -z -- /dev/null ${quote(file)}`,
-			context,
-			[0, 1],
-		);
-		const [adds, dels] = stat.split("\t");
-		const binary = adds === "-";
-		return { file, binary, adds: binary ? 0 : Number(adds), dels: binary ? 0 : Number(dels) };
-	}));
+/**
+ * Untracked files, except that a wholly untracked directory with more than `TREE` files, such as
+ * an unignored `node_modules`, is only counted so the Diff neither stats nor lists each file.
+ */
+async function untracked(env: ExecutionEnv, cwd: string, context: Context) {
+	const list = async (args: string) =>
+		(await read(env, cwd, `ls-files --others --exclude-standard ${args} -z`, context))
+			.split("\0").filter(Boolean);
+	const [entries, all] = await Promise.all([list("--directory --no-empty-directory"), list("")]);
+	const counts = new Map(entries.filter((entry) => entry.endsWith("/")).map((dir) => [dir, 0]));
+	const owner = new Map<string, string>();
+	for (const file of all) {
+		for (let i = file.indexOf("/"); i !== -1; i = file.indexOf("/", i + 1)) {
+			const dir = file.slice(0, i + 1);
+			const count = counts.get(dir);
+			if (count === undefined) continue;
+			counts.set(dir, count + 1);
+			owner.set(file, dir);
+			break;
+		}
+	}
+	const dirs = [...counts].filter(([, files]) => files > TREE)
+		.map(([dir, files]) => ({ dir: dir.slice(0, -1), files }));
+	const large = new Set(dirs.map(({ dir }) => `${dir}/`));
+	const files = await Promise.all(
+		all.filter((file) => !large.has(owner.get(file) || "")).slice(0, FILES).map(async (file) => {
+			// --no-index exits 1 when the files differ, which they always do here.
+			const stat = await read(
+				env,
+				cwd,
+				`diff --no-index --numstat -z -- /dev/null ${quote(file)}`,
+				context,
+				[0, 1],
+			);
+			const [adds, dels] = stat.split("\t");
+			const binary = adds === "-";
+			return {
+				file,
+				binary,
+				adds: binary ? 0 : Number(adds),
+				dels: binary ? 0 : Number(dels),
+				state: "untracked" as const,
+			};
+		}),
+	);
+	return { files, dirs };
 }
 
 export async function changes(
@@ -97,10 +128,17 @@ export async function changes(
 	context: Context,
 ): Promise<Changes> {
 	const range = await base(env, cwd, project, lane?.base, context);
-	const branch = (await read(env, cwd, "rev-parse --abbrev-ref HEAD", context)).trim();
-	const tracked = numstat(await read(env, cwd, `diff -M --numstat -z ${range.base}`, context));
+	const stat = async (args: string, state: Stat["state"]) =>
+		numstat(await read(env, cwd, `diff -M --numstat -z ${args}`, context))
+			.map((change) => Object.assign(change, { state }));
+	const [branch, committed, uncommitted, loose] = await Promise.all([
+		read(env, cwd, "rev-parse --abbrev-ref HEAD", context),
+		stat(`${range.base} ${range.head}`, "committed"),
+		stat(range.head, "uncommitted"),
+		untracked(env, cwd, context),
+	]);
 	const files = await Promise.all(
-		[...tracked, ...await untracked(env, cwd, context)].slice(0, FILES).map(async (change) => {
+		[...committed, ...uncommitted, ...loose.files].slice(0, FILES).map(async (change) => {
 			const info = await env.fileInfo(`${cwd}/${change.file}`, context);
 			if (!info.ok && info.error.code !== "not_found") throw info.error;
 			const version = info.ok
@@ -109,12 +147,14 @@ export async function changes(
 			return Object.assign(change, { version });
 		}),
 	);
+	const name = branch.trim();
 	return {
 		...(lane ? { lane: lane.name } : {}),
-		...(branch && branch !== "HEAD" ? { branch } : {}),
+		...(name && name !== "HEAD" ? { branch: name } : {}),
 		cwd,
 		...range,
 		files,
+		...(loose.dirs.length ? { dirs: loose.dirs } : {}),
 	};
 }
 
@@ -125,29 +165,38 @@ export async function patch(
 	project: string,
 	target: string | undefined,
 	file: string,
+	state: Change["state"],
 	context: Context,
 ): Promise<string> {
 	if (!file || file.startsWith("/") || file.split("/").includes("..") || file.includes("\0")) {
 		throw new Error(`Invalid path ${file}`);
 	}
-	const { base: from } = await base(env, cwd, project, target, context);
-	const known = await read(env, cwd, `ls-files -- ${quote(file)}`, context);
-	const historic = await read(
-		env,
-		cwd,
-		`diff -M --name-status -z ${from} -- ${quote(file)}`,
-		context,
-	);
-	let text: string;
-	if (known.trim() || historic) {
+	const untracked = () =>
+		read(env, cwd, `diff --no-index -- /dev/null ${quote(file)}`, context, [0, 1]);
+	const tracked = async (range: string) => {
 		// A renamed file's diff needs its old path in the pathspec too.
-		const status = await read(env, cwd, `diff -M --name-status -z ${from}`, context);
+		const status = await read(env, cwd, `diff -M --name-status -z ${range}`, context);
 		const fields = status.split("\0");
 		const at = fields.findIndex((value, i) => value === file && fields[i - 2]?.startsWith("R"));
 		const paths = at > 0 ? `${quote(fields[at - 1]!)} ${quote(file)}` : quote(file);
-		text = await read(env, cwd, `diff -M ${from} -- ${paths}`, context);
-	} else {
-		text = await read(env, cwd, `diff --no-index -- /dev/null ${quote(file)}`, context, [0, 1]);
+		return read(env, cwd, `diff -M ${range} -- ${paths}`, context);
+	};
+	const from = async () => (await base(env, cwd, project, target, context)).base;
+	let text: string;
+	if (state === "untracked") text = await untracked();
+	else if (state === "uncommitted") text = await tracked("HEAD");
+	else if (state === "committed") text = await tracked(`${await from()} HEAD`);
+	else {
+		// Older clients list each file once, its worktree against the base.
+		const range = await from();
+		const known = await read(env, cwd, `ls-files -- ${quote(file)}`, context);
+		const historic = await read(
+			env,
+			cwd,
+			`diff -M --name-status -z ${range} -- ${quote(file)}`,
+			context,
+		);
+		text = known.trim() || historic ? await tracked(range) : await untracked();
 	}
 	return text.length > PATCH ? `${text.slice(0, PATCH)}\n… (diff truncated)` : text;
 }

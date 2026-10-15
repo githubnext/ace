@@ -34,6 +34,7 @@ import {
 } from "../../icons";
 
 type Totals = {
+	group?: string;
 	adds: number;
 	dels: number;
 };
@@ -54,14 +55,25 @@ type HeaderProps = {
 const HEADER = 32;
 const BUFFER = 1600;
 
-function total(files: DiffViewFile[]): Totals {
-	let adds = 0;
-	let dels = 0;
+/** One total per group, in the order groups first appear, so groups' counts never merge. */
+function total(files: DiffViewFile[]): Totals[] {
+	let groups = new Map<string | undefined, Totals>();
 	for (let file of files) {
-		adds += file.adds;
-		dels += file.dels;
+		let sum = groups.get(file.group);
+		if (!sum) groups.set(file.group, sum = { group: file.group, adds: 0, dels: 0 });
+		sum.adds += file.adds;
+		sum.dels += file.dels;
 	}
-	return { adds, dels };
+	return [...groups.values()];
+}
+
+/** Grouped files can repeat a path, so their identity, and tree path, includes the group. */
+function id(file: DiffViewFile) {
+	return file.group ? `${file.group}/${file.file}` : file.file;
+}
+
+function fixed(file: DiffViewFile) {
+	return file.binary || !!file.note;
 }
 
 function basename(path: string) {
@@ -75,7 +87,7 @@ function dirname(path: string) {
 }
 
 function filesKey(files: DiffViewFile[]) {
-	return files.map(file => `${file.from ?? ""}->${file.file}`).join("\0");
+	return files.map(file => `${file.from ?? ""}->${id(file)}`).join("\0");
 }
 
 function stamp(file: DiffViewFile) {
@@ -194,30 +206,30 @@ function option(view: DiffViewMode): CodeViewOptions<undefined> {
 function item(file: DiffViewFile, open: boolean, cache: Map<string, Cache>): CodeViewItem {
 	let state = `${stamp(file)}\0${open ? "open" : "closed"}`;
 	let version = hash(state);
-	let key = `${file.file}\0${version}`;
-	let cached = cache.get(file.file);
+	let key = `${id(file)}\0${version}`;
+	let cached = cache.get(id(file));
 	if (cached?.key === key) return cached.item;
 
 	let { patch } = file;
-	let parsed = file.binary || patch === undefined ? null : parseDiff(
+	let parsed = fixed(file) || patch === undefined ? null : parseDiff(
 		patch,
 		file.oldFile && file.newFile ? { oldFile: file.oldFile, newFile: file.newFile } : undefined,
 	);
 	// Stamp a content-stable cacheKey so pierre's worker cache survives a
 	// scroll-release/re-create instead of re-highlighting (a visible flash).
 	if (parsed && !parsed.cacheKey) {
-		parsed.cacheKey = file.signature || `${file.file}\0${patch?.length}`;
+		parsed.cacheKey = file.signature || `${id(file)}\0${patch?.length}`;
 	}
 	let next: CodeViewItem = parsed
 		? {
-			id: file.file,
+			id: id(file),
 			type: "diff",
 			fileDiff: parsed,
 			version,
 			collapsed: !open,
 		}
 		: {
-			id: file.file,
+			id: id(file),
 			type: "file",
 			file: {
 				name: file.file,
@@ -229,7 +241,7 @@ function item(file: DiffViewFile, open: boolean, cache: Map<string, Cache>): Cod
 			collapsed: !open,
 		};
 
-	cache.set(file.file, { key, item: next });
+	cache.set(id(file), { key, item: next });
 	return next;
 }
 
@@ -253,7 +265,7 @@ function Header({
 			<button
 				type="button"
 				className="min-w-0 rounded-md text-left transition-[color] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-ring/50 focus-visible:outline-none motion-reduce:transition-none"
-				aria-expanded={file.binary ? undefined : open}
+				aria-expanded={fixed(file) ? undefined : open}
 				title={subtitle ?? file.file}
 				onClick={() => onToggle(file, open)}
 			>
@@ -277,8 +289,8 @@ function Header({
 							)
 							: null}
 					</span>
-					{file.binary
-						? <span className="shrink-0 text-muted-foreground">Binary</span>
+					{fixed(file)
+						? <span className="shrink-0 text-muted-foreground">{file.note || "Binary"}</span>
 						: (
 							<span className="flex shrink-0 items-center gap-1 tabular-nums">
 								<span className="text-accent">+{file.adds}</span>
@@ -295,7 +307,7 @@ function Header({
 						: null}
 				</span>
 			</button>
-			{file.binary
+			{fixed(file)
 				? null
 				: (
 					<Button
@@ -356,7 +368,7 @@ function useDiffView({
 	let code = useRef<CodeViewHandle<undefined>>(null);
 	let cache = useRef(new Map<string, Cache>());
 
-	let names = useMemo(() => new Set(files.map(file => file.file)), [files]);
+	let names = useMemo(() => new Set(files.map(file => id(file))), [files]);
 	let external = useMemo(() => selection(names, selected, selectedKey), [
 		names,
 		selected,
@@ -385,31 +397,33 @@ function useDiffView({
 		: files[0]?.file ?? "";
 	let summary = useMemo(() => total(files), [files]);
 	let duplicates = useMemo(() => duplicateNames(files), [files]);
-	let index = useMemo(() => new Map(files.map(file => [file.file, file])), [files]);
-	let paths = useMemo(() => files.map(file => file.file), [files]);
+	let index = useMemo(() => new Map(files.map(file => [id(file), file])), [files]);
+	let paths = useMemo(() => files.map(file => id(file)), [files]);
 	let decorations = useMemo(
 		() =>
 			new Map(
-				files.map(file => [file.file, {
-					text: file.binary ? "Binary" : `+${file.adds} -${file.dels}`,
-					title: file.binary ? "Binary file" : `${file.adds} additions, ${file.dels} deletions`,
+				files.map(file => [id(file), {
+					text: fixed(file) ? file.note || "Binary" : `+${file.adds} -${file.dels}`,
+					title: fixed(file)
+						? file.note || "Binary file"
+						: `${file.adds} additions, ${file.dels} deletions`,
 				}]),
 			),
 		[files],
 	);
 	let view = mode ?? internalMode;
 	let options = useMemo(() => option(view), [view]);
-	let expandable = useMemo(() => files.filter(file => !file.binary), [files]);
-	let allExpanded = expandable.length > 0 && expandable.every(file => !collapsed.has(file.file));
+	let expandable = useMemo(() => files.filter(file => !fixed(file)), [files]);
+	let allExpanded = expandable.length > 0 && expandable.every(file => !collapsed.has(id(file)));
 	let snapshot = useMemo(() => {
 		let previous = new Map(cache.current);
 		let next = new Map<string, Cache>();
 		let items: CodeViewItem[] = [];
 		for (let file of files) {
-			let open = !file.binary && !collapsed.has(file.file);
+			let open = !fixed(file) && !collapsed.has(id(file));
 			let value = item(file, open, previous);
-			let hit = previous.get(file.file);
-			if (hit) next.set(file.file, hit);
+			let hit = previous.get(id(file));
+			if (hit) next.set(id(file), hit);
 			items.push(value);
 		}
 		return { cache: next, items };
@@ -440,7 +454,7 @@ function useDiffView({
 		if (scroll) scrollTo(file);
 	}, [scrollTo, select]);
 
-	let load = useEffectEvent((file: string) => onFileOpen?.(file));
+	let load = useEffectEvent((file: string) => onFileOpen?.(index.get(file)!));
 	useEffect(() => {
 		if (!navigation.request) return;
 		// This requests lazy patch I/O for a navigation intent. Selection and expansion
@@ -450,17 +464,17 @@ function useDiffView({
 	}, [navigation.request, scrollTo]);
 
 	function fileOpen(file: DiffViewFile) {
-		return !file.binary && !collapsed.has(file.file);
+		return !fixed(file) && !collapsed.has(id(file));
 	}
 
 	function toggleFile(file: DiffViewFile, open: boolean) {
-		select(file.file);
-		if (file.binary) return;
-		if (!open) onFileOpen?.(file.file);
+		select(id(file));
+		if (fixed(file)) return;
+		if (!open) onFileOpen?.(file);
 		setCollapsed(previous => {
 			let next = new Set(previous);
-			if (open) next.add(file.file);
-			else next.delete(file.file);
+			if (open) next.add(id(file));
+			else next.delete(id(file));
 			return next;
 		});
 	}
@@ -472,8 +486,8 @@ function useDiffView({
 	}
 
 	function toggleAll() {
-		if (!allExpanded) { for (let file of expandable) onFileOpen?.(file.file); }
-		setCollapsed(allExpanded ? new Set(expandable.map(file => file.file)) : new Set());
+		if (!allExpanded) { for (let file of expandable) onFileOpen?.(file); }
+		setCollapsed(allExpanded ? new Set(expandable.map(id)) : new Set());
 	}
 
 	let header = (item: CodeViewItem) => {
@@ -588,10 +602,16 @@ function DiffViewContent(props: DiffViewProps) {
 						<span className="shrink-0 text-muted-foreground">-&gt;</span>
 						<span className="min-w-0 truncate text-muted-foreground">{base}</span>
 					</div>
-					<div className="flex shrink-0 items-center gap-2 text-xs font-medium tabular-nums">
-						<span className="text-accent">+{summary.adds}</span>
-						<span className="text-destructive">-{summary.dels}</span>
-					</div>
+					{summary.map(sum => (
+						<div
+							key={sum.group || ""}
+							className="flex shrink-0 items-center gap-2 text-xs font-medium tabular-nums"
+						>
+							{sum.group ? <span className="text-muted-foreground">{sum.group}</span> : null}
+							<span className="text-accent">+{sum.adds}</span>
+							<span className="text-destructive">-{sum.dels}</span>
+						</div>
+					))}
 				</div>
 				<TooltipProvider>
 					<div className="flex shrink-0 items-center gap-1.5">

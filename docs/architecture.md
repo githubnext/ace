@@ -91,7 +91,9 @@ is one pi conversation in that Session.
   directory is its current lane. A new lane starts from origin's advertised default branch, fetched
   first, from the project's HEAD in a repository without origin, or from an explicit base, without
   changing the project checkout. Each lane records that
-  base as a ref or commit, and its Diff shows what a pull request into that base would. An explicit
+  base as a ref or commit, and its Diff shows what a pull request into that base would, totaled
+  apart from uncommitted and untracked files. An untracked directory of more than 100 files shows
+  only its file count. An explicit
   base for an existing lane changes only that comparison. The
   [lane CLI](https://lane.lukeed.com/usage/), which Ace ships, creates each new lane at
   `.lane/trees/<prefix>/<name>` with ignored files cloned by reference, records the starting base
