@@ -488,13 +488,16 @@ types live in `@ace/directory/protocol`. The `Directory` object and its contract
 - **Presence is never stored.** Each host replaces its owner's presence in the project (GitHub
   login, the project's channels open in their windows, and whether all of them are unfocused) and
   the lobby keeps it in the socket's hibernation attachment, sending everyone the whole list on
-  each change. Hosts ping every 30 seconds; the lobby answers without waking and an alarm closes
-  sockets silent for 90 seconds, so a host that slept without closing TCP stops being here.
+  each change. The attachment holds 2 KiB, so the lobby drops open channels beyond what fits.
+  Hosts ping every 30 seconds; the lobby answers without waking and an alarm closes sockets silent
+  for 90 seconds, so a host that slept without closing TCP stops being here. A host process's
+  reconnect replaces its own stale socket; two processes on one machine each keep theirs.
 - **Lifecycle events are a resume buffer.** Hosts send channel lifecycle events and the lobby
   numbers them with one `seq` per project. A host reconnects with the newest `seq` it applied and
   receives the events after it; when those are gone (pruned, older than the lobby's storage, or a
-  first visit) it is told to read listings again. Events are pruned after 30 days and beyond the
-  newest 2,000. Listings and catalogs stay authoritative; losing the log loses only promptness.
+  first visit) it is told to read listings again. Events are pruned 30 days after the lobby
+  received them, by its own clock, and beyond the newest 2,000. Listings and catalogs stay
+  authoritative; losing the log loses only promptness.
 - **Schema versions** are counted in the object's `version` key, because Durable Object SQLite
   refuses `PRAGMA user_version`. Migrations run in order inside one transaction.
 

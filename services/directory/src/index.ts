@@ -91,6 +91,14 @@ function authorized(request: Request, env: Env): boolean {
 		&& crypto.subtle.timingSafeEqual(given, expected);
 }
 
+function decoded(component: string): string | undefined {
+	try {
+		return decodeURIComponent(component);
+	} catch {
+		return undefined;
+	}
+}
+
 const HOST = /^\/hosts\/([A-Za-z0-9._-]{1,128})$/;
 const LOBBY = /^\/lobbies\/([^/]{1,1024})$/;
 
@@ -100,7 +108,9 @@ export default {
 		const { pathname } = new URL(request.url);
 		const lobby = LOBBY.exec(pathname);
 		if (lobby && request.headers.get("upgrade") === "websocket") {
-			return env.LOBBY.get(env.LOBBY.idFromName(decodeURIComponent(lobby[1]!))).fetch(request);
+			const project = decoded(lobby[1]!);
+			if (!project) return new Response("Malformed project ID", { status: 400 });
+			return env.LOBBY.get(env.LOBBY.idFromName(project)).fetch(request);
 		}
 		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") return Response.json(await directory.read());

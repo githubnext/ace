@@ -10,6 +10,12 @@ const CAP = 2000;
 /** Hosts ping every 30 s; a socket silent this long belongs to a host that slept without closing it. */
 const SILENT = 90_000;
 const SWEEP = 60_000;
+/**
+ * Hibernation refuses attachments over 2 KiB. This budget is for their JSON in UTF-8, which is no
+ * smaller than the structured clone, with room for its framing.
+ */
+const ATTACHMENT = 1800;
+const NAME = 256;
 
 /**
  * Applied in order and counted in the `version` key, since Durable Object SQLite refuses
@@ -25,7 +31,25 @@ const MIGRATIONS = [
 ];
 
 /** Presence lives on the socket, so hibernation keeps it and it never reaches storage. */
-type Attachment = { host?: string; seen: number; presence: Presence | null };
+type Attachment = { host?: string; process?: string; seen: number; presence: Presence | null };
+
+const encoder = new TextEncoder();
+
+function size(value: unknown): number {
+	return encoder.encode(JSON.stringify(value)).byteLength;
+}
+
+/** Drops channels until the attachment serializes; a person in too many is still here in the rest. */
+function fit(attachment: Attachment): Attachment {
+	const { presence } = attachment;
+	if (!presence) return attachment;
+	let bytes = size(attachment);
+	while (bytes > ATTACHMENT && presence.channels.length) {
+		bytes -= size(presence.channels.pop()) + 1;
+	}
+	if (bytes > ATTACHMENT) attachment.presence = null;
+	return attachment;
+}
 
 function log(level: "info" | "warn", event: string, fields: Record<string, unknown>) {
 	const line = { level, event, ...fields };
@@ -56,7 +80,9 @@ export class Lobby extends DurableObject {
 		const { 0: client, 1: server } = new WebSocketPair();
 		this.ctx.acceptWebSocket(server);
 		server.serializeAttachment({ seen: Date.now(), presence: null } satisfies Attachment);
-		if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + SWEEP);
+		// With no hosts, the alarm waits for the oldest event to expire; a host arriving needs sweeps.
+		const alarm = await this.ctx.storage.getAlarm();
+		if (!alarm || alarm > Date.now() + SWEEP) await this.ctx.storage.setAlarm(Date.now() + SWEEP);
 		return new Response(null, { status: 101, webSocket: client });
 	}
 
@@ -65,12 +91,18 @@ export class Lobby extends DurableObject {
 		attachment.seen = Date.now();
 		const up = JSON.parse(message as string) as LobbyUp;
 		if (up.op === "hello") {
+			if (up.host.length > NAME || up.process.length > NAME) {
+				return socket.close(1008, "names too long");
+			}
 			attachment.host = up.host;
+			attachment.process = up.process;
 			socket.serializeAttachment(attachment);
-			// A reconnect can arrive before the host's previous socket closes.
+			// A reconnect can arrive before the same process's previous socket closes.
 			for (const old of this.#open()) {
 				const other = old.deserializeAttachment() as Attachment;
-				if (old !== socket && other.host === up.host) this.#close(old, "replaced");
+				if (old !== socket && other.host === up.host && other.process === up.process) {
+					this.#close(old, "replaced");
+				}
 			}
 			this.#replay(socket, up.since);
 			return this.#send(socket, { kind: "presence", people: this.#people() });
@@ -78,19 +110,20 @@ export class Lobby extends DurableObject {
 		if (!attachment.host) return socket.close(1008, "hello first");
 		if (up.op === "presence") {
 			attachment.presence = up.presence && { ...up.presence, host: attachment.host };
-			socket.serializeAttachment(attachment);
+			socket.serializeAttachment(fit(attachment));
 			return this.#broadcast({ kind: "presence", people: this.#people() });
 		}
 		socket.serializeAttachment(attachment);
 		const event: Lifecycle = { ...up.event, host: attachment.host };
 		// Kept apart from the rows, so pruning every event never reuses a seq a host resumes from.
 		const seq = this.#latest() + 1;
+		// Retention runs on the lobby's clock, since a host's can be days off.
 		this.ctx.storage.transactionSync(() => {
 			this.ctx.storage.kv.put("seq", seq);
 			this.ctx.storage.sql.exec(
 				"INSERT INTO events (seq, at, event) VALUES (?, ?, ?)",
 				seq,
-				event.at,
+				Date.now(),
 				JSON.stringify(event),
 			);
 		});

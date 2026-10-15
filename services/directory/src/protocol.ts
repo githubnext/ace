@@ -9,7 +9,10 @@ export type Presence = {
 	login: string;
 	/** The reporting host, by its tailnet name. */
 	host: string;
-	/** The project's channels open in this person's windows on that host. */
+	/**
+	 * The project's channels open in this person's windows on that host. The lobby keeps as many
+	 * as fit in a socket attachment.
+	 */
 	channels: string[];
 	/** No focused window on any of them. */
 	away: boolean;
@@ -22,7 +25,9 @@ export type LifecycleKind =
 	| "archived"
 	| "resumed"
 	| "moved"
-	| "deleted";
+	| "deleted"
+	/** The channel's run ended. */
+	| "ran";
 
 /**
  * A channel's lifecycle as its host saw it, after publishing to the directory. `listing` is the
@@ -37,8 +42,12 @@ export type Lifecycle<Listing = unknown> = {
 };
 
 export type LobbyUp<Listing = unknown> =
-	/** First on every socket. `since` is the newest seq the host applied; omitted on its first visit. */
-	| { op: "hello"; host: string; since?: number }
+	/**
+	 * First on every socket. `since` is the newest seq the host applied; omitted on its first visit.
+	 * `process` names this host process, so its reconnect replaces its own stale socket while two
+	 * processes on one machine (an installed and a source Ace) each keep theirs.
+	 */
+	| { op: "hello"; host: string; process: string; since?: number }
 	/** This host's whole presence in the project, replacing what it sent before; null when not here. */
 	| { op: "presence"; presence: Presence | null }
 	| { op: "lifecycle"; event: Omit<Lifecycle<Listing>, "host"> };
