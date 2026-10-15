@@ -94,6 +94,7 @@ function ComposerSubmit(
 	let state = submitState({ busy, editing, empty, plan, recording });
 	let { mode, label } = state;
 	let variant = mode === "send" ? SLIDE : NONE;
+	let off = disabled || state.disabled;
 	function click() {
 		if (state.disabled) return;
 		if (mode === "mic") return onRecord?.();
@@ -108,12 +109,14 @@ function ComposerSubmit(
 			type="button"
 			{...props}
 			aria-label={label}
-			disabled={disabled || state.disabled}
+			disabled={off}
 			className={cn(
 				"relative flex size-7 items-center justify-center overflow-hidden rounded-full! contain-content active:scale-[0.96]",
 				"transition-[background-color,color,box-shadow,scale] duration-150",
 				mode === "stop"
 					? "bg-red-500 text-white"
+					: off
+					? "bg-muted text-muted-foreground"
 					: ready
 					? "bg-primary text-primary-foreground"
 					: "bg-foreground text-background",
