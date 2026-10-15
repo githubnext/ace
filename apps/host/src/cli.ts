@@ -2,7 +2,7 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import type { ChannelInfo, ChatId, Event } from "@ace/channel/protocol";
+import type { ChannelInfo, ChatId, Event, Request } from "@ace/channel/protocol";
 
 import { appUrl, token } from "./auth";
 import { backup } from "./backup";
@@ -12,13 +12,13 @@ import { config } from "./config";
 import * as directory from "./directory";
 import * as web from "./web";
 import { serve } from "./gateway";
-import { GatewayClient } from "./gateway-client";
+import { GatewayClient, type Watch } from "./gateway-client";
 import { forget, store } from "./keys";
 import { dir as logDir, failure, log, open as openLog } from "./log";
 import { type Filter, follow, print } from "./logs";
 import { health } from "./health";
 import { preference } from "./preferences";
-import type { HostRequest, WindowInfo } from "./protocol";
+import type { HostRequest, Listing, WindowInfo } from "./protocol";
 import { setModel } from "./settings";
 import { archive, host, isRunning, kill, models, parseModel, project, remove } from "./manage";
 import { move } from "./move";
@@ -26,7 +26,7 @@ import { move } from "./move";
 const HELP = `ace — channels on this host
 
   ace new [--project <dir>] [--name <name>] [--model <provider/id>] [--hosted <url>]
-  ace ls [--all]
+  ace ls [--all] [--team]                        --team adds reachable teammates' channels
   ace info <channel>
   ace rename <channel> <name>                   rename without changing its lanes
   ace tabs [--port <port>] [--json]              list open windows and their current channel's tabs
@@ -52,6 +52,9 @@ const HELP = `ace — channels on this host
   ace open [--port 4140]                          open this host's authenticated app
   ace archive <channel> | unarchive <channel> | delete <channel>
 
+info, say, ask, watch, chat and stop also take a teammate's channel, by name or ID, through this
+host's running gateway (open Ace or run ace serve). Their host decides who may invoke its agents.
+
 Models are provider/id, such as openai/gpt-6-astra or anthropic/claude-opus-5-5.
 A credential such as OPENAI_API_KEY comes from ACE_OPENAI_API_KEY, then OPENAI_API_KEY, then the
 keychain. Store keys there for the desktop app, which starts without your shell's environment.`;
@@ -67,6 +70,7 @@ const { values: flags, positionals } = parseArgs({
 		chat: { type: "string" },
 		port: { type: "string" },
 		all: { type: "boolean" },
+		team: { type: "boolean" },
 		detach: { type: "boolean" },
 		channel: { type: "string" },
 		trace: { type: "string" },
@@ -117,19 +121,22 @@ function render(event: Event, info: ChannelInfo) {
 	}
 }
 
-async function watch(id: string, until?: (event: Event) => boolean, replay = true) {
-	const connection = await Connection.open(id);
-	const info = await connection.request<ChannelInfo>({ op: "info" });
+/** A channel's requests: its local worker, or a teammate's channel relayed by this host's gateway. */
+type Session = { request<T = unknown>(request: Request, watch?: Watch): Promise<T>; close(): void };
+
+/** Once watching; `ended` resolves when its channel or relaying host ends the watch. */
+async function watch(session: Session, replay = true): Promise<{ ended: Promise<void> }> {
+	const info = await session.request<ChannelInfo>({ op: "info" });
 	let live = false;
-	const done = Promise.withResolvers<void>();
-	await connection.request({ op: "watch", chat: chat() }, {
+	const ended = Promise.withResolvers<void>();
+	await session.request({ op: "watch", chat: chat() }, {
 		event(event) {
 			if (event.kind === "live") return void (live = true);
 			if (live || replay) render(event, info);
-			if (live && until?.(event)) done.resolve();
 		},
+		closed: () => ended.resolve(),
 	});
-	return { connection, done: done.promise };
+	return { ended: ended.promise };
 }
 
 /** `10m`, `2h`, `1d`, or an ISO time. */
@@ -140,34 +147,78 @@ function since(value: string): number {
 	return Date.now() - Number(match[1]) * unit;
 }
 
-async function local<T>(request: HostRequest): Promise<T> {
+function within<T>(promise: Promise<T>): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<never>((_, reject) => {
+		timer = setTimeout(
+			() => reject(new Error("The host did not answer within 10 seconds")),
+			10_000,
+		);
+	});
+	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** This host's running gateway, which also reaches teammates' channels on the owner's behalf. */
+async function gateway(): Promise<GatewayClient> {
 	const port = Number(flags.port || config.port);
 	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid host port");
 	const info = await health(port);
 	if (!info || info.home !== config.home) {
-		throw new Error("Start this host with ace serve or open Ace before using tab commands");
+		throw new Error("Open Ace or start this host with ace serve first");
 	}
 	const client = new GatewayClient(`ws://127.0.0.1:${port}/ws`, token());
-	const done = Promise.withResolvers<T>();
-	let sent = false;
+	const opened = Promise.withResolvers<void>();
 	const check = () => {
-		if (client.status === "closed") return done.reject(new Error("Disconnected from the host"));
-		if (client.status !== "open" || sent) return;
-		sent = true;
-		client.request<T>(request).then(done.resolve, done.reject);
+		if (client.status === "open") opened.resolve();
+		if (client.status === "closed") opened.reject(new Error("Disconnected from the host"));
 	};
 	const unsubscribe = client.subscribe(check);
-	const timer = setTimeout(
-		() => done.reject(new Error("The host did not answer within 10 seconds")),
-		10_000,
-	);
 	try {
 		check();
-		return await done.promise;
-	} finally {
-		clearTimeout(timer);
-		unsubscribe();
+		await within(opened.promise);
+		return client;
+	} catch (error) {
 		client.close();
+		throw error;
+	} finally {
+		unsubscribe();
+	}
+}
+
+async function local<T>(request: HostRequest): Promise<T> {
+	const client = await gateway();
+	try {
+		return await within(client.request<T>(request));
+	} finally {
+		client.close();
+	}
+}
+
+/** What a teammate can do in a channel from the app; everything else acts on this host's own. */
+const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
+
+/** A channel this host runs, or else one a reachable teammate's host runs. */
+async function join(ref: string): Promise<{ name: string; session: Session }> {
+	if (catalog.list().some((record) => record.id === ref || record.name === ref)) {
+		const record = catalog.find(ref);
+		return { name: record.name, session: await Connection.open(record.id) };
+	}
+	const client = await gateway();
+	try {
+		const listings = await within(client.request<Listing[]>({ op: "channels" }));
+		const identified = listings.filter((listing) => listing.id === ref);
+		const matches = identified.length ? identified : listings.filter((value) => value.name === ref);
+		if (matches.length > 1) throw new Error(`More than one channel is named ${ref}; use its ID`);
+		const listing = matches[0];
+		if (!listing) throw new Error(`No channel ${ref} here or on a reachable teammate's host`);
+		const session: Session = {
+			request: (request, watch) => client.channel(listing.id, request, watch),
+			close: () => client.close(),
+		};
+		return { name: listing.name, session };
+	} catch (error) {
+		client.close();
+		throw error;
 	}
 }
 
@@ -233,6 +284,14 @@ async function main() {
 			return console.log(`${record.name}\t${record.id}`);
 		}
 		case "ls": {
+			if (flags.team) {
+				for (const listing of await local<Listing[]>({ op: "channels" })) {
+					if (listing.state === "archived" && !flags.all) continue;
+					const { name, id, state, host, owner, project } = listing;
+					console.log([name, id, state, host, owner, project].join("\t"));
+				}
+				return;
+			}
 			for (const record of catalog.list()) {
 				if (record.archived && !flags.all) continue;
 				const running = isRunning(record.id) ? "running" : "dormant";
@@ -301,60 +360,64 @@ async function main() {
 	}
 
 	if (!ref) throw new Error(`ace ${command} needs a channel`);
-	const record = catalog.find(ref);
 	const text = rest.join(" ");
+	if (participant.has(command)) {
+		const { name, session } = await join(ref);
+		try {
+			switch (command) {
+				case "info":
+					return console.log(JSON.stringify(await session.request({ op: "info" }), null, 2));
+				case "say":
+					if (!text) throw new Error("Nothing to say");
+					await session.request({ op: "say", chat: chat(), author: catalog.user, text });
+					return;
+				case "ask": {
+					if (!text) throw new Error("Nothing to ask");
+					const body = {
+						op: "ask",
+						chat: chat(),
+						author: catalog.user,
+						text,
+						model: flags.model ? model(flags.model) : undefined,
+					} as const;
+					if (flags.detach) return void (await session.request(body));
+					await watch(session, false);
+					const { submission } = await session.request<{ submission: number }>(body);
+					process.on("SIGINT", () => {
+						console.log(dim(`\nDetached; the run continues. Stop it with: ace stop ${name}`));
+						process.exit(130);
+					});
+					const status = await session.request<string>({ op: "wait", submission });
+					if (status === "unanswered") console.log(dim("  (stopped before answering)"));
+					return;
+				}
+				case "watch":
+					return await (await watch(session)).ended;
+				case "chat": {
+					const body = {
+						op: "chat",
+						author: catalog.user,
+						model: flags.model ? model(flags.model) : undefined,
+					} as const;
+					return console.log((await session.request<{ chat: number }>(body)).chat);
+				}
+				case "stop":
+					return void (await session.request({ op: "stop", chat: chat() }));
+			}
+		} finally {
+			session.close();
+		}
+	}
+	const record = catalog.find(ref);
 	switch (command) {
 		case "backup":
 			if (rest.length !== 1) throw new Error("ace backup <channel> <new-directory>");
 			console.log(await backup(record, rest[0]!));
 			console.log("Channel data saved. Back up project files and lane worktrees separately.");
 			return;
-		case "info":
-			return console.log(JSON.stringify(await request(record.id, { op: "info" }), null, 2));
 		case "rename":
 			if (rest.length !== 1) throw new Error("ace rename <channel> <name>");
 			await request(record.id, { op: "rename", author: catalog.user, name: rest[0]! });
-			return;
-		case "say":
-			if (!text) throw new Error("Nothing to say");
-			await request(record.id, { op: "say", chat: chat(), author: catalog.user, text });
-			return;
-		case "ask": {
-			if (!text) throw new Error("Nothing to ask");
-			const selected = flags.model ? model(flags.model) : undefined;
-			const body = {
-				op: "ask",
-				chat: chat(),
-				author: catalog.user,
-				text,
-				model: selected,
-			} as const;
-			if (flags.detach) return void (await request(record.id, body));
-			const { connection } = await watch(record.id, undefined, false);
-			const { submission } = await connection.request<{ submission: number }>(body);
-			process.on("SIGINT", () => {
-				console.log(dim(`\nDetached; the run continues. Stop it with: ace stop ${record.name}`));
-				process.exit(130);
-			});
-			const status = await connection.request<string>({ op: "wait", submission });
-			if (status === "unanswered") console.log(dim("  (stopped before answering)"));
-			return connection.close();
-		}
-		case "watch": {
-			const { connection } = await watch(record.id);
-			return connection.closed;
-		}
-		case "chat": {
-			const body = {
-				op: "chat",
-				author: catalog.user,
-				model: flags.model ? model(flags.model) : undefined,
-			} as const;
-			const created = await request<{ chat: number }>(record.id, body);
-			return console.log(created.chat);
-		}
-		case "stop":
-			await request(record.id, { op: "stop", chat: chat() });
 			return;
 		case "kill":
 			return kill(record.id);
