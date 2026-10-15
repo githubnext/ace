@@ -400,7 +400,7 @@ async function handle(
 		case "settings":
 			return settings();
 		case "diagnostics":
-			return diagnostics();
+			return diagnostics(request.sync);
 		case "key-set":
 			await setKey(request.provider, request.value);
 			return settingsChanged();

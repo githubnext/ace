@@ -24,7 +24,9 @@ export function url(): string | undefined {
 
 let known: { hosts: Host[]; channels: Listing[] } = { hosts: [], channels: [] };
 let synced: number | undefined;
+/** The last sync's failure, kept until a sync succeeds so Settings can say what is wrong and since when. */
 let error: string | undefined;
+let failed: number | undefined;
 /** The running host's watch, so a change made through it takes effect without waiting for a heartbeat. */
 let active: { sync(): Promise<void>; changed(): void } | undefined;
 
@@ -49,6 +51,7 @@ export function configure(value: string | undefined): Promise<void> | undefined 
 	known = { hosts: [], channels: [] };
 	synced = undefined;
 	error = undefined;
+	failed = undefined;
 	active?.changed();
 	return active?.sync();
 }
@@ -78,7 +81,12 @@ export async function check(base: string, secret: string): Promise<void> {
 }
 
 export function status() {
-	return { url: url(), synced, error };
+	return { url: url(), synced, error, failed };
+}
+
+/** Sync now, or join the sync under way; nothing without a running host. */
+export function sync(): Promise<void> {
+	return active?.sync() ?? Promise.resolve();
 }
 
 /** The directory's last answer; empty until it first responds or without a directory. */
@@ -86,12 +94,33 @@ export function read() {
 	return known;
 }
 
-async function call(base: string, path: string, init?: RequestInit): Promise<Response> {
-	const response = await fetch(`${base}${path}`, {
-		...init,
-		headers: { ...(await hostedAuth()), ...init?.headers },
-	});
-	if (!response.ok) throw new Error(`The directory answered ${response.status}`);
+async function call(
+	base: string,
+	path: string,
+	signal: AbortSignal,
+	init?: RequestInit,
+): Promise<Response> {
+	const headers = { ...(await hostedAuth()), ...init?.headers };
+	let response: Response;
+	try {
+		// A directory that never answers must still fail the sync, or Settings waits forever.
+		response = await fetch(`${base}${path}`, {
+			...init,
+			headers,
+			signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+		});
+	} catch (cause) {
+		if (signal.aborted) throw cause;
+		throw new Error(`Could not reach ${base}. Check the URL and your connection.`, { cause });
+	}
+	if (!response.ok) {
+		await response.body?.cancel();
+		throw new Error(
+			response.status === 401
+				? "The directory rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret."
+				: `The directory answered HTTP ${response.status}. Check the URL.`,
+		);
+	}
 	return response;
 }
 
@@ -105,24 +134,21 @@ export function watch(
 	onChange: () => void,
 ) {
 	const controller = new AbortController();
-	let pending = false;
-	const sync = async () => {
-		const base = url();
-		if (!base || pending || controller.signal.aborted) return;
-		pending = true;
+	let running: { base: string; done: Promise<void> } | undefined;
+	const attempt = async (base: string) => {
 		try {
 			const host = self();
-			await call(base, `/hosts/${encodeURIComponent(host.name)}`, {
+			await call(base, `/hosts/${encodeURIComponent(host.name)}`, controller.signal, {
 				method: "PUT",
 				body: JSON.stringify({ ...host, channels: await channels() }),
-				signal: controller.signal,
 			});
-			const answer = await (await call(base, "/", { signal: controller.signal })).json();
+			const answer = await (await call(base, "/", controller.signal)).json();
 			// The directory changed while this sync was under way; its answer belongs to the old one.
 			if (url() !== base) return;
 			known = answer;
 			synced = Date.now();
 			error = undefined;
+			failed = undefined;
 			log("debug", "directory.sync", {
 				hosts: known.hosts.length,
 				channels: known.channels.length,
@@ -131,11 +157,24 @@ export function watch(
 		} catch (cause) {
 			if (controller.signal.aborted || url() !== base) return;
 			error = (cause as Error).message;
-			log("warn", "directory.failed", { url: url(), ...failure(cause) });
-		} finally {
-			pending = false;
-			if (url() !== base && !controller.signal.aborted) void sync();
+			failed = Date.now();
+			log("warn", "directory.failed", { url: base, ...failure(cause) });
 		}
+	};
+	const sync = (): Promise<void> => {
+		const base = url();
+		if (!base || controller.signal.aborted) return Promise.resolve();
+		if (running?.base === base) return running.done;
+		// A sync for the old URL may wait on a keychain prompt; don't hold a directory change on it.
+		if (running) {
+			void running.done.then(sync);
+			return Promise.resolve();
+		}
+		const done = attempt(base).finally(() => {
+			running = undefined;
+		});
+		running = { base, done };
+		return done;
 	};
 	active = { sync, changed: onChange };
 	void sync();

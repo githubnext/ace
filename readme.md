@@ -114,7 +114,9 @@ for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf
 Share the directory's URL (`https://ace-directory.<your-subdomain>.workers.dev`) and the secret
 with teammates privately. Every host, including yours, joins in Settings → This Mac → Team
 directory: Ace Helper checks the URL and secret against the directory, then saves the secret to
-the Keychain. Change or leave the directory, or remove the saved secret, in the same place.
+the Keychain. Change or leave the directory, or remove the saved secret, in the same place. The
+row shows the directory's URL, the last successful sync, and the last sync's error until a sync
+succeeds; Troubleshooting → Refresh status syncs at once.
 
 From a checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>`
 does the same. While Ace Helper or `ace serve` runs, both go through it: macOS asks before a signed
