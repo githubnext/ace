@@ -74,6 +74,8 @@ let suspending: Promise<unknown> | undefined;
 const pending = new Set<Promise<unknown>>();
 /** Deleting kills the worker first; the watches that ends must not start it again. */
 const deleting = new Set<string>();
+/** Moves under way here; a fence an interrupted move left behind is not one. */
+const moves = new Set<string>();
 
 async function local(): Promise<Listing[]> {
 	const records = catalog.list();
@@ -114,6 +116,9 @@ async function local(): Promise<Listing[]> {
 		listing.root = root;
 		if (repo) listing.repo = repo;
 		if (hosted) listing.hosted = hosted;
+		if (record.moving && moves.has(id)) {
+			listing.moving = record.moving.to === "local" ? name : new URL(record.moving.to).host;
+		}
 		return listing;
 	});
 }
@@ -448,17 +453,22 @@ async function handle(
 		}
 		case "move-targets":
 			return catalog.owns(request.channel) ? targets(request.channel) : [];
-		case "move":
+		case "move": {
 			if (!catalog.owns(request.channel)) {
 				throw new Error("Move channels from the host that runs them");
 			}
+			// A second request for the same channel is refused and must not end the first's progress.
+			const first = !moves.has(request.channel);
+			moves.add(request.channel);
 			try {
 				await move(request.channel, request.target, (waiting) => send({ id, waiting }));
 			} finally {
+				if (first) moves.delete(request.channel);
 				// A failed move lifts its fence, which listings and reopened chats must see.
 				await broadcast();
 			}
 			return;
+		}
 		case "delete":
 			terminals.closeChannel(request.channel);
 			deleting.add(request.channel);

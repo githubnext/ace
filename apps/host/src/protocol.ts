@@ -85,6 +85,8 @@ export type Listing = {
 	state: ChannelState;
 	/** The hosting service's base URL, for a hosted channel; `host` is then its workspace. */
 	hosted?: string;
+	/** Where a move under way is taking the channel: a hosting service's host, or this host's name. */
+	moving?: string;
 };
 
 /** Channels idle this long are inactive until their transcript grows again. */
