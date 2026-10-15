@@ -250,7 +250,7 @@ the app. As with channels, this does not isolate Ace from tools running as the s
 Local app windows report their current channel and tabs to the host while connected. The owner
 can list these windows and rename one tab through the CLI. A rename targets a window, channel,
 and tab ID, so switching channels before the request arrives rejects it. The host returns success
-after the target window applies the change. Tab names stay in the client's existing layout state;
+after the target window applies the change. Tab names stay in that window's layout state;
 they do not rename channels, chats, or another participant's tabs. The window registry is transient,
 and these operations use the authenticated loopback connection, never a tailnet peer.
 
