@@ -10,6 +10,8 @@ export type Tool = {
 	name: string;
 	args: unknown;
 	result?: { error: boolean; text: string; images?: Image[]; interrupted?: boolean };
+	/** The running call's live output tail, until its result replaces it. */
+	progress?: { text: string; truncated?: boolean };
 };
 
 export type Item =
@@ -107,6 +109,22 @@ export function apply(state: Transcript, event: Event): Transcript {
 			};
 			return { ...state, draft: "", items: [...state.items, item] };
 		}
+		case "progress": {
+			const progress = { text: event.text, ...(event.truncated ? { truncated: true } : {}) };
+			return {
+				...state,
+				items: state.items.map((item) =>
+					item.kind === "reply" && item.tools.some((tool) => tool.call === event.call)
+						? {
+							...item,
+							tools: item.tools.map((tool) =>
+								tool.call === event.call && !tool.result ? { ...tool, progress } : tool
+							),
+						}
+						: item
+				),
+			};
+		}
 		case "result":
 			return {
 				...state,
@@ -118,7 +136,9 @@ export function apply(state: Transcript, event: Event): Transcript {
 							tools: item.tools.map((tool) =>
 								tool.call === event.call
 									? {
-										...tool,
+										call: tool.call,
+										name: tool.name,
+										args: tool.args,
 										result: {
 											error: event.error,
 											text: event.text,
@@ -222,6 +242,7 @@ export function useTranscript(
 				op: "watch",
 				queue: true,
 				captions: true,
+				progress: true,
 				...(chat === undefined ? {} : { chat }),
 			}, {
 				event(event) {
