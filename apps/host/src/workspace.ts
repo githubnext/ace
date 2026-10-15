@@ -127,10 +127,12 @@ export async function close(): Promise<void> {
 	await Promise.all(closing);
 }
 
-/** Serve the workspace of every hosted channel in this host's catalog. */
+/** Serve the workspace of every hosted channel in this host's catalog that has none of its own. */
 export function sync(): void {
 	const wanted = new Map(
-		catalog.list().filter((record) => record.hosted && !record.archived).map((r) => [r.id, r]),
+		// A compute container serves its own workspace; a second link would replace it.
+		catalog.list().filter((record) => record.hosted && !record.compute && !record.archived)
+			.map((r) => [r.id, r]),
 	);
 	for (const [id, stop] of links) {
 		if (!wanted.has(id)) {

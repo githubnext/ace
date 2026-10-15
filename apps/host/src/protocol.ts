@@ -168,6 +168,9 @@ export type Project = {
 
 export type ProviderId = "anthropic" | "openai";
 
+/** Beta: new channels in GitHub projects can run on the team's compute service at `url`. */
+export type Compute = { enabled: boolean; url: string | null };
+
 export type CredentialStatus = {
 	source: "keychain" | "environment" | "missing" | "unavailable";
 	stored: boolean | null;
@@ -230,7 +233,10 @@ export type HostRequest =
 	| { op: "key-set"; provider: ProviderId; value: string }
 	| { op: "key-check"; provider: ProviderId }
 	| { op: "key-remove"; provider: ProviderId }
-	| { op: "preferences"; model: ModelRef | null }
+	/** The cloud compute beta's settings, which hold no secret and so never wait on Keychain. */
+	| { op: "compute" }
+	/** Each field present is saved; the others keep their saved values. */
+	| { op: "preferences"; model?: ModelRef | null; compute?: Compute }
 	/**
 	 * Only this host's loopback clients save or remove keychain items and join or leave the
 	 * directory: Ace Helper saves them so it can read them back without a macOS prompt.
@@ -245,7 +251,12 @@ export type HostRequest =
 	/** Models with credentials on a host; this host when omitted. */
 	| { op: "models"; host?: string }
 	/** Owner actions; tailnet peers create, archive, and delete channels on their own hosts. */
-	| { op: "create"; project: string; name?: string; model?: ModelRef }
+	/**
+	 * `cloud` creates the channel on the cloud compute beta's service, with its workspace there;
+	 * `compute-start` then starts that workspace and answers once it is connected.
+	 */
+	| { op: "create"; project: string; name?: string; model?: ModelRef; cloud?: true }
+	| { op: "compute-start"; channel: string }
 	| { op: "archive"; channel: string; archived: boolean }
 	/** Archive the project's channels on this host that have no work in progress. */
 	| { op: "archive-inactive"; project: string }

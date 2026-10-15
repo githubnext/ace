@@ -252,6 +252,11 @@ export class GatewayClient {
 		return this.#request({ op: "move", channel, target }, { waiting });
 	}
 
+	/** Start a cloud compute channel's workspace, hearing each step until it connects. */
+	startCompute(channel: string, waiting: (text: string | null) => void): Promise<void> {
+		return this.#request({ op: "compute-start", channel }, { waiting });
+	}
+
 	#request<T>(
 		request: HostRequest,
 		observe: Pick<Pending, "watch" | "waiting">,

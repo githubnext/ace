@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { validateName } from "@ace/channel";
 import type { ModelRef } from "@ace/channel/protocol";
 
 import channels from "../channel/src/index";
@@ -17,6 +18,7 @@ type Settings = {
 	id: string;
 	repository: string;
 	hosted: string;
+	/** The Git author; the channel's owner is the Ace user in its own config. */
 	owner: { name: string; email: string };
 	size: Size;
 	started?: boolean;
@@ -232,13 +234,17 @@ export class Compute extends DurableObject<Env> {
 				repository.protocol !== "https:" || repository.hostname !== "github.com"
 				|| repository.username || repository.password || repository.search || repository.hash
 			) throw new Error("Use a GitHub HTTPS repository URL without credentials");
-			const owner = body.owner as Settings["owner"];
-			if (!owner?.name || !owner.email) throw new Error("Owner name and email are required");
+			const author = body.author as Settings["owner"];
+			if (typeof body.owner !== "string" || !body.owner) {
+				throw new Error("Owner is the Ace user who owns the channel");
+			}
+			if (!author?.name || !author.email) throw new Error("Author name and email are required");
+			const name = validateName(String(body.name || id));
 			const settings: Settings = {
 				id,
 				repository: repository.href,
 				hosted: url.origin,
-				owner,
+				owner: author,
 				size: size(body.size || "standard-1"),
 			};
 			const response = await this.env.CHANNEL.getByName(id).fetch(
@@ -248,10 +254,10 @@ export class Compute extends DurableObject<Env> {
 					body: JSON.stringify({
 						version: 2,
 						id,
-						name: id,
-						prefix: id,
-						named: true,
-						owner: owner.email,
+						name,
+						prefix: validateName(String(body.prefix || name)),
+						named: !!body.named,
+						owner: body.owner,
 						project: "/workspace/project",
 						lanes: "/workspace/lanes",
 						workspace: `compute:${id}`,

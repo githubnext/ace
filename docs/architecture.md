@@ -445,6 +445,22 @@ offline, and a call in flight when it drops is reported to the model as failed.
   hosted channel can still run model-only work. It adds no client transcript subscriptions or
   keepalive timers to dormant hosted objects.
 
+### Cloud compute (beta)
+
+With Settings → Beta → Cloud compute on and a service URL saved, a new channel in a GitHub project
+can **Run in cloud** on the team's [compute service](../services/compute/README.md). The host calls
+`init` with the project's GitHub repository, its owner as the channel owner, and the project's Git
+`user.name` and `user.email` as the author; it then saves the record with `hosted` set to the
+service and `compute`. The app calls `start` through the host, which waits for `runner.connected`
+in `status`, and invokes the agent only after that. Starting again is the retry after a failure.
+The service's settings live in `settings.json` beside the default model; its secret is the team's
+`ACE_SECRET`.
+
+The container serves the workspace, so the host opens no workspace link for a `compute` record,
+refuses to move it, and opens no terminal for it. Busy and rename projections arrive only over the
+workspace link, so for the beta the listing shows a cloud channel idle and keeps its created name
+until the channel's own metadata is read.
+
 ### Moving channels
 
 The owner moves an idle channel between its host and a hosting service with `ace move` or the
