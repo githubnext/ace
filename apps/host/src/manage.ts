@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { resolve } from "node:path";
@@ -11,7 +10,7 @@ import { Connection, hostedAuth, request } from "./client";
 import { config } from "./config";
 import { models as providers } from "./keys";
 import { preference } from "./preferences";
-import { checkout } from "./projects";
+import { checkout, git } from "./projects";
 import { isInactive } from "./protocol";
 
 export function parseModel(value: string): ModelRef {
@@ -35,15 +34,14 @@ export async function defaultModel(): Promise<ModelRef> {
 }
 
 /** The Git top level containing `dir`, which needs a commit for lanes to start from. */
-export function project(dir: string): string {
+export async function project(dir: string): Promise<string> {
 	dir = resolve(dir === "~" ? homedir() : dir.startsWith("~/") ? homedir() + dir.slice(1) : dir);
-	const git = (args: string[]) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
-	const result = git(["rev-parse", "--show-toplevel"]);
-	if (result.error) throw new Error("Git is unavailable. Check This Mac in Settings.");
+	const result = await git(dir, ["rev-parse", "--show-toplevel"]);
+	if (result.status === null) throw new Error("Git is unavailable. Check This Mac in Settings.");
 	if (result.status !== 0) {
 		throw new Error(`${dir} is not a Git repository. Initialize Git to start channels in it.`);
 	}
-	if (git(["rev-parse", "--verify", "-q", "HEAD"]).status !== 0) {
+	if ((await git(dir, ["rev-parse", "--verify", "-q", "HEAD"])).status !== 0) {
 		throw new Error(`${dir} has no commits yet. Commit its files to start channels in it.`);
 	}
 	return result.stdout.trim();
@@ -151,9 +149,9 @@ async function busy(id: string): Promise<boolean> {
 /** Archives a project's inactive channels on this host, judged by this host's clock; returns their IDs. */
 export async function archiveInactive(root: string): Promise<string[]> {
 	const now = Date.now();
-	const open = catalog.list().filter((record) =>
-		!record.archived && isInactive(record, now) && checkout(record.project).root === root
-	);
+	const inactive = catalog.list().filter((record) => !record.archived && isInactive(record, now));
+	const roots = await Promise.all(inactive.map((record) => checkout(record.project)));
+	const open = inactive.filter((_, index) => roots[index]!.root === root);
 	const idle = await Promise.all(open.map(async ({ id }) => (await busy(id)) ? undefined : id));
 	const ids = idle.filter((id) => id !== undefined);
 	await Promise.all(ids.map((id) => archive(id, true)));
@@ -192,7 +190,7 @@ export async function remove(id: string): Promise<void> {
 	const { lanes } = catalog.paths(id);
 	try {
 		for (const lane of existsSync(lanes) ? readdirSync(lanes) : []) {
-			spawnSync("git", ["-C", project, "worktree", "remove", "--force", `${lanes}/${lane}`]);
+			await git(project, ["worktree", "remove", "--force", `${lanes}/${lane}`]);
 		}
 		catalog.remove(id);
 	} catch (error) {
