@@ -35,7 +35,9 @@ export async function git(dir: string, args: string[]): Promise<Git> {
 	if (running < LIMIT) running++;
 	else await new Promise<void>((resolve) => waiting.push(resolve));
 	try {
+		// Without `env`, Bun resolves `git` on the startup PATH, before the login shell's is adopted.
 		const child = Bun.spawn(["git", "-C", dir, ...args], {
+			env: process.env,
 			stdin: "ignore",
 			stdout: "pipe",
 			stderr: "pipe",
