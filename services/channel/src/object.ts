@@ -146,6 +146,7 @@ export class HostedChannel extends DurableObject<Env> {
 				}),
 				desktop: (request, context) => this.#link.desktop(request, context),
 				browser: (request, context) => this.#link.browser(request, context),
+				images: (path, context) => this.#link.image(path, context),
 				env: (cwd) => {
 					let found = envs.get(cwd);
 					if (!found) envs.set(cwd, found = this.#link.env(config.workspace, cwd));
