@@ -5,6 +5,7 @@ import type { RunEnd } from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
 
 import { desktop } from "./desktop";
+import { isFocused, subscribe } from "./focus";
 import { host } from "./host";
 
 /**
@@ -17,17 +18,6 @@ export type Outcome = Exclude<RunEnd["outcome"], "stopped">;
 
 /** The pulse holds its glow this long, then keeps these props until it has faded out. */
 export const glow = { hold: 1800, props: { glowOpacity: 0.6, glowFadeIn: 0.8, glowFadeOut: 1.3 } };
-
-const EVENTS = ["focus", "blur", "visibilitychange"];
-
-function subscribe(listener: () => void) {
-	for (const event of EVENTS) addEventListener(event, listener);
-	return () => {
-		for (const event of EVENTS) removeEventListener(event, listener);
-	};
-}
-
-const isWatching = () => document.visibilityState === "visible" && document.hasFocus();
 
 /** A stopped run was a participant's own doing, so it needs no attention. */
 function pending(channel: Listing, user: string, state: State): Outcome | undefined {
@@ -46,7 +36,7 @@ export function useAttention(channels: Listing[], user: string, open: string | u
 		`ace:attention:${host.url}:${user}`,
 		null,
 	);
-	const watching = useSyncExternalStore(subscribe, isWatching);
+	const watching = useSyncExternalStore(subscribe, isFocused);
 	const [pulse, setPulse] = useState<"on" | "fading">();
 
 	useEffect(() => {

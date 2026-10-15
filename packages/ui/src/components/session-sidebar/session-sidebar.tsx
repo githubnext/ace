@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import * as format from "../../lib/format";
 import { AnimatePresence, m as motion, useReducedMotion } from "motion/react";
 
-import { SessionItem } from "../session-item/session-item";
+import { Presence, SessionItem } from "../session-item/session-item";
 import { SessionItemLoading } from "../session-item/session-item-loading";
 import type { MoveTarget, SidebarRow } from "../session-item/session-item.types";
 import { middle } from "../../lib/truncate";
@@ -65,6 +65,8 @@ export type SessionSidebarRepo = {
 
 export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children" | "onSelect"> & {
 	projectName?: string;
+	/** People here in the selected project, shown beside the project picker. */
+	here?: SidebarRow["online"];
 	repos?: SessionSidebarRepo[];
 	selectedRepoId?: SessionSidebarRepo["id"];
 	groups: SessionSidebarGroup[];
@@ -760,6 +762,7 @@ function ArchivedHeader({ onBack }: { onBack: () => void }) {
 
 export function ProjectSidebar({
 	projectName,
+	here,
 	repos,
 	selectedRepoId,
 	onRepoChange,
@@ -772,7 +775,13 @@ export function ProjectSidebar({
 	& ComponentPropsWithRef<"aside">
 	& Pick<
 		SessionSidebarProps,
-		"projectName" | "repos" | "selectedRepoId" | "onRepoChange" | "onRepoRemove" | "onAddRepo"
+		| "projectName"
+		| "here"
+		| "repos"
+		| "selectedRepoId"
+		| "onRepoChange"
+		| "onRepoRemove"
+		| "onAddRepo"
 	>)
 {
 	return (
@@ -794,6 +803,7 @@ export function ProjectSidebar({
 						onAddRepo={onAddRepo}
 					/>
 				</div>
+				{here && <Presence members={here} />}
 			</header>
 			{children}
 		</aside>

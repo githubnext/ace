@@ -58,7 +58,10 @@ requests over time; the sidebar follows the chat's current lane.
 
 Avatars come from GitHub logins. Each host resolves its owner's login with `gh api user`, returns
 it from `hello` to peers, and publishes it to the directory. The app maps message authors'
-Tailscale logins to GitHub avatars and shows initials when no login is known.
+Tailscale logins to GitHub avatars and shows initials when no login is known. People are named by
+GitHub login everywhere else: a host converts its own owner's Tailscale login with that same `gh`
+login before publishing presence (`lobbyChanged` in `apps/host/src/gateway.ts`), and an owner
+without one is not shown as here.
 
 ## Channel
 
@@ -265,10 +268,10 @@ on the tailnet listener, including requests from the owner's other machines. A h
 binds discovery to the owner token, listening port, and process before the desktop or CLI opens
 the app. As with channels, this does not isolate Ace from tools running as the same OS user.
 
-Local app windows report their current channel and tabs to the host while connected. The owner
-can list these windows and rename one tab through the CLI. A channel worker's agent does the same
-for windows showing its channel, as the owner over loopback; these tools are not native desktop
-tools and do not depend on that setting. A rename targets a window, channel,
+Local app windows report their current channel, tabs, and focus to the host while connected. The
+owner can list these windows and rename one tab through the CLI. A channel worker's agent does the
+same for windows showing its channel, as the owner over loopback; these tools are not native
+desktop tools and do not depend on that setting. A rename targets a window, channel,
 and tab ID, so switching channels before the request arrives rejects it. The host returns success
 after the target window applies the change. Tab names stay in that window's layout state;
 they do not rename channels, chats, or another participant's tabs. The window registry is transient,
@@ -500,6 +503,17 @@ types live in `@ace/directory/protocol`. The `Directory` object and its contract
   first visit) it is told to read listings again. Events are pruned 30 days after the lobby
   received them, by its own clock, and beyond the newest 2,000. Listings and catalogs stay
   authoritative; losing the log loses only promptness.
+- **Hosts subscribe to every project their owner's app lists**: opened projects and every
+  listed channel's project. A host derives its owner's presence from the window registry (each
+  window's channel and whether it is focused and visible) and relays everyone's presence to its own
+  app's sockets only, never to peers. The sidebar shows who is here in each channel, and the
+  project header shows who is here in the project, each person once and marked away only when
+  every one of their hosts says so. The viewer is left out. A host reports its owner away only
+  after 3 seconds without a focused window, so switching between Ace windows never reaches the
+  lobby.
+- **An absent lobby is harmless.** Without a directory, `ACE_SECRET`, or a Worker deployed with
+  lobbies (which answers 404), each subscription retries from 5 seconds up to every 10 minutes,
+  logging only at debug level, and the app shows nobody here.
 - **Schema versions** are counted in the object's `version` key, because Durable Object SQLite
   refuses `PRAGMA user_version`. Migrations run in order inside one transaction.
 

@@ -48,6 +48,7 @@ import { MoveChannel } from "./move-channel";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import { Palette } from "./palette";
+import { present } from "./presence";
 import { type AppProject, label, projects, title } from "./projects";
 import { Settings } from "./settings";
 import { SetupProject } from "./setup-project";
@@ -114,7 +115,13 @@ function Disconnected() {
 const ALL_PROJECTS = "all";
 const RECENT_CHANNELS = 10;
 
-function row(channel: Listing, user: string, host: string, outcome?: Outcome): SidebarRow {
+function row(
+	channel: Listing,
+	user: string,
+	host: string,
+	online: SidebarRow["online"],
+	outcome?: Outcome,
+): SidebarRow {
 	return {
 		uid: channel.id,
 		kind: "session",
@@ -143,7 +150,7 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 		needsAttention: outcome === "failed",
 		mentionCount: 0,
 		lastActivityAt: Math.floor((channel.active || channel.created) / 1000),
-		online: [],
+		online,
 	};
 }
 
@@ -164,10 +171,13 @@ function pinnedGroup(
 	hello: Hello,
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
 	attention: Map<string, Outcome>,
+	online: (channel: Listing) => SidebarRow["online"],
 ): SessionSidebarGroup {
 	const rows = pins.flatMap((id) => {
 		const channel = channels.find((value) => value.id === id && value.state !== "archived");
-		return channel ? [row(channel, hello.user, hello.host, attention.get(id))] : [];
+		return channel
+			? [row(channel, hello.user, hello.host, online(channel), attention.get(id))]
+			: [];
 	});
 	return { id: "pinned", label: "Pinned", rows, collapsed: collapsed.pinned };
 }
@@ -191,13 +201,14 @@ function projectGroups(
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
 	attention: Map<string, Outcome>,
 	pins: string[],
+	online: (channel: Listing) => SidebarRow["online"],
 ): SessionSidebarGroup[] {
 	const mine: SidebarRow[] = [];
 	const inactive: SidebarRow[] = [];
 	const archived: SidebarRow[] = [];
 	const team = new Map<string, { name: string; rows: SidebarRow[]; archived: SidebarRow[] }>();
 	for (const channel of channels) {
-		const next = row(channel, hello.user, hello.host, attention.get(channel.id));
+		const next = row(channel, hello.user, hello.host, online(channel), attention.get(channel.id));
 		const stored = channel.state === "archived";
 		if (!stored && pins.includes(channel.id)) continue;
 		if (!stored && isInactive(channel, now)) {
@@ -216,7 +227,7 @@ function projectGroups(
 		(stored ? owned.archived : owned.rows).push(next);
 	}
 	return [
-		pinnedGroup(channels, pins, hello, collapsed, attention),
+		pinnedGroup(channels, pins, hello, collapsed, attention, online),
 		{ id: "mine", label: "Channels", rows: mine, collapsed: collapsed.mine },
 		...[...team].sort(([, a], [, b]) => a.name.localeCompare(b.name)).flatMap((
 			[owner, { name, rows, archived }],
@@ -243,6 +254,7 @@ export function App() {
 	const opened = useSyncExternalStore(host.subscribe, () => host.projects);
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
+	const presence = useSyncExternalStore(host.subscribe, () => host.presence);
 	const [hello, setHello] = useState<Hello>({ user: "", host: "" });
 	const [page, setPage] = useWindowStorage<Page>("ace:page", "dashboard");
 	const [project, setProject] = useWindowStorage<string | undefined>("ace:project-id", undefined);
@@ -349,7 +361,9 @@ export function App() {
 		hello.user,
 		page === "channels" ? channel?.id : undefined,
 	);
-	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins);
+	const online = (channel: Listing) =>
+		present(presence[channelProject(channel)], people[hello.user], channel.id);
+	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins, online);
 
 	if (allProjects) {
 		const byProject = new Map<string, Listing[]>();
@@ -371,7 +385,13 @@ export function App() {
 				|| b.created - a.created || b.id.localeCompare(a.id)
 			).slice(0, RECENT_CHANNELS);
 			for (const channel of recent) {
-				const next = row(channel, hello.user, hello.host, attention.get(channel.id));
+				const next = row(
+					channel,
+					hello.user,
+					hello.host,
+					online(channel),
+					attention.get(channel.id),
+				);
 				if (channel.owner === hello.user) {
 					mine.push(next);
 					continue;
@@ -405,7 +425,7 @@ export function App() {
 					}),
 			];
 		});
-		groups.unshift(pinnedGroup(channels, pins, hello, collapsed, attention));
+		groups.unshift(pinnedGroup(channels, pins, hello, collapsed, attention, online));
 	}
 
 	function chooseProject(id: string) {
@@ -615,6 +635,9 @@ export function App() {
 									<ChannelsSidebar
 										className="min-h-0 w-full min-w-0 flex-1 bg-transparent"
 										projectName={allProjects ? "All Projects" : current.label}
+										here={allProjects
+											? undefined
+											: present(presence[current.id], people[hello.user])}
 										repos={repos}
 										selectedRepoId={allProjects ? ALL_PROJECTS : current.id}
 										groups={groups}

@@ -59,7 +59,8 @@ function names(members: SidebarRow["online"]) {
 	return shown.join(", ");
 }
 
-function Presence({ members }: { members: SidebarRow["online"] }) {
+/** People here in a channel or project, with their names in a tooltip. */
+export function Presence({ members }: { members: SidebarRow["online"] }) {
 	if (members.length === 0) return null;
 
 	let label = names(members);
@@ -70,7 +71,7 @@ function Presence({ members }: { members: SidebarRow["online"] }) {
 			<TooltipTrigger
 				render={
 					<span
-						aria-label={`Online: ${label}`}
+						aria-label={`Here: ${label}`}
 						className="shrink-0 rounded-full"
 					/>
 				}

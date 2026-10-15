@@ -50,6 +50,7 @@ export function list(): WindowInfo[] {
 		id,
 		channel: value.channel,
 		tabs: value.tabs,
+		focused: value.focused,
 	}));
 }
 

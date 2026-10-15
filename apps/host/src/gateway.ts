@@ -15,6 +15,7 @@ import type { GatewayClient, Watch } from "./gateway-client";
 import * as github from "./github";
 import { health, HostConflict } from "./health";
 import { seal } from "./keys";
+import * as lobby from "./lobby";
 import { failure, log, open as openLog } from "./log";
 import { move, targets } from "./move";
 import {
@@ -29,6 +30,7 @@ import {
 import * as peers from "./peers";
 import * as projects from "./projects";
 import {
+	channelProject,
 	HOST_PROTOCOL,
 	type HostEnvelope,
 	type HostFrame,
@@ -36,6 +38,8 @@ import {
 	type HostRequest,
 	type Listing,
 	type People,
+	type Presence,
+	projectId,
 } from "./protocol";
 import { type Machine, self, whois } from "./tailnet";
 import {
@@ -141,11 +145,15 @@ function listed(seen: Set<string>): Listing[] {
 		);
 }
 
-async function listings(client: Client, own?: Listing[]): Promise<Listing[]> {
-	own ||= await local();
-	if (client.peer) return own;
+/** Every channel the owner's app lists: this host's, reachable peers', and the directory's. */
+function everyone(own: Listing[]): Listing[] {
 	const reachable = [...own, ...peers.listings()];
 	return [...reachable, ...listed(new Set(reachable.map((value) => value.id)))];
+}
+
+async function listings(client: Client, own?: Listing[]): Promise<Listing[]> {
+	own ||= await local();
+	return client.peer ? own : everyone(own);
 }
 
 const sockets = new Set<ServerWebSocket<Client>>();
@@ -180,6 +188,7 @@ function ownersChanged(): Promise<void> {
 
 /** Peer and directory listings reach only the owner's app; peers never see them. */
 async function owners(own?: Listing[]): Promise<void> {
+	own ||= await local();
 	let frame: string | undefined;
 	for (const socket of sockets) {
 		if (socket.data.peer) continue;
@@ -187,6 +196,7 @@ async function owners(own?: Listing[]): Promise<void> {
 		socket.send(frame);
 	}
 	peopleChanged();
+	await lobbyProjects(own);
 }
 
 /** Fresher sources win: the directory, then reachable peers, then this host's own owner. */
@@ -194,7 +204,7 @@ function people(): People {
 	const known: People = {};
 	for (const host of directory.read().hosts) if (host.github) known[host.login] = host.github;
 	Object.assign(known, peers.people());
-	const own = github.login(peopleChanged);
+	const own = github.login(loginChanged);
 	if (own) known[catalog.user] = own;
 	return known;
 }
@@ -208,10 +218,60 @@ function peopleChanged(): void {
 	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
 }
 
+function loginChanged(): void {
+	peopleChanged();
+	lobbyChanged();
+}
+
+/** Each listed channel's project, so presence can follow window changes without reading Git. */
+let projectOf = new Map<string, string>();
+/** Every project the owner's app lists; this host subscribes to each one's lobby. */
+let known = new Set<string>();
+
+async function lobbyProjects(own?: Listing[]): Promise<void> {
+	if (!directory.url()) return;
+	own ||= await local();
+	projectOf = new Map(everyone(own).map((value) => [value.id, channelProject(value)]));
+	known = new Set(projectOf.values());
+	for (const value of await projects.list()) known.add(projectId(name, value.path, value.repo));
+	lobbyChanged();
+}
+
+/**
+ * Publish the owner's presence in each known project's lobby. This is where the owner's Tailscale
+ * login becomes the GitHub login lobbies identify people by, from the same `gh` login `people`
+ * maps it to; without one the owner is not here anywhere.
+ */
+function lobbyChanged(): void {
+	const here = new Map<string, Presence>();
+	const login = github.login(loginChanged);
+	for (const window of login ? windows.list() : []) {
+		const project = projectOf.get(window.channel.id);
+		if (!project) continue;
+		let found = here.get(project);
+		if (!found) here.set(project, found = { login: login!, host: name, channels: [], away: true });
+		if (!found.channels.includes(window.channel.id)) found.channels.push(window.channel.id);
+		// Apps that predate focus reports cannot say they are away.
+		if (window.focused !== false) found.away = false;
+	}
+	lobby.update(known, here);
+}
+
+let presenceSent = "";
+
+/** Lobby presence reaches only the owner's app; peers never see it. */
+function presenceChanged(): void {
+	const frame = JSON.stringify({ presence: lobby.presence() } satisfies HostFrame);
+	if (frame === presenceSent) return;
+	presenceSent = frame;
+	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
+}
+
 function projectsChanged(): Promise<void> {
 	return queue(async () => {
 		const frame = JSON.stringify({ projects: await projects.list() } satisfies HostFrame);
 		for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
+		await lobbyProjects();
 	});
 }
 
@@ -314,8 +374,11 @@ async function handle(
 		throw new Error("Only this host's owner can do that");
 	}
 	switch (request.op) {
-		case "window":
-			return windows.publish(socket, request.value);
+		case "window": {
+			const window = windows.publish(socket, request.value);
+			lobbyChanged();
+			return window;
+		}
 		case "windows":
 			return windows.list();
 		case "tab-rename":
@@ -357,7 +420,7 @@ async function handle(
 			}
 			return;
 		case "hello":
-			return { user: client.user, host: name, github: github.login(peopleChanged) };
+			return { user: client.user, host: name, github: github.login(loginChanged) };
 		case "channels":
 			return listings(client);
 		case "projects":
@@ -570,6 +633,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 			void queue(async () => {
 				socket.send(JSON.stringify({ projects: await projects.list() } satisfies HostFrame));
 				socket.send(JSON.stringify({ people: people() } satisfies HostFrame));
+				socket.send(JSON.stringify({ presence: lobby.presence() } satisfies HostFrame));
 			});
 		},
 		async message(socket, raw) {
@@ -610,6 +674,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 		close(socket, code) {
 			sockets.delete(socket);
 			windows.drop(socket);
+			if (!socket.data.peer) lobbyChanged();
 			log("info", "gateway.close", { user: socket.data.user, peer: socket.data.peer, code });
 			for (const open of socket.data.channels.values()) {
 				open.then((connection) => connection.close(), () => {});
@@ -758,8 +823,9 @@ async function listen(port: number): Promise<Server<Client>> {
 }
 
 /**
- * `loopback` keeps a disposable host off the team: no tailnet listener, peer discovery, or directory
- * entry. A second host on this machine would otherwise publish under the machine's tailnet name.
+ * `loopback` keeps a disposable host off the team: no tailnet listener, peer discovery, directory
+ * entry, or lobby presence. A second host on this machine would otherwise publish under the
+ * machine's tailnet name.
  */
 export async function serve(port: number, loopback = false): Promise<never> {
 	config.port = port;
@@ -821,7 +887,7 @@ export async function serve(port: number, loopback = false): Promise<never> {
 	if (machine) name = machine.name;
 	const address = machine ? { address: machine.address } : {};
 	const publish = loopback ? undefined : directory.watch(
-		() => ({ name, login: catalog.user, github: github.login(peopleChanged), ...address }),
+		() => ({ name, login: catalog.user, github: github.login(loginChanged), ...address }),
 		local,
 		() => void ownersChanged(),
 	);
@@ -832,6 +898,8 @@ export async function serve(port: number, loopback = false): Promise<never> {
 			machine ? { name, address: machine.address } : { tailscale: false },
 		);
 		cleanup.push(publish.stop);
+		cleanup.push(lobby.watch({ host: () => name, changed: presenceChanged }));
+		void queue(() => lobbyProjects());
 	}
 	if (machine) {
 		servers.push(team(machine, { port, secure: false }));

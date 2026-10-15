@@ -8,6 +8,7 @@ import type {
 	Request,
 	RunEnd,
 } from "@ace/channel/protocol";
+import type { Presence } from "@ace/directory/protocol";
 
 export const HOST_PROTOCOL = 10;
 
@@ -138,7 +139,12 @@ export type Tab = {
 	active: boolean;
 };
 
-export type WindowState = { channel: { id: string; name: string }; tabs: Tab[] };
+/** `focused` is false while the window is hidden or unfocused; older apps omit it. */
+export type WindowState = {
+	channel: { id: string; name: string };
+	tabs: Tab[];
+	focused?: boolean;
+};
 export type WindowInfo = WindowState & { id: string };
 export type TabRename = {
 	call: string;
@@ -292,6 +298,11 @@ export type HostFrame =
 	/** Sent to local clients when known GitHub logins change. */
 	| { people: People }
 	/**
+	 * Everyone here in each project whose lobby this host is subscribed to, by project ID. Sent to
+	 * local clients on every change; tailnet peers never receive lobby frames.
+	 */
+	| { presence: Record<string, Presence[]> }
+	/**
 	 * Pushed when any reachable host's catalog changes. A local client sees every reachable host's
 	 * channels; a tailnet peer sees only this host's.
 	 */
@@ -308,4 +319,4 @@ export type TerminalFrame =
 
 export type TerminalOpened = { terminal: string; cwd: string };
 
-export type { ChannelInfo, Event, ModelRef, Request };
+export type { ChannelInfo, Event, ModelRef, Presence, Request };
