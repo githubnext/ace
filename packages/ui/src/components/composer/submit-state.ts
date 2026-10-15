@@ -1,9 +1,19 @@
 import type { SubmitProps } from "./composer-submit";
 
-type StateOptions = Pick<SubmitProps, "busy" | "editing" | "empty" | "plan" | "recording">;
+type StateOptions = Pick<
+	SubmitProps,
+	"busy" | "busyLabel" | "editing" | "empty" | "plan" | "recording"
+>;
 
 export function submitState(
-	{ busy = false, editing = false, empty = true, plan = false, recording = false }: StateOptions,
+	{
+		busy = false,
+		busyLabel = "Starting channel",
+		editing = false,
+		empty = true,
+		plan = false,
+		recording = false,
+	}: StateOptions,
 ) {
 	let mode: "loading" | "stop" | "edit" | "mic" | "plan" | "send" = busy
 		? "loading"
@@ -17,7 +27,7 @@ export function submitState(
 		? "plan"
 		: "send";
 	let label = mode === "loading"
-		? "Starting channel"
+		? busyLabel
 		: mode === "mic"
 		? "Record"
 		: mode === "stop"

@@ -33,7 +33,7 @@ export type Status = "connecting" | "open" | "closed";
 /** A request's failure when the socket it was sent on closed, including on a relaying host. */
 export const DISCONNECTED = "Disconnected from the host";
 
-/** Silence while a request waits before asking the host for any answer, then before calling it stalled. */
+/** Silence while a request or watch waits before asking the host for any answer, then before calling it stalled. */
 const QUIET = 5000;
 
 /** One WebSocket to a host gateway, reconnecting with backoff until closed. */
@@ -53,7 +53,8 @@ export class GatewayClient {
 	status: Status = "connecting";
 	/**
 	 * The socket is open but the host stopped answering, as while its process is suspended: TCP
-	 * keeps the connection, so only silence while a request waits reveals it. Any frame ends it.
+	 * keeps the connection, so only silence while a request or watch waits reveals it. Any frame
+	 * ends it.
 	 */
 	stalled = false;
 	channels: Listing[] = [];
@@ -165,8 +166,9 @@ export class GatewayClient {
 		const now = Date.now();
 		if (now - this.#heard < QUIET) return;
 		if (this.#asked === undefined) {
-			// An idle socket is quiet by design; only a request still waiting makes silence suspicious.
-			if (![...this.#pending.values()].some((pending) => !pending.accepted)) return;
+			// An idle socket is quiet by design. An open watch counts as waiting: a relayed channel's
+			// watch is often all that crosses to a frozen peer host while its chat is open.
+			if (!this.#pending.size) return;
 			this.#asked = now;
 			this.request({ op: "hello" }).catch(() => {});
 		} else if (now - this.#asked >= QUIET) {

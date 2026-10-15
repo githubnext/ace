@@ -11,7 +11,7 @@ import { config } from "./config";
 import { diagnostics } from "./diagnostics";
 import * as directory from "./directory";
 import { retryLoginShell, shell } from "./environment";
-import { GatewayClient, type Watch } from "./gateway-client";
+import type { GatewayClient, Watch } from "./gateway-client";
 import * as github from "./github";
 import { health, HostConflict } from "./health";
 import { seal } from "./keys";
@@ -241,7 +241,7 @@ async function remote(client: Client, host: string): Promise<GatewayClient> {
 	if (!open) {
 		const machine = peers.machine(host);
 		if (!machine) throw new Error(`${host} is not reachable`);
-		open = new GatewayClient(peers.url(machine));
+		open = peers.relay(machine);
 		client.remotes.set(host, open);
 	}
 	for (let waited = 0; open.status !== "open"; waited += 50) {

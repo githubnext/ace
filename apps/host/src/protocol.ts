@@ -91,6 +91,8 @@ export type Listing = {
 	hosted?: string;
 	/** Where a move under way is taking the channel: a hosting service's host, or this host's name. */
 	moving?: string;
+	/** Its peer host stopped answering while relaying a request or watch here; absent on older hosts. */
+	stalled?: boolean;
 };
 
 /** Channels idle this long are inactive until their transcript grows again. */

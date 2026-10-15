@@ -12,9 +12,7 @@ import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
 import { Usage } from "./usage";
 
-const STALLED = desktop
-	? "Ace Helper isn't responding. The chat continues when it answers."
-	: "Your host isn't responding. The chat continues when it answers.";
+const stopped = (who: string) => `${who} isn't responding. The chat continues when it answers.`;
 
 type Props = {
 	channel: Listing;
@@ -49,7 +47,18 @@ export function Conversation(
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
+	// This app's own host, or the peer host relaying this channel to it, stopped answering.
 	const stalled = useSyncExternalStore(host.subscribe, () => host.stalled);
+	const notice = stalled
+		? stopped(desktop ? "Ace Helper" : "Your host")
+		: channel.stalled && stopped(channel.host);
+	const waiting = stalled
+		? `Waiting for ${desktop ? "Ace Helper" : "your host"}`
+		: channel.stalled
+		? `Waiting for ${channel.host}`
+		: channel.state === "dormant"
+		? "Starting channel"
+		: "Sending";
 	const senders = useMemo(() => sources(channels, channel.host), [channels, channel.host]);
 	const events = useMemo(
 		() =>
@@ -146,9 +155,8 @@ export function Conversation(
 									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
 									: moving
 										|| failed
-										|| (stalled
-											? STALLED
-											: transcript.restarting
+										|| notice
+										|| (transcript.restarting
 											? "Channel is restarting…"
 											: channel.state === "dormant"
 											? "Starting channel…"
@@ -159,9 +167,9 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && (stalled || moving || transcript.restarting) && (
+				{transcript.live && (notice || moving || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
-						{stalled ? STALLED : moving || "Channel is restarting…"}
+						{notice || moving || "Channel is restarting…"}
 					</p>
 				)}
 				{transcript.live && (
@@ -174,6 +182,7 @@ export function Conversation(
 					current={model}
 					currentEffort={chat?.effort}
 					busy={transcript.busy}
+					waiting={waiting}
 					shared={transcript.shared}
 					ready={transcript.live && !moving && channel.state !== "archived"}
 					draft={draft}

@@ -4,9 +4,9 @@ anchor: class GatewayClient
 created: 2026-10-15T02:55:20Z
 norm: '1'
 sig: 41366b9e88f0e890
-body_hash: 584ed6d3bef8fcf8
-raw_hash: e63624db23238cef
-vouched: 2026-10-15T04:57:12Z
+body_hash: ef90a181eb0b7386
+raw_hash: ead53010ff32bd19
+vouched: 2026-10-15T06:16:16Z
 lines: 33-240
 ---
 

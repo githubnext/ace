@@ -44,6 +44,8 @@ type SubmitProps = Omit<ComponentPropsWithRef<"button">, "children" | "onClick">
 	editing?: boolean;
 	/** Whether submission is in progress. */
 	busy?: boolean;
+	/** The label while submission is in progress. */
+	busyLabel?: string;
 	/** Whether the composer is in plan mode (swaps paper plane for a checklist icon). */
 	plan?: boolean;
 	/** Called when the mic button is clicked to start recording. */
@@ -80,6 +82,7 @@ function ComposerSubmit(
 		recording = false,
 		editing = false,
 		busy = false,
+		busyLabel,
 		plan = false,
 		onRecord,
 		onStop,
@@ -91,7 +94,7 @@ function ComposerSubmit(
 	}: SubmitProps,
 ) {
 	let [tick, setTick] = useState(0);
-	let state = submitState({ busy, editing, empty, plan, recording });
+	let state = submitState({ busy, busyLabel, editing, empty, plan, recording });
 	let { mode, label } = state;
 	let variant = mode === "send" ? SLIDE : NONE;
 	let off = disabled || state.disabled;
