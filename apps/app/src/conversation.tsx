@@ -8,6 +8,7 @@ import { desktop } from "./desktop";
 import { publish } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
+import { pendingQuestion, Question } from "./question";
 import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
 import { Usage } from "./usage";
@@ -68,6 +69,8 @@ export function Conversation(
 		: channel.state === "dormant"
 		? "Starting channel"
 		: "Sending";
+	const reply = transcript.items.findLast((item) => item.kind === "reply");
+	const question = reply?.kind === "reply" && pendingQuestion(reply.tools, transcript.busy);
 	const senders = useMemo(() => sources(channels, channel.host), [channels, channel.host]);
 	const events = useMemo(
 		() =>
@@ -180,6 +183,16 @@ export function Conversation(
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
 						{notice || transition || "Channel is restarting…"}
 					</p>
+				)}
+				{transcript.live && question && (
+					<Question
+						key={question.call}
+						channel={channel}
+						chat={id}
+						call={question}
+						user={user}
+						mayAnswer={channel.owner === user || transcript.shared !== false}
+					/>
 				)}
 				{transcript.live && (
 					<MessageQueue messages={transcript.queue} people={people} channels={senders} />

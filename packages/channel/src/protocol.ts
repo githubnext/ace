@@ -31,7 +31,8 @@ export type Metadata = { name: string; summary: string; revision: number };
 export type RunEnd = {
 	chat: ChatId;
 	at: number;
-	outcome: "done" | "failed" | "stopped";
+	/** `question` is published when a run starts waiting on a question, not at its end. */
+	outcome: "done" | "failed" | "stopped" | "question";
 	author: string;
 };
 
@@ -164,6 +165,8 @@ export type QueuedMessage = {
 	invoked: boolean;
 };
 
+export type Answer = { choices: number[] } | { custom: string };
+
 export type Request =
 	| { op: "info" }
 	| { op: "models" }
@@ -188,6 +191,8 @@ export type Request =
 		requestId?: string;
 	}
 	| { op: "chat"; author: string; model?: ModelRef }
+	/** Answer a pending `question` tool call: each question's chosen option indices or written answer. */
+	| { op: "answer"; chat?: ChatId; call: string; author: string; answers: Answer[] }
 	| { op: "stop"; chat?: ChatId }
 	| { op: "kill" }
 	| { op: "share"; author: string; shared: boolean }
