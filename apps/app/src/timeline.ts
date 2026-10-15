@@ -118,6 +118,13 @@ export function toEvents(
 		for (const call of item.tools) {
 			content.push(tool(call, busy, captions[call.call], recaps[call.call]));
 		}
+		for (const call of item.tools) {
+			if (call.result?.interrupted) {
+				content.push(
+					text(`The channel restarted while ${call.name} ran, so it may have partially run.`),
+				);
+			}
+		}
 		if (item.error) content.push(text(`Run failed: ${item.error}`));
 		if (item.stopped) content.push(text("Stopped."));
 		return {

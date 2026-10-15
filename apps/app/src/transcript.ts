@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { Image, QueuedMessage } from "@ace/channel/protocol";
-import type { ChannelInfo, Event } from "@ace/host/protocol";
+import { CHANNEL_CLOSED, type ChannelInfo, type Event } from "@ace/host/protocol";
 
 import { host, onOpen } from "./host";
 
@@ -9,7 +9,7 @@ export type Tool = {
 	call: string;
 	name: string;
 	args: unknown;
-	result?: { error: boolean; text: string; images?: Image[] };
+	result?: { error: boolean; text: string; images?: Image[]; interrupted?: boolean };
 };
 
 export type Item =
@@ -123,6 +123,7 @@ export function apply(state: Transcript, event: Event): Transcript {
 											error: event.error,
 											text: event.text,
 											...(event.images ? { images: event.images } : {}),
+											...(event.interrupted ? { interrupted: true } : {}),
 										},
 									}
 									: tool
@@ -180,6 +181,8 @@ export function useTranscript(
 	const [state, setState] = useState<Transcript>(EMPTY);
 	const [info, setInfo] = useState<ChannelInfo>();
 	const [error, setError] = useState<string>();
+	/** The channel's worker ended the watch and a re-watch is waiting for it to come back. */
+	const [restarting, setRestarting] = useState(false);
 	const [attempt, setAttempt] = useState(0);
 	const [wasOffline, setWasOffline] = useState(offline);
 	if (offline !== wasOffline) {
@@ -201,10 +204,11 @@ export function useTranscript(
 		let started = 0;
 		setState(EMPTY);
 		setInfo(undefined);
-		const start = () => {
+		const start = (restart = false) => {
 			const version = ++generation;
 			started = Date.now();
 			setError(undefined);
+			setRestarting(restart);
 			const current = () => active && version === generation;
 			// A re-watch replays the whole chat; the shown transcript stays until the replay is
 			// complete so the timeline, and what is expanded in it, stays mounted.
@@ -226,6 +230,7 @@ export function useTranscript(
 					else if (event.kind !== "live") replay = apply(replay, event);
 					else {
 						setState(apply(replay, event));
+						setRestarting(false);
 						replay = undefined;
 					}
 					if (event.kind === "run") void refresh();
@@ -234,16 +239,18 @@ export function useTranscript(
 				closed(reason) {
 					if (!current() || host.status !== "open") return;
 					if (Date.now() - started > STABLE) recoveries = 0;
-					if (recoveries++ < RECOVERIES) return start();
+					if (recoveries++ < RECOVERIES) return start(reason === CHANNEL_CLOSED);
 					generation++;
 					setState(EMPTY);
 					setInfo(undefined);
+					setRestarting(false);
 					setError(reason);
 				},
 			}).catch((error: Error) => {
 				if (!current()) return;
 				setState(EMPTY);
 				setInfo(undefined);
+				setRestarting(false);
 				setError(error.message);
 			});
 		};
@@ -270,6 +277,7 @@ export function useTranscript(
 		desktopLive: state.desktop !== undefined,
 		info,
 		error,
+		restarting,
 		retry: () => setAttempt((value) => value + 1),
 	};
 }

@@ -244,6 +244,7 @@ export type Event =
 		name: string;
 		args: unknown;
 	}
+	/** `interrupted` when the channel restarted while the tool ran, so it may have partially run. */
 	| {
 		kind: "result";
 		chat: ChatId;
@@ -252,6 +253,7 @@ export type Event =
 		text: string;
 		images?: Image[];
 		stopped?: boolean;
+		interrupted?: boolean;
 	}
 	/**
 	 * A fast model's one-line description of a group of consecutive tool calls, sent on attachment

@@ -10,7 +10,7 @@ import type { Watch } from "./gateway-client";
 import { key, workerEnv } from "./keys";
 import { lines } from "./lines";
 import { failure, log } from "./log";
-import type { WorkerRequest } from "./protocol";
+import { CHANNEL_CLOSED, type WorkerRequest } from "./protocol";
 
 function start(id: string): void {
 	// Output the worker didn't log itself, such as a crash before its log opens.
@@ -107,7 +107,7 @@ export class Connection {
 		connection.#transport = await open((text) => connection.#receive(JSON.parse(text)));
 		connection.closed = connection.#transport.closed;
 		connection.closed.then(() => {
-			const error = "The channel closed the connection";
+			const error = CHANNEL_CLOSED;
 			// Every accepted watch ends here, so relays can drop it; its owner decides whether to watch again.
 			for (const [id, watch] of connection.#watchers) {
 				if (connection.#pending.has(id)) continue;
