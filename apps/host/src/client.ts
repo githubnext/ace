@@ -59,7 +59,11 @@ function local(socket: Socket, receive: (text: string) => void): Transport {
 /** Hosts hold the team's secret for its services: hosted channels and the directory. */
 export async function hostedAuth(): Promise<Record<string, string>> {
 	const secret = await key("ACE_SECRET");
-	if (!secret) throw new Error("The team's services need ACE_SECRET; see ace key set");
+	if (!secret) {
+		throw new Error(
+			"The team's services need ACE_SECRET. Add it in Settings → This Mac → Team directory, or with ace key set ACE_SECRET",
+		);
+	}
 	return { authorization: `Bearer ${secret}` };
 }
 
