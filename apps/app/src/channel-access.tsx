@@ -108,7 +108,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 				live={desktopLive}
 				owner={owner}
 				pending={changingDesktop}
-				description="Allow native computer use in this channel, including owner and collaborator runs. Turning this off blocks new desktop calls, not shell tools or operations already dispatched."
+				description="Allow native computer use in this channel, including owner and collaborator runs. Turning this off refuses new desktop calls only. Shell commands keep Ace's macOS permissions, such as Screen Recording, so this isn't a security boundary."
 				onClick={computer}
 			>
 				<IconMonitor aria-hidden />
@@ -118,7 +118,8 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 					<DialogHeader>
 						<DialogTitle>Let collaborators invoke agents?</DialogTitle>
 						<DialogDescription>
-							Teammates can run commands as you on this machine.
+							Teammates can run commands as you on this machine, with Ace's macOS permissions such
+							as Screen Recording.
 							{desktop && " Desktop tools are on, so they can also operate your apps."}
 						</DialogDescription>
 					</DialogHeader>

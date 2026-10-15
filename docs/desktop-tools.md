@@ -367,8 +367,9 @@ channel header rather than work around it.
 Turning desktop tools off refuses subsequent calls before the injected desktop capability runs;
 it does not cancel or undo an operation already dispatched. Non-desktop tools remain available.
 This is not a shell security sandbox: agents run as the host's user, and shell commands can still
-access that user's environment. Desktop tools have no separate participant roles, allowlists,
-or per-call approval flow in Ace. macOS permissions authorize Ace on the machine.
+access that user's environment, including Ace's macOS permissions such as Screen Recording.
+Desktop tools have no separate participant roles, allowlists, or per-call approval flow in Ace.
+macOS permissions authorize Ace on the machine.
 
 Clients change this setting with owner-only `{ op: "desktop", author, enabled: boolean }`.
 `info` and every metadata watch event expose `desktop: boolean`, independent of `shared`;
