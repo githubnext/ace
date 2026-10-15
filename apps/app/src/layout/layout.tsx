@@ -44,6 +44,7 @@ import {
 	IconX,
 } from "@ace/ui/icons";
 
+import { isFocused, subscribe as onFocus } from "../focus";
 import { host } from "../host";
 import { Bar as Header } from "./bar";
 import { Grip } from "./grip";
@@ -669,6 +670,7 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 	const [diff, setDiff] = useState(data.diff);
 	const state = useSyncExternalStore(api.subscribe, api.get, api.get);
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
+	const focused = useSyncExternalStore(onFocus, isFocused);
 	const { view, css, grips, grid, flat, desktop, box, start: resize } = useResize(
 		api,
 		state,
@@ -696,6 +698,7 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 				type: item.kind,
 				active: active.has(item.uid),
 			})),
+			focused,
 		};
 	});
 	const persist = useEffectEvent(() => write(id, api.get(), meta, diff));
@@ -725,7 +728,7 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 	useEffect(() => {
 		if (status !== "open") return;
 		host.request({ op: "window", value: snapshot() }).catch(() => {});
-	}, [id, name, state, meta, flat, status]);
+	}, [id, name, state, meta, flat, status, focused]);
 
 	// New changes open a Diff tab behind the Chat tab once; closing it keeps it closed until the
 	// changes clear and new ones appear.

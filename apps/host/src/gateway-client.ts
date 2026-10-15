@@ -7,6 +7,7 @@ import type {
 	HostRequest,
 	Listing,
 	People,
+	Presence,
 	Project,
 	Request,
 	TabRename,
@@ -60,6 +61,8 @@ export class GatewayClient {
 	channels: Listing[] = [];
 	projects: Project[] = [];
 	people: People = {};
+	/** Everyone here by project ID, while the host is connected. */
+	presence: Record<string, Presence[]> = {};
 	settingsVersion = 0;
 	/** Called after every connect so watches can be re-established. */
 	onOpen?: () => void;
@@ -108,6 +111,7 @@ export class GatewayClient {
 			clearInterval(this.#watchdog);
 			this.#asked = undefined;
 			this.stalled = false;
+			this.presence = {};
 			// Listings outlive the socket so open channels stay mounted until the next connect replaces them.
 			this.#set("closed");
 			const error = DISCONNECTED;
@@ -135,6 +139,10 @@ export class GatewayClient {
 		}
 		if ("people" in frame) {
 			this.people = frame.people;
+			return this.#emit();
+		}
+		if ("presence" in frame) {
+			this.presence = frame.presence;
 			return this.#emit();
 		}
 		if ("settings" in frame) {

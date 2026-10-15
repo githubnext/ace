@@ -55,6 +55,7 @@
       },
       "dependencies": {
         "@ace/channel": "workspace:*",
+        "@ace/directory": "workspace:*",
         "@earendil-works/chord": "catalog:pi",
         "@earendil-works/pi-ai": "catalog:pi",
         "@earendil-works/pi-durable": "catalog:pi",
