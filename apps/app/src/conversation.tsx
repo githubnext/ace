@@ -4,12 +4,17 @@ import { Button, Timeline } from "@ace/ui";
 import type { Listing } from "@ace/host/protocol";
 
 import { Composer } from "./composer";
+import { desktop } from "./desktop";
 import { publish } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
 import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
 import { Usage } from "./usage";
+
+const STALLED = desktop
+	? "Ace Helper isn't responding. The chat continues when it answers."
+	: "Your host isn't responding. The chat continues when it answers.";
 
 type Props = {
 	channel: Listing;
@@ -36,6 +41,7 @@ export function Conversation(
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
+	const stalled = useSyncExternalStore(host.subscribe, () => host.stalled);
 	const senders = useMemo(() => sources(channels, channel.host), [channels, channel.host]);
 	const events = useMemo(
 		() =>
@@ -131,7 +137,9 @@ export function Conversation(
 								{offline
 									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
 									: failed
-										|| (transcript.restarting
+										|| (stalled
+											? STALLED
+											: transcript.restarting
 											? "Channel is restarting…"
 											: channel.state === "dormant"
 											? "Starting channel…"
@@ -142,9 +150,9 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && transcript.restarting && (
+				{transcript.live && (stalled || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
-						Channel is restarting…
+						{stalled ? STALLED : "Channel is restarting…"}
 					</p>
 				)}
 				{transcript.live && (
