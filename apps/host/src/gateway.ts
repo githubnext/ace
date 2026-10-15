@@ -487,8 +487,11 @@ async function handle(
 				return target.request(forwarded, watch, trace);
 			}
 			const machine = !client.peer && peers.find(request.channel);
+			// A hosted channel outlives its host's reachability: the directory or that host's last listing says where it runs.
 			const hosted = !client.peer && !machine
-				&& directory.read().channels.find((value) => value.id === request.channel && value.hosted);
+				&& [...directory.read().channels, ...peers.unreachable()].find((value) =>
+					value.id === request.channel && value.hosted
+				);
 			if (hosted) {
 				if (request.request.op === "kill" && client.user !== hosted.owner) {
 					throw new Error("Only the channel's owner can kill it");
