@@ -128,7 +128,7 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && <MessageQueue messages={transcript.queue} />}
+				{transcript.live && <MessageQueue messages={transcript.queue} people={people} />}
 				<Composer
 					channel={channel}
 					chat={id}
