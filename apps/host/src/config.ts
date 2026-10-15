@@ -17,7 +17,7 @@ export const config = {
 	/** HTTPS for browsers on the tailnet; defaults to port + 1000. */
 	webPort: process.env.ACE_WEB_PORT ? Number(process.env.ACE_WEB_PORT) : undefined,
 	peerPort: process.env.ACE_PEER_PORT ? Number(process.env.ACE_PEER_PORT) : undefined,
-	app: process.env.ACE_APP_DIR || fileURLToPath(new URL("../../app/dist", import.meta.url)),
+	app: fileURLToPath(new URL("../../app/dist", import.meta.url)),
 	appUrl: process.env.ACE_APP_URL,
 	helper: false,
 	/** Ace Helper's app version, reported by /health so a conflict can name the build on the port. */
@@ -27,7 +27,7 @@ export const config = {
 	worker: [
 		process.execPath,
 		"--no-env-file",
-		process.env.ACE_WORKER || fileURLToPath(new URL("./worker.ts", import.meta.url)),
+		fileURLToPath(new URL("./worker.ts", import.meta.url)),
 	] as [string, ...string[]],
 };
 

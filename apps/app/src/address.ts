@@ -49,7 +49,6 @@ if (given) {
 /** The deployed app's chosen host, shown when it cannot be reached. */
 export const chosen = deployed ? stored() : undefined;
 
-export const gateway: string | undefined = import.meta.env.VITE_ACE_HOST
-	|| (deployed
-		? chosen && `wss://${chosen}/ws`
-		: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`);
+export const gateway: string | undefined = deployed
+	? chosen && `wss://${chosen}/ws`
+	: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`;
