@@ -18,7 +18,8 @@ New channels start with collaborator agent invocation off: teammates can read ch
 post messages, but not invoke agents. Turning it on with `bun ace share <channel> on` or the
 channel header lets teammates run commands as you on its host. `bun ace share <channel> off`
 blocks new collaborator invocations; active work continues. Native desktop tools also start off;
-the owner turns them on from the channel header, and an agent that needs them asks first.
+the owner turns them on from the channel header or with `bun ace desktop <channel> on`, and an
+agent that needs them asks first.
 Disabling them does not restrict shell access.
 
 Keep the host's gateway on loopback or your private tailnet. **Do not expose it to the public
