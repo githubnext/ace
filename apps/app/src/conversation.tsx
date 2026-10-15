@@ -131,13 +131,22 @@ export function Conversation(
 						>
 							<p>
 								{transcript.error
-									|| (channel.state === "dormant" ? "Starting channel…" : "Loading chat…")}
+									|| (transcript.restarting
+										? "Channel is restarting…"
+										: channel.state === "dormant"
+										? "Starting channel…"
+										: "Loading chat…")}
 							</p>
 							{transcript.error && <Button onClick={transcript.retry}>Try again</Button>}
 						</div>
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
+				{transcript.live && transcript.restarting && (
+					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
+						Channel is restarting…
+					</p>
+				)}
 				{transcript.live && (
 					<MessageQueue messages={transcript.queue} people={people} channels={senders} />
 				)}

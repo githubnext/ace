@@ -895,8 +895,10 @@ function events(entry: EntryRecord): Event[] {
 		return out;
 	}
 	if (message?.role === "toolResult") {
-		const stopped = ToolResultEntry.is(entry)
-			&& entry.data.diagnostics.some(({ code }) => code === "aborted");
+		const codes = ToolResultEntry.is(entry) ? entry.data.diagnostics.map(({ code }) => code) : [];
+		const stopped = codes.includes("aborted");
+		// pi reports this only when recovery finds an unsafe call that a previous worker started.
+		const interrupted = codes.includes("interrupted");
 		const images = room.images(message);
 		return [{
 			kind: "result",
@@ -906,6 +908,7 @@ function events(entry: EntryRecord): Event[] {
 			text: room.text(message),
 			...(images ? { images } : {}),
 			...(stopped ? { stopped: true } : {}),
+			...(interrupted ? { interrupted: true } : {}),
 		}];
 	}
 	return [];

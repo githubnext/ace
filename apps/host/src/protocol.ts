@@ -11,6 +11,9 @@ import type {
 
 export const HOST_PROTOCOL = 9;
 
+/** A watch's `closed` reason when the channel's worker or hosting service ended it, as a restart does. */
+export const CHANNEL_CLOSED = "The channel closed the connection";
+
 export type HostInfo = {
 	app: "ace";
 	protocol: number;
