@@ -7,6 +7,7 @@ import * as catalog from "./catalog";
 import { hostedSocket } from "./client";
 import { browser } from "./browser";
 import { desktop } from "./desktop";
+import { images } from "./images";
 import { failure, log } from "./log";
 
 /**
@@ -37,7 +38,7 @@ function link(record: catalog.Listing): () => Promise<void> {
 			log("info", "workspace.connect", { channel: record.id, hosted: record.hosted });
 			const handle = serve(env, (reply) => {
 				if (connected.readyState === WebSocket.OPEN) connected.send(JSON.stringify(reply));
-			}, { desktop, browser });
+			}, { desktop, browser, images });
 			stopCalls = () => handle.close();
 			socket.addEventListener("message", ({ data }) => {
 				if (stopped || socket !== connected) return;

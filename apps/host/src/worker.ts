@@ -11,6 +11,7 @@ import * as catalog from "./catalog";
 import { request } from "./client";
 import { browser } from "./browser";
 import { desktop } from "./desktop";
+import { images } from "./images";
 import { models, seal } from "./keys";
 import { defaultModel } from "./manage";
 import { lines } from "./lines";
@@ -64,6 +65,7 @@ const channel = await Channel.open({
 	models: models(),
 	desktop,
 	browser,
+	images,
 	env(cwd) {
 		let env = envs.get(cwd);
 		if (!env) envs.set(cwd, env = new NodeExecutionEnv({ cwd }));

@@ -16,6 +16,7 @@ import {
 
 import { type Browser, type BrowserRequest, type BrowserResult, isBrowserAction } from "./browser";
 import { type Desktop, type DesktopRequest, type DesktopResult, isDesktopAction } from "./desktop";
+import type { ImageFile, Images } from "./images";
 import type { Metadata, RunEnd } from "./protocol";
 
 declare function btoa(data: string): string;
@@ -26,7 +27,7 @@ type CallId = string | number;
 
 /** Channel to workspace. */
 export type Call =
-	| { call: CallId; method: Method | Tool; cwd: string; args: unknown[] }
+	| { call: CallId; method: Method | Tool | "image"; cwd: string; args: unknown[] }
 	| { cancel: CallId };
 
 /** Metadata and activity are projected by the workspace host even when no client watches the channel. */
@@ -180,7 +181,7 @@ export class Link {
 	}
 
 	request(
-		method: Method | Tool,
+		method: Method | Tool | "image",
 		cwd: string,
 		args: unknown[],
 		context: Context,
@@ -236,6 +237,12 @@ export class Link {
 
 	browser(request: BrowserRequest, context: Context): Promise<BrowserResult> {
 		return this.#tool("browser", request, isBrowserAction(request), context);
+	}
+
+	async image(path: string, context: Context): Promise<ImageFile> {
+		const result = await this.request("image", "", [path], context);
+		if (!result.ok) throw result.error;
+		return result.value as ImageFile;
 	}
 
 	async #tool(
@@ -304,7 +311,7 @@ export class Link {
 export function serve(
 	env: (cwd: string) => ExecutionEnv,
 	send: (reply: Reply) => void,
-	tools: { desktop?: Desktop; browser?: Browser } = {},
+	tools: { desktop?: Desktop; browser?: Browser; images?: Images } = {},
 ) {
 	const running = new Map<CallId, { abort: AbortController; done: Promise<void> }>();
 	let closed = false;
@@ -324,7 +331,10 @@ export function serve(
 				result: err(failure(new Error("The workspace disconnected"))),
 			});
 		}
-		if (call.method !== "desktop" && call.method !== "browser" && !METHODS.includes(call.method)) {
+		if (
+			call.method !== "desktop" && call.method !== "browser" && call.method !== "image"
+			&& !METHODS.includes(call.method)
+		) {
 			return send({
 				call: call.call,
 				result: err(failure(new Error(`Unknown method ${call.method}`))),
@@ -336,6 +346,13 @@ export function serve(
 		const context = withAbortSignal(abort.signal, BACKGROUND_CONTEXT);
 		try {
 			const args = call.args.map(decode);
+			if (call.method === "image") {
+				if (!tools.images) throw new Error("Reading images is unavailable on this workspace");
+				return send({
+					call: call.call,
+					result: ok(await tools.images(args[0] as string, context)),
+				});
+			}
 			if (call.method === "desktop" || call.method === "browser") {
 				const tool = call.method;
 				const execute = tools[tool] as

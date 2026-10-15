@@ -44,6 +44,7 @@ import {
 import { instructions } from "./context";
 import { changes, patch } from "./changes";
 import { type Desktop, desktop } from "./desktop";
+import { type Images, images } from "./images";
 import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
 import { metadata, MetadataDoc, validateName } from "./metadata";
@@ -98,6 +99,7 @@ export type Options = {
 	env(cwd: string): ExecutionEnv;
 	desktop?: Desktop;
 	browser?: Browser;
+	images?: Images;
 	directory: Directory;
 	/** Publish a projection of committed metadata to the runtime's channel catalog. */
 	onMetadata?(value: Metadata): void;
@@ -166,6 +168,7 @@ export class Channel {
 			}));
 		}
 		if (options.browser) registry.install(browser(options.browser));
+		if (options.images) registry.install(images(options.images));
 		registry.install(lanes({ ...options, name: options.prefix || options.name }));
 		registry.install(Subagent);
 		registry.install(metadata((value) => channel.#changed(value)));
