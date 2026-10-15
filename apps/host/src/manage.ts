@@ -8,6 +8,7 @@ import { available, choose, usable } from "@ace/channel/models";
 import * as catalog from "./catalog";
 import { Connection, hostedAuth, request } from "./client";
 import { config } from "./config";
+import { refusal } from "./http";
 import { models as providers } from "./keys";
 import { preference } from "./preferences";
 import { checkout, git } from "./projects";
@@ -90,13 +91,23 @@ export async function host(
 ) {
 	// Saving the record starts the workspace link, so the service must have the channel first.
 	const record = catalog.draft(dir, model, name, url.replace(/\/$/, ""));
-	const response = await fetch(`${record.hosted}/channels/${record.id}`, {
-		method: "POST",
-		headers: await hostedAuth(),
-		body: JSON.stringify(hostedConfig(record)),
-	}).catch((error: Error) => new Response(error.message, { status: 502 }));
+	const headers = await hostedAuth();
+	let response: Response;
+	try {
+		response = await fetch(`${record.hosted}/channels/${record.id}`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify(hostedConfig(record)),
+		});
+	} catch (error) {
+		throw new Error(`Could not reach ${record.hosted}: ${(error as Error).message}.`, {
+			cause: error,
+		});
+	}
 	if (!response.ok) {
-		throw new Error(`The hosting service refused the channel: ${await response.text()}`);
+		throw new Error(
+			`${await refusal(response, "The hosting service")} The channel was not created.`,
+		);
 	}
 	return catalog.save(record);
 }
@@ -184,7 +195,9 @@ export async function remove(id: string): Promise<void> {
 			headers: await hostedAuth(),
 		});
 		if (!response.ok && response.status !== 404) {
-			throw new Error(`The hosting service did not delete the channel: ${response.status}`);
+			throw new Error(
+				`${await refusal(response, "The hosting service")} The channel was not deleted.`,
+			);
 		}
 	} else await hold(id);
 	const { lanes } = catalog.paths(id);

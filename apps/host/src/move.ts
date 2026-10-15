@@ -14,6 +14,7 @@ import type { ChannelInfo } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
 import { Connection, hostedAuth } from "./client";
+import { refusal } from "./http";
 import { KEYCHAIN_WAITING } from "./keys";
 import { log } from "./log";
 import { hostedConfig, isWorkerAlive } from "./manage";
@@ -121,17 +122,24 @@ async function transfer<T>(auth: Auth, url: string, id: string, body: object): P
 			body: JSON.stringify(body),
 		});
 	} catch (error) {
-		throw new Unknown(`Cannot reach ${url}: ${(error as Error).message}`);
+		throw new Unknown(`Could not reach ${url}: ${(error as Error).message}.`);
 	}
 	if (response.ok) {
 		try {
 			return await response.json() as T;
 		} catch (error) {
-			throw new Unknown(`${url} answered without a readable result: ${(error as Error).message}`);
+			throw new Unknown(`${url} answered without a readable result: ${(error as Error).message}.`);
 		}
 	}
-	const message = `${url} refused: ${(await response.text().catch(() => "")).slice(0, 500)}`;
+	const message = await refusal(response, "The hosting service");
 	throw response.status >= 500 ? new Unknown(message) : new Error(message);
+}
+
+/** A failed move says where the channel is now, since that decides what the person can do next. */
+function stranded(error: unknown, where: string): Error {
+	return new Error(`${(error as Error).message.replace(/[.\s]*$/, ".")} ${where}`, {
+		cause: error,
+	});
 }
 
 /** Worker startup checks the fence after taking this lock, so holding it keeps storage still. */
@@ -180,7 +188,7 @@ async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promi
 		} catch (error) {
 			catalog.write({ ...catalog.read(id), moving: undefined });
 			catalog.unlock(id);
-			throw error;
+			throw stranded(error, "The channel is still on this Mac.");
 		}
 		catalog.write({ ...catalog.read(id), moving: { to: url, digest } });
 	}
@@ -188,14 +196,14 @@ async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promi
 		await transfer<ChannelInfo>(auth, url, id, { action: "activate", digest });
 	} catch (error) {
 		if (error instanceof Unknown) {
-			throw new Error(
-				`${error.message}. The channel may now be active there, so this copy stays fenced; run the same move again to finish it.`,
-				{ cause: error },
+			throw stranded(
+				error,
+				"The channel may now be active there, so this copy stays fenced; run the same move again to finish it.",
 			);
 		}
 		catalog.write({ ...catalog.read(id), moving: undefined });
 		catalog.unlock(id);
-		throw error;
+		throw stranded(error, "The channel is still on this Mac.");
 	}
 	catalog.write({ ...catalog.read(id), hosted: url, moving: undefined, busy: false });
 	catalog.unlock(id);
@@ -238,7 +246,7 @@ async function toLocal(auth: Auth, record: catalog.Listing): Promise<void> {
 		}
 		catalog.write({ ...catalog.read(id), moving: undefined });
 		catalog.unlock(id);
-		throw error;
+		throw stranded(error, `The channel is still on ${new URL(url).host}.`);
 	}
 	catalog.write({ ...catalog.read(id), hosted: undefined, moving: undefined, busy: false });
 	catalog.unlock(id);
