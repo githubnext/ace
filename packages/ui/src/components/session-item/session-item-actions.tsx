@@ -349,6 +349,13 @@ export function RowMenu(
 									<ArchiveContent2 className="size-3.5" />
 									Archive channel
 								</ContextMenu.Item>
+								{onDelete && (
+									<ContextMenu.Item className={MENU_ITEM_DESTRUCTIVE_FULL} disabled>
+										<Trash className="size-3.5" />
+										Delete channel
+										<span className="ml-auto pl-3 text-muted-foreground">Archive first</span>
+									</ContextMenu.Item>
+								)}
 							</>
 						)}
 						{!lobby && archived && (

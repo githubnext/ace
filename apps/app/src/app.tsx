@@ -35,6 +35,7 @@ import { chosen, deployed, remember } from "./address";
 import { glow, type Outcome, useAttention } from "./attention";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { Dashboard } from "./dashboard";
+import { DeleteChannel } from "./delete-channel";
 import { Github, GithubSidebar } from "./github";
 import { useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
@@ -250,6 +251,7 @@ export function App() {
 	const [settings, setSettings] = useState<boolean | "updates">(false);
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
+	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
 	const [pins, setPins] = useLocalStorage<string[]>("ace:pinned-channels", []);
@@ -603,7 +605,7 @@ export function App() {
 											? () => void archiveInactive(current.path)
 											: undefined}
 										onDelete={!allProjects && local && connected
-											? (item) => void change({ op: "delete", channel: item.uid })
+											? (item) => setDeleting({ id: item.uid, name: item.name })
 											: undefined}
 										empty={
 											<p className="px-4 py-6 text-xs text-muted-foreground">
@@ -770,6 +772,16 @@ export function App() {
 						required
 						onSave={rename}
 						onCancel={() => setRenaming(undefined)}
+					/>
+				)}
+				{deleting && (
+					<DeleteChannel
+						name={deleting.name}
+						onDelete={async () => {
+							await change({ op: "delete", channel: deleting.id });
+							setDeleting(undefined);
+						}}
+						onCancel={() => setDeleting(undefined)}
 					/>
 				)}
 				{settings && (
