@@ -27,8 +27,11 @@
 }
 
 - (void)fail:(NSError *)error {
+	NSString *phase = self.state[@"phase"];
+	// Sparkle replaces the app only after Ace answers Install in showReadyToInstallAndRelaunch.
+	BOOL unchanged = [phase isEqual:@"downloading"] || [phase isEqual:@"installing"];
 	self.state[@"phase"] = @"error";
-	self.state[@"error"] = error.localizedDescription;
+	self.state[@"error"] = unchanged ? [error.localizedDescription stringByAppendingString:@" Ace was not changed."] : error.localizedDescription;
 	self.choice = nil;
 	self.cancel = nil;
 }
@@ -121,8 +124,10 @@
 	if (error.code == SUNoUpdateError) {
 		self.state[@"phase"] = @"idle";
 		[self.state removeObjectForKey:@"error"];
-	} else if (error) [self fail:error];
-	else if (![self.state[@"phase"] isEqual:@"restarting"] && ![self.state[@"phase"] isEqual:@"error"]) self.state[@"phase"] = @"idle";
+	} else if (error) {
+		// showUpdaterError already reported this error with what it left unchanged.
+		if (![self.state[@"phase"] isEqual:@"error"]) [self fail:error];
+	} else if (![self.state[@"phase"] isEqual:@"restarting"] && ![self.state[@"phase"] isEqual:@"error"]) self.state[@"phase"] = @"idle";
 }
 @end
 

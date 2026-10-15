@@ -10,6 +10,7 @@ import { Connection } from "./client";
 import { config } from "./config";
 import { diagnostics } from "./diagnostics";
 import * as directory from "./directory";
+import { shellError } from "./environment";
 import { GatewayClient, type Watch } from "./gateway-client";
 import * as github from "./github";
 import { seal } from "./keys";
@@ -675,8 +676,17 @@ export async function serve(port: number): Promise<never> {
 	await resume();
 	const server = owner(port);
 	log("info", "host.start", { port: server.port, user: catalog.user, bun: Bun.version });
+	if (shellError) log("warn", "host.shell", { error: shellError });
 	const servers = [server];
 	const cleanup: (() => void)[] = [];
+	// A blocked event loop fails the desktop's health check, which then cannot tell a busy helper from a stopped one.
+	let tick = performance.now();
+	const stalls = setInterval(() => {
+		const now = performance.now();
+		if (now - tick > 2000) log("warn", "host.stall", { ms: Math.round(now - tick - 1000) });
+		tick = now;
+	}, 1000);
+	cleanup.push(() => clearInterval(stalls));
 	async function stop() {
 		if (closing) return;
 		closing = true;

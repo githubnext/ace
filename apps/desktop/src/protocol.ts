@@ -2,6 +2,8 @@ export type HelperState = {
 	service: "unregistered" | "enabled" | "approval";
 	running: boolean;
 	managed: boolean;
+	/** launchd runs Ace Helper but it did not answer, as while it starts or is busy. */
+	unresponsive: boolean;
 };
 
 export type HelperAction = "status" | "start" | "stop" | "restart" | "settings" | "log";

@@ -52,6 +52,12 @@ export function HostStatus({ active }: { active: boolean }) {
 		};
 	}, [active, status, retry]);
 
+	useEffect(() => {
+		if (!active || !helper.value?.unresponsive) return;
+		const timer = setTimeout(() => setRetry((value) => value + 1), 2000);
+		return () => clearTimeout(timer);
+	}, [active, helper]);
+
 	async function control(command: HelperAction) {
 		if (!desktop) return;
 		setAction({ busy: command });
@@ -82,6 +88,8 @@ export function HostStatus({ active }: { active: boolean }) {
 									? "Using a command-line host. Stop ace serve before managing Ace Helper here."
 									: current?.running
 									? "Running in the background. It starts at login and keeps channels available after you quit Ace."
+									: current?.unresponsive
+									? "Running, but not responding yet. Ace keeps checking; channels on this Mac wait until it answers."
 									: current?.service === "approval"
 									? "macOS approval required. Allow Ace in Login Items to run Ace Helper in the background."
 									: current
@@ -121,7 +129,7 @@ export function HostStatus({ active }: { active: boolean }) {
 								Open Login Items
 							</Button>
 						)}
-						{!current?.running
+						{!current?.running && !current?.unresponsive
 							? (
 								<Button disabled={!available} onClick={() => void control("start")}>
 									Start
@@ -129,13 +137,15 @@ export function HostStatus({ active }: { active: boolean }) {
 							)
 							: (
 								<>
-									<Button
-										variant="outline"
-										disabled={!available}
-										onClick={() => void control("restart")}
-									>
-										Restart
-									</Button>
+									{current?.running && (
+										<Button
+											variant="outline"
+											disabled={!available}
+											onClick={() => void control("restart")}
+										>
+											Restart
+										</Button>
+									)}
 									<Button
 										variant="outline"
 										disabled={!available || confirm}
