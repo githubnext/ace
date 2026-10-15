@@ -35,15 +35,19 @@ export function Conversation(
 	const offline = channel.state === "offline";
 	const placement = channel.hosted || channel.host;
 	const moving = channel.moving && `Moving to ${channel.moving}…`;
+	const computing = channel.computing
+		&& `${channel.computing === "starting" ? "Starting" : "Stopping"} the cloud workspace…`;
+	const transition = moving || computing;
+	// The service refuses a computing channel, so the chat is watched again only once that ends.
 	const transcript = useTranscript(
-		channel.id,
+		computing ? undefined : channel.id,
 		id,
 		offline,
 		channel.moving ? `${placement} → ${channel.moving}` : placement,
 	);
-	// The watch retries once the host is back or the move ends, so its error until then is not the
-	// user's to retry.
-	const failed = !offline && !moving && transcript.error;
+	// The watch retries once the host is back or the move or compute transition ends, so its error
+	// until then is not the user's to retry.
+	const failed = !offline && !transition && transcript.error;
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
@@ -153,7 +157,7 @@ export function Conversation(
 							<p>
 								{offline
 									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
-									: moving
+									: transition
 										|| failed
 										|| notice
 										|| (transcript.restarting
@@ -167,9 +171,9 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && (notice || moving || transcript.restarting) && (
+				{transcript.live && (notice || transition || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
-						{notice || moving || "Channel is restarting…"}
+						{notice || transition || "Channel is restarting…"}
 					</p>
 				)}
 				{transcript.live && (
@@ -184,7 +188,7 @@ export function Conversation(
 					busy={transcript.busy}
 					waiting={waiting}
 					shared={transcript.shared}
-					ready={transcript.live && !moving && channel.state !== "archived"}
+					ready={transcript.live && !transition && channel.state !== "archived"}
 					draft={draft}
 					onDraftLoaded={onDraftLoaded}
 					onSettings={onSettings}

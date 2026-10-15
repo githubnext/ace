@@ -84,6 +84,8 @@ const pending = new Set<Promise<unknown>>();
 const deleting = new Set<string>();
 /** Moves under way here; a fence an interrupted move left behind is not one. */
 const moves = new Set<string>();
+/** Cloud compute starts and stops under way here; each freezes its hosted channel until it ends. */
+const computing = new Map<string, "starting" | "stopping">();
 
 async function local(): Promise<Listing[]> {
 	const records = catalog.list();
@@ -125,6 +127,8 @@ async function local(): Promise<Listing[]> {
 		if (repo) listing.repo = repo;
 		if (hosted) listing.hosted = hosted;
 		if (record.compute) listing.compute = true;
+		const transition = computing.get(id);
+		if (transition) listing.computing = transition;
 		if (record.moving && moves.has(id)) {
 			listing.moving = record.moving.to === "local" ? name : new URL(record.moving.to).host;
 		}
@@ -313,6 +317,28 @@ async function remote(client: Client, host: string): Promise<GatewayClient> {
 		await Bun.sleep(50);
 	}
 	return open;
+}
+
+/**
+ * The service refuses the channel's connections while it starts or stops, so the listing says so
+ * beforehand and clients open the chat again once it ends.
+ */
+async function lifecycle(
+	channel: string,
+	transition: "starting" | "stopping",
+	run: () => Promise<void>,
+): Promise<void> {
+	// A second request for the same channel waits behind the first at the service; only the first
+	// may end the listing's transition.
+	const first = !computing.has(channel);
+	if (first) computing.set(channel, transition);
+	await broadcast();
+	try {
+		await run();
+	} finally {
+		if (first) computing.delete(channel);
+		await broadcast();
+	}
 }
 
 const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete"]);
@@ -514,9 +540,13 @@ async function handle(
 		case "compute":
 			return computeSettings();
 		case "compute-start":
-			return compute.start(request.channel, (waiting) => send({ id, waiting }));
+			return lifecycle(
+				request.channel,
+				"starting",
+				() => compute.start(request.channel, (waiting) => send({ id, waiting })),
+			);
 		case "compute-stop":
-			return compute.stop(request.channel);
+			return lifecycle(request.channel, "stopping", () => compute.stop(request.channel));
 		case "archive":
 			if (request.archived) terminals.closeChannel(request.channel);
 			await archive(request.channel, request.archived);
