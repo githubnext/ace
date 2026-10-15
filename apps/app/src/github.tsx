@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import type { GithubFilter, GithubItem, GithubKind, GithubList } from "@ace/channel/protocol";
+import { checkoutId } from "@ace/host/protocol";
 import {
 	Button,
 	buttonVariants,
@@ -28,7 +29,7 @@ import {
 
 import { type Query, useGithub } from "./github-cache";
 import { host } from "./host";
-import { type AppProject, checkoutId } from "./projects";
+import type { AppProject } from "./projects";
 
 const NAMES = { issues: "Issues", prs: "Pull requests" };
 const DATE = new Intl.DateTimeFormat(undefined, {

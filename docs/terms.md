@@ -72,6 +72,12 @@ _Avoid_: task (pi's term for a durable state machine), workspace, branch (a lane
 **Participant**:
 A human or an agent in a channel.
 
+**Person**:
+A human on the team. Ace shows and names people by GitHub login; the tailnet still authenticates
+them by Tailscale login, and messages record that login as their author. Each host converts its
+own owner's Tailscale login to a GitHub login, the same way for avatars and presence.
+_Avoid_: user (outside code), account
+
 **Message**:
 What participants see in a chat. Messages are stored as pi entries.
 
@@ -128,3 +134,22 @@ _Avoid_: idle, asleep, offline
 
 **Offline**:
 A host, and therefore its channels, that cannot be reached.
+
+## Presence
+
+**Here**:
+A person with a channel open in an Ace window right now: here in a chat while that chat is open,
+here in a channel while any of its views is, and here in a project while any of its channels is.
+It ends when the window closes or moves
+to another channel, or their host leaves the project's lobby. Here is never stored.
+_Avoid_: online (when you mean here), viewing, joined
+
+**Away**:
+Here, but without a focused Ace window on any of the project's channels.
+_Avoid_: idle (a dormant channel's avoided term), offline
+
+**Lifecycle event**:
+A lobby's ordered record that a channel was created, renamed, summarized, archived, resumed,
+moved, or deleted. Hosts emit them after publishing to the directory; they speed up listings but
+never replace them, since catalogs and listings stay authoritative.
+_Avoid_: channel event (a channel's own watch events)
