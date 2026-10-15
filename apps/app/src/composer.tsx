@@ -25,7 +25,7 @@ const MODES = [
 // Teammates keep the Ace mode and their drafts while the owner has turned invocation off.
 const BLOCKED_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }, ACE_MODE];
 const MENTIONS = [{ name: "ace", avatar: aceAvatar }];
-const EFFORTS: Record<Effort, string> = {
+export const EFFORTS: Record<Effort, string> = {
 	off: "Off",
 	minimal: "Minimal",
 	low: "Low",
