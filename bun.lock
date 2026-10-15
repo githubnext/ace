@@ -171,7 +171,7 @@
       "wrangler": "4.140.0",
     },
     "desktop": {
-      "@githubnext/desktop-tools": "github:githubnext/desktop-tools#034a6956b0976feac23bf572a3b0ec62e1e9f5bd",
+      "@githubnext/desktop-tools": "github:githubnext/desktop-tools#8801b314bdd6a584e4528e41fcf66b240be7f4d7",
       "@types/three": "0.165.0",
       "electrobun": "1.18.1",
     },
@@ -469,7 +469,7 @@
 
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.2.8", "", {}, "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ=="],
 
-    "@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#034a695", { "bin": { "desktop-tools-build": "dist/build.js" } }, "githubnext-desktop-tools-034a695", "sha512-am2qeBbSThltshV3hmp2kIH1a4nZfUPBGNS5EInHU8bHB+zTMXGzguFwZVvg6L1/zkBkTiR2E3mIT5tUsI9F8w=="],
+    "@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#8801b31", { "bin": { "desktop-tools-build": "dist/build.js" } }, "githubnext-desktop-tools-8801b31", "sha512-pVnlUGEyjUDHF41DIiIVmBi1sywI5hDJdzebDRM4GeD8/+kz8XVtSVMLG/nRpWPgNGschrIHDMtjGcH5fHfTRg=="],
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
