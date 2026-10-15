@@ -10,6 +10,7 @@
 		"./images": "./src/images.ts",
 		"./models": "./src/models.ts",
 		"./protocol": "./src/protocol.ts",
+		"./tabs": "./src/tabs.ts",
 		"./transfer": "./src/transfer.ts",
 		"./workspace": "./src/workspace.ts"
 	},

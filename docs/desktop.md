@@ -243,8 +243,9 @@ local gateway. Desktop builds use their bundled web assets by default.
 
 ## Rename a tab from an agent or the CLI
 
-An Ace agent can use its shell tool to discover open local windows and rename a tab. From this
-checkout, run:
+An agent in a channel on this host has `tabs` and `tab_rename` tools for the open Ace windows
+showing that channel. They act on Ace's own layout, so they work with Channel desktop tools off.
+From a shell, or for any channel's windows, run from this checkout:
 
 ```sh
 bun ace tabs --json

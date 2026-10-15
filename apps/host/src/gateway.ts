@@ -667,6 +667,8 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 
 export async function serve(port: number): Promise<never> {
 	config.port = port;
+	// Channel workers and agent shells reach this listener for the owner's windows.
+	process.env.ACE_PORT = String(port);
 	// Hosted channels run tools in this process.
 	seal();
 	openLog("host");
