@@ -489,8 +489,10 @@ types live in `@ace/directory/protocol`. The `Directory` object and its contract
   login, the project's channels open in their windows, and whether all of them are unfocused) and
   the lobby keeps it in the socket's hibernation attachment, sending everyone the whole list on
   each change. The attachment holds 2 KiB, so the lobby drops open channels beyond what fits.
-  Hosts ping every 30 seconds; the lobby answers without waking and an alarm closes sockets silent
-  for 90 seconds, so a host that slept without closing TCP stops being here. A host process's
+  Hosts ping every 30 seconds; the lobby answers without waking and an alarm every 5 minutes
+  closes sockets silent for 90 seconds, so a host that slept without closing TCP stops being here
+  within about 6.5 minutes. Re-arming that alarm is the lobby's only steady write: 288 billed row
+  writes a day while any host is connected, and none for pings or presence. A host process's
   reconnect replaces its own stale socket; two processes on one machine each keep theirs.
 - **Lifecycle events are a resume buffer.** Hosts send channel lifecycle events and the lobby
   numbers them with one `seq` per project. A host reconnects with the newest `seq` it applied and

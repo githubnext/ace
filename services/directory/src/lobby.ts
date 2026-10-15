@@ -9,7 +9,11 @@ const RETAIN = 30 * 24 * 60 * 60_000;
 const CAP = 2000;
 /** Hosts ping every 30 s; a socket silent this long belongs to a host that slept without closing it. */
 const SILENT = 90_000;
-const SWEEP = 60_000;
+/**
+ * Each sweep re-arms the alarm, one billed row write, so a lobby with hosts costs 288 writes a day.
+ * A sleeping host's presence lingers up to SILENT + SWEEP.
+ */
+const SWEEP = 5 * 60_000;
 /**
  * Hibernation refuses attachments over 2 KiB. This budget is for their JSON in UTF-8, which is no
  * smaller than the structured clone, with room for its framing.
