@@ -66,8 +66,8 @@ export type SidebarRow = {
 	lastSpeaker?: "user" | "agent";
 	lastActivityAt: UNIX;
 
-	// Per-session presence (current user excluded)
-	online: { id: string; name: string; avatar?: string }[];
+	// Per-session presence (current user excluded), away people last
+	online: { id: string; name: string; avatar?: string; away?: boolean }[];
 
 	// Optional / deferred (v1.1)
 	hasPlan?: boolean;

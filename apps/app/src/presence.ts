@@ -18,5 +18,5 @@ export function present(
 	}
 	return [...away]
 		.sort(([a, x], [b, y]) => Number(x) - Number(y) || a.localeCompare(b))
-		.map(([login, isAway]) => ({ id: login, name: isAway ? `${login} (away)` : login }));
+		.map(([login, away]) => ({ id: login, name: login, away }));
 }
