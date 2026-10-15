@@ -4,9 +4,9 @@ anchor: function join
 created: 2026-10-15T00:37:32Z
 norm: '1'
 sig: 2e2a490821164beb
-body_hash: e578693bef0388bb
-raw_hash: 8e0483dfea2e961f
-vouched: 2026-10-15T03:39:53Z
+body_hash: cfd68c1e1f71ebcd
+raw_hash: bd472575a375bbf3
+vouched: 2026-10-15T04:47:29Z
 lines: 201-223
 ---
 

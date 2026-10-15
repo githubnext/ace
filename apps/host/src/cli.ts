@@ -170,19 +170,43 @@ async function isHostRunning(): Promise<boolean> {
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
 const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
 
+/** What only a channel's owner can do, phrased for refusing a teammate's channel. */
+const owned: Record<string, string> = {
+	backup: "back it up",
+	rename: "rename it",
+	kill: "kill it",
+	move: "move it",
+	share: "change its sharing",
+	desktop: "change its desktop tools",
+	archive: "archive it",
+	unarchive: "unarchive it",
+	delete: "delete it",
+};
+
+function mine(ref: string): boolean {
+	return catalog.list().some((record) => record.id === ref || record.name === ref);
+}
+
+/** The listing `ref` names, by ID before name. */
+function listed(listings: Listing[], ref: string): Listing | undefined {
+	const identified = listings.filter((listing) => listing.id === ref);
+	const matches = identified.length ? identified : listings.filter((value) => value.name === ref);
+	if (matches.length > 1) throw new Error(`More than one channel is named ${ref}; use its ID`);
+	return matches[0];
+}
+
 /** A channel this host runs, or else one a reachable teammate's host runs. */
 async function join(ref: string): Promise<{ name: string; session: Session }> {
-	if (catalog.list().some((record) => record.id === ref || record.name === ref)) {
+	if (mine(ref)) {
 		const record = catalog.find(ref);
 		return { name: record.name, session: await Connection.open(record.id) };
 	}
 	const client = await gateway();
 	try {
-		const listings = await loopback.within(client.request<Listing[]>({ op: "channels" }));
-		const identified = listings.filter((listing) => listing.id === ref);
-		const matches = identified.length ? identified : listings.filter((value) => value.name === ref);
-		if (matches.length > 1) throw new Error(`More than one channel is named ${ref}; use its ID`);
-		const listing = matches[0];
+		const listing = listed(
+			await loopback.within(client.request<Listing[]>({ op: "channels" })),
+			ref,
+		);
 		if (!listing) throw new Error(`No channel ${ref} here or on a reachable teammate's host`);
 		const session: Session = {
 			request: (request, watch) => client.channel(listing.id, request, watch),
@@ -193,6 +217,19 @@ async function join(ref: string): Promise<{ name: string; session: Session }> {
 		client.close();
 		throw error;
 	}
+}
+
+/**
+ * A channel this host runs, for an owner-only command. A teammate's channel the running host can
+ * see is refused by its owner and host, since info, say, ask and watch accept the same name.
+ */
+async function own(ref: string, action: string): Promise<catalog.Listing> {
+	if (mine(ref) || !(await isHostRunning())) return catalog.find(ref);
+	const listing = listed(await local<Listing[]>({ op: "channels" }), ref);
+	if (!listing) return catalog.find(ref);
+	throw new Error(
+		`${listing.name} is ${listing.owner}'s channel on ${listing.host}; only its owner can ${action}`,
+	);
 }
 
 function printTabs(windows: WindowInfo[]): void {
@@ -215,6 +252,9 @@ function printTabs(windows: WindowInfo[]): void {
 
 async function main() {
 	if (flags.help || !command) return console.log(HELP);
+	// Shells start background jobs with SIGINT ignored and Bun keeps that, so `kill -INT` would not
+	// end a backgrounded watch. A listener takes SIGINT back; serve shuts down with its own.
+	if (command !== "serve") process.on("SIGINT", () => process.exit(130));
 	if (command !== "serve" && command !== "logs") {
 		openLog("cli");
 		log("info", "cli.command", { command, ...(ref ? { ref } : {}) });
@@ -365,7 +405,7 @@ async function main() {
 					if (flags.detach) return void (await session.request(body));
 					await watch(session, false);
 					const { submission } = await session.request<{ submission: number }>(body);
-					process.on("SIGINT", () => {
+					process.prependListener("SIGINT", () => {
 						console.log(dim(`\nDetached; the run continues. Stop it with: ace stop ${name}`));
 						process.exit(130);
 					});
@@ -390,7 +430,9 @@ async function main() {
 			session.close();
 		}
 	}
-	const record = catalog.find(ref);
+	const action = owned[command];
+	if (!action) throw new Error(`Unknown command ${command}\n\n${HELP}`);
+	const record = await own(ref, action);
 	switch (command) {
 		case "backup":
 			if (rest.length !== 1) throw new Error("ace backup <channel> <new-directory>");
@@ -437,7 +479,6 @@ async function main() {
 			await remove(record.id);
 			return console.log(`Deleted ${record.name}. Its lane branches remain in ${record.project}.`);
 	}
-	throw new Error(`Unknown command ${command}\n\n${HELP}`);
 }
 
 main().then(
