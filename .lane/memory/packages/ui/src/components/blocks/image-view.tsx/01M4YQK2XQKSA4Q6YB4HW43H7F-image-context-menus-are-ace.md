@@ -4,8 +4,9 @@ anchor: function ImageOpen
 created: 2026-10-15T02:52:18Z
 norm: '1'
 sig: bbc79eb64fffddaf
-body_hash: cbbfaa97095c28a2
-raw_hash: 265e2203f617ae7a
+body_hash: 89efe43d1bda1f7a
+raw_hash: 3c26cd583540bcd1
+vouched: 2026-10-15T03:37:38Z
 lines: 139-194
 ---
 
