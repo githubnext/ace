@@ -37,7 +37,9 @@ keeps that grouped view; channel creation and GitHub pages retain a concrete pro
 The app identifies a project with a GitHub remote by its repository, compared case-insensitively,
 so checkouts of it on any host are one project; a folder without one is its host and main checkout.
 A project keeps every known checkout. A GitHub project shows its name wherever it is checked out;
-a folder without one on another host is labeled with that host. Creating channels and archiving
+a folder without one on another host is labeled with that host. Projects that would show the same
+label add the fewest trailing parent folders that tell them apart, or a GitHub project its owner, and
+the project picker shows each checkout's full path on hover. Creating channels and archiving
 inactive ones use this host's checkout. A GitHub project checked out only on teammates' hosts lists
 their channels, and its channel creation entry points first offer to set it up on this machine:
 the person confirms or edits a destination, `~/code/<repo>` by default, before anything is cloned.

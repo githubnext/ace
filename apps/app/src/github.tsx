@@ -85,7 +85,7 @@ export function GithubSidebar({ kind, project, repos, connected, onProject, onOp
 	return (
 		<ProjectSidebar
 			className="min-h-0 w-full min-w-0 flex-1 bg-transparent"
-			projectName={project.name}
+			projectName={project.label}
 			repos={repos}
 			selectedRepoId={project.id}
 			onRepoChange={(repo) => onProject(repo.id)}

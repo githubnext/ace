@@ -4,10 +4,12 @@ import type { Listing, Project } from "@ace/host/protocol";
  * `host` and `path` are the checkout that creates channels and reads GitHub: this host's own
  * checkout when it has one, else one whose host can answer for it. `reachable` is whether it can:
  * a peer answers only for a project its own listing shows a live channel in.
- * `checkouts` holds every known checkout's ID on any host.
+ * `checkouts` holds every known checkout's ID on any host. `label` is `name`, unique among
+ * projects shown alike.
  */
 export type AppProject = Project & {
 	id: string;
+	label: string;
 	host: string;
 	reachable: boolean;
 	hosts: Set<string>;
@@ -34,10 +36,47 @@ export const channelProject = (channel: Pick<Listing, "host" | "project" | "root
  * A GitHub project is the same project wherever it is checked out. A folder without one is only
  * its host's, so a folder elsewhere is named by the hosts that have it.
  */
-export const label = (project: AppProject, host: string) =>
-	project.repo || project.host === host
-		? project.name
-		: `${project.name} · ${[...project.hosts].join(", ")}`;
+const hosts = (project: AppProject, host: string) =>
+	project.repo || project.host === host ? "" : ` · ${[...project.hosts].join(", ")}`;
+
+export const label = (project: AppProject, host: string) => project.label + hosts(project, host);
+
+/** The full checkout behind a label, for hover. */
+export const title = (project: AppProject, host: string) =>
+	project.host === host ? project.path : `${project.path} on ${project.host}`;
+
+/**
+ * Like VS Code's editor tabs, projects shown alike gain the fewest trailing parent folders that
+ * tell them apart, or the owner for a GitHub project, whose checkout is not its identity.
+ */
+function disambiguate(values: AppProject[], host: string) {
+	const alike = new Map<string, AppProject[]>();
+	for (const value of values) {
+		const key = value.name + hosts(value, host);
+		const list = alike.get(key);
+		if (list) list.push(value);
+		else alike.set(key, [value]);
+	}
+	for (const list of alike.values()) {
+		if (list.length < 2) continue;
+		const parents = list.map((value) =>
+			value.repo
+				? [value.repo.split("/")[0]!]
+				: value.path.replace(/\/+$/, "").split("/").slice(0, -1).filter(Boolean)
+		);
+		list.forEach((value, index) => {
+			const own = parents[index]!;
+			let count = 1;
+			while (
+				count < own.length
+				&& parents.some((other, at) =>
+					at !== index && other.slice(-count).join("/") === own.slice(-count).join("/")
+				)
+			) count++;
+			value.label = `${value.name} — ${own.slice(-count).join("/") || "/"}`;
+		});
+	}
+}
 
 export function projects(opened: Project[], channels: Listing[], host: string): AppProject[] {
 	const values = new Map<string, AppProject>();
@@ -59,6 +98,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 				host: at,
 				path,
 				name,
+				label: name,
 				reachable,
 				hosts: new Set([at]),
 				checkouts: new Set([checkout]),
@@ -87,5 +127,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 			|| !channel.hosted && (channel.state === "running" || channel.state === "dormant");
 		add(channel.host, path, name, reachable, channel.repo);
 	}
-	return [...values.values()];
+	const found = [...values.values()];
+	disambiguate(found, host);
+	return found;
 }
