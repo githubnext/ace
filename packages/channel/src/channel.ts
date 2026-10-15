@@ -64,6 +64,7 @@ import type {
 } from "./protocol";
 import { queue } from "./queue";
 import * as room from "./room";
+import { type Tabs, tabs } from "./tabs";
 
 type Settings = { shared: boolean; desktop: boolean };
 
@@ -100,6 +101,7 @@ export type Options = {
 	desktop?: Desktop;
 	browser?: Browser;
 	images?: Images;
+	tabs?: Tabs;
 	directory: Directory;
 	/** Publish a projection of committed metadata to the runtime's channel catalog. */
 	onMetadata?(value: Metadata): void;
@@ -169,6 +171,7 @@ export class Channel {
 		}
 		if (options.browser) registry.install(browser(options.browser));
 		if (options.images) registry.install(images(options.images));
+		if (options.tabs) registry.install(tabs(options.tabs));
 		registry.install(lanes({ ...options, name: options.prefix || options.name }));
 		registry.install(Subagent);
 		registry.install(metadata((value) => channel.#changed(value)));

@@ -17,6 +17,7 @@ import { defaultModel } from "./manage";
 import { lines } from "./lines";
 import { log, open } from "./log";
 import type { WorkerInfo, WorkerRequest } from "./protocol";
+import { tabs } from "./tabs";
 
 const RETIRE_AFTER = 10 * 60_000;
 
@@ -66,6 +67,7 @@ const channel = await Channel.open({
 	desktop,
 	browser,
 	images,
+	tabs: tabs(id),
 	env(cwd) {
 		let env = envs.get(cwd);
 		if (!env) envs.set(cwd, env = new NodeExecutionEnv({ cwd }));

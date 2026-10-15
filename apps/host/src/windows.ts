@@ -55,12 +55,12 @@ export function list(): WindowInfo[] {
 
 export function rename(request: Extract<HostRequest, { op: "tab-rename" }>): Promise<WindowInfo> {
 	const window = windows.get(request.window);
-	if (!window) throw new Error("No connected Ace window with that ID; run ace tabs again");
+	if (!window) throw new Error("No connected Ace window with that ID; list tabs again");
 	if (window.value.channel.id !== request.channel) {
-		throw new Error("That Ace window is showing a different channel; run ace tabs again");
+		throw new Error("That Ace window is showing a different channel; list tabs again");
 	}
 	const tab = window.value.tabs.find((tab) => tab.id === request.tab);
-	if (!tab) throw new Error("That tab is closed or unknown; run ace tabs again");
+	if (!tab) throw new Error("That tab is closed or unknown; list tabs again");
 	if (tab.type === "chat") {
 		throw new Error("The Chat tab follows the channel name and cannot be renamed");
 	}
@@ -70,7 +70,7 @@ export function rename(request: Extract<HostRequest, { op: "tab-rename" }>): Pro
 	return new Promise((resolve, reject) => {
 		const timer = setTimeout(() => {
 			pending.delete(call);
-			reject(new Error("The Ace window did not respond; run ace tabs to check its current state"));
+			reject(new Error("The Ace window did not respond; list tabs to check its current state"));
 		}, TIMEOUT);
 		pending.set(call, {
 			window,

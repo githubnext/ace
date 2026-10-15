@@ -12,11 +12,12 @@ import { config } from "./config";
 import * as directory from "./directory";
 import * as web from "./web";
 import { serve } from "./gateway";
-import { GatewayClient, type Watch } from "./gateway-client";
+import type { GatewayClient, Watch } from "./gateway-client";
 import { forget, store } from "./keys";
 import { dir as logDir, failure, log, open as openLog } from "./log";
-import { type Filter, follow, print } from "./logs";
 import { health } from "./health";
+import { type Filter, follow, print } from "./logs";
+import * as loopback from "./loopback";
 import { preference } from "./preferences";
 import type { HostRequest, Listing, WindowInfo } from "./protocol";
 import { setModel } from "./settings";
@@ -148,51 +149,12 @@ function since(value: string): number {
 	return Date.now() - Number(match[1]) * unit;
 }
 
-function within<T>(promise: Promise<T>): Promise<T> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const timeout = new Promise<never>((_, reject) => {
-		timer = setTimeout(
-			() => reject(new Error("The host did not answer within 10 seconds")),
-			10_000,
-		);
-	});
-	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+function gateway(): Promise<GatewayClient> {
+	return loopback.gateway(Number(flags.port || config.port));
 }
 
-/** This host's running gateway, which also reaches teammates' channels on the owner's behalf. */
-async function gateway(): Promise<GatewayClient> {
-	const port = Number(flags.port || config.port);
-	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid host port");
-	const info = await health(port);
-	if (!info || info.home !== config.home) {
-		throw new Error("Open Ace or start this host with ace serve first");
-	}
-	const client = new GatewayClient(`ws://127.0.0.1:${port}/ws`, token());
-	const opened = Promise.withResolvers<void>();
-	const check = () => {
-		if (client.status === "open") opened.resolve();
-		if (client.status === "closed") opened.reject(new Error("Disconnected from the host"));
-	};
-	const unsubscribe = client.subscribe(check);
-	try {
-		check();
-		await within(opened.promise);
-		return client;
-	} catch (error) {
-		client.close();
-		throw error;
-	} finally {
-		unsubscribe();
-	}
-}
-
-async function local<T>(request: HostRequest): Promise<T> {
-	const client = await gateway();
-	try {
-		return await within(client.request<T>(request));
-	} finally {
-		client.close();
-	}
+function local<T>(request: HostRequest): Promise<T> {
+	return loopback.local<T>(request, Number(flags.port || config.port));
 }
 
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
@@ -206,7 +168,7 @@ async function join(ref: string): Promise<{ name: string; session: Session }> {
 	}
 	const client = await gateway();
 	try {
-		const listings = await within(client.request<Listing[]>({ op: "channels" }));
+		const listings = await loopback.within(client.request<Listing[]>({ op: "channels" }));
 		const identified = listings.filter((listing) => listing.id === ref);
 		const matches = identified.length ? identified : listings.filter((value) => value.name === ref);
 		if (matches.length > 1) throw new Error(`More than one channel is named ${ref}; use its ID`);
