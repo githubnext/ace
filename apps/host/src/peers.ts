@@ -22,6 +22,8 @@ const hosts = new Map<string, Peer>();
 const listeners = new Set<() => void>();
 /** Each peer's channels as it last answered, listed as offline while the peer is unreachable. */
 const remembered = new Map<string, Listing[]>();
+/** Relays per peer that stopped answering a request or watch, while their sockets stay open. */
+const stalled = new Map<string, number>();
 /** Peer owners' GitHub logins by Tailscale login, from their last hello, so remembered channels keep their owner's name and avatar. */
 const named: People = {};
 
@@ -84,11 +86,36 @@ export function watch(onChange: () => void) {
 	};
 }
 
+/**
+ * A connection relaying one of this host's clients to a peer. The listing connection is idle, so
+ * only a relay with a request or watch waiting notices the peer stop answering, as while it is
+ * suspended; its channels are then listed `stalled` until any relay to it hears from it again.
+ */
+export function relay(machine: Machine): GatewayClient {
+	const client = new GatewayClient(url(machine));
+	let quiet = false;
+	client.subscribe(() => {
+		if (client.stalled === quiet) return;
+		quiet = client.stalled;
+		const count = (stalled.get(machine.name) || 0) + (quiet ? 1 : -1);
+		if (count) stalled.set(machine.name, count);
+		else stalled.delete(machine.name);
+		log("info", "peer.stalled", { peer: machine.name, stalled: quiet });
+		emit();
+	});
+	return client;
+}
+
 /** Every reachable peer's channels. */
 export function listings(): Listing[] {
-	return [...hosts.values()].flatMap(({ client }) =>
-		client.status === "open" ? client.channels : []
-	);
+	return [...hosts.values()].flatMap(({ machine, client }) => {
+		if (client.status !== "open") return [];
+		if (!stalled.has(machine.name)) return client.channels;
+		// A hosted channel is reached at its service, never through the peer.
+		return client.channels.map((channel) =>
+			channel.hosted ? channel : { ...channel, stalled: true }
+		);
+	});
 }
 
 /** Channels of peers that answered before but are unreachable now. */
