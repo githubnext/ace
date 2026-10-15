@@ -41,7 +41,7 @@ const ACTION_BUTTON = cn(
 // Hit-testing must not wait for :hover. A press that arrives before hover styles apply lands on the
 // row, its release lands on the button, and the click then reaches neither.
 const SESSION_ACTIONS =
-	"absolute top-1/2 right-1 z-20 inline-flex -translate-y-1/2 items-center gap-0 -space-x-0.5 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-[menu-open=true]/menu:opacity-100";
+	"inline-flex items-center gap-0 -space-x-0.5 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-[menu-open=true]/menu:opacity-100";
 
 type SessionActionsProps = ActionProps & {
 	data: SidebarRow;
