@@ -141,6 +141,7 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 			: channel.state === "offline"
 			? "offline"
 			: "idle",
+		host: channel.host,
 		agent: channel.state === "running" && channel.busy ? "thinking" : "idle",
 		unreadCount: outcome === "done" ? 1 : 0,
 		needsAttention: outcome === "failed",
@@ -152,6 +153,13 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 
 /** Teammates appear by GitHub login where their host knows it. */
 const person = (people: People, owner: string) => people[owner] || owner;
+
+/** A teammate's section says when none of its channels can open because their hosts are unreachable. */
+function heading(label: string, rows: SidebarRow[]) {
+	return rows.length > 0 && rows.every((value) => value.connection === "offline")
+		? `${label} · Offline`
+		: label;
+}
 
 /** Pins belong to the person, not the channel, so teammates never see them. */
 function pinnedGroup(
@@ -220,7 +228,7 @@ function projectGroups(
 			const id: SessionSidebarGroupId = `team:${owner}`;
 			const stored: SessionSidebarGroupId = `team:${owner}:archived`;
 			return [
-				{ id, label: name, rows, collapsed: folded(collapsed, id) },
+				{ id, label: heading(name, rows), rows, collapsed: folded(collapsed, id) },
 				{
 					id: stored,
 					label: `${name} · Archived`,
@@ -392,7 +400,7 @@ export function App() {
 						const group: SessionSidebarGroupId = `${id}:team:${owner}`;
 						return {
 							id: group,
-							label: `${name} · ${teammate}`,
+							label: heading(`${name} · ${teammate}`, rows),
 							rows,
 							sort: "none",
 							collapsed: collapsed[group],

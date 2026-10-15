@@ -40,6 +40,8 @@ export type SidebarRow = {
 		| "error"
 		| "idle"
 		| "offline";
+	/** The machine running the channel, which an offline row names. */
+	host?: string;
 
 	// Agent (only meaningful while connection === "connected")
 	agent: "idle" | "thinking" | "tool" | "streaming" | "aborting";

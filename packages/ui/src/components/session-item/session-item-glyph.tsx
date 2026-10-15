@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { AceAvatar } from "../ace-avatar/ace-avatar";
 import { cn } from "../../lib/utils";
 import { Badge } from "../../ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 
 import type { SidebarRow } from "./session-item.types";
 import {
@@ -202,7 +203,7 @@ export function RowGlyph({ data, selected }: { data: SidebarRow; selected?: bool
 		return <MentionBadge count={data.mentionCount} label={label} />;
 	}
 
-	return (
+	let glyph = (
 		<Badge
 			show={badge.show}
 			pulse={badge.pulse}
@@ -210,5 +211,19 @@ export function RowGlyph({ data, selected }: { data: SidebarRow; selected?: bool
 		>
 			{resolveIcon(data)}
 		</Badge>
+	);
+	if (data.connection !== "offline") return glyph;
+
+	// The gray dot alone doesn't say why the channel can't open (#361).
+	let offline = `Offline: ${data.host} is unreachable`;
+	return (
+		<Tooltip>
+			<TooltipTrigger render={<span role="img" aria-label={offline} className="grid" />}>
+				{glyph}
+			</TooltipTrigger>
+			<TooltipContent side="right" sideOffset={8}>
+				{offline}
+			</TooltipContent>
+		</Tooltip>
 	);
 }

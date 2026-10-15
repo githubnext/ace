@@ -7,6 +7,9 @@ import {
 	ProjectPicker,
 	serialize,
 	type SessionSidebarRepo,
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
 } from "@ace/ui";
 import { IconChevronDown, IconCloud, IconHash, IconPlus } from "@ace/ui/icons";
 import type { Listing } from "@ace/host/protocol";
@@ -199,7 +202,14 @@ export function Dashboard(
 										)}
 									</span>
 									{channel.state === "offline" && (
-										<span className="text-xs text-muted-foreground">Offline</span>
+										<Tooltip>
+											<TooltipTrigger
+												render={<span className="text-xs text-muted-foreground" />}
+											>
+												Offline<span className="sr-only">: {channel.host} is unreachable</span>
+											</TooltipTrigger>
+											<TooltipContent>{channel.host} is unreachable</TooltipContent>
+										</Tooltip>
 									)}
 								</button>
 							))}
