@@ -55,7 +55,12 @@ export function Conversation(
 	const stalled = useSyncExternalStore(host.subscribe, () => host.stalled);
 	const notice = stalled
 		? stopped(desktop ? "Ace Helper" : "Your host")
-		: channel.stalled && stopped(channel.host);
+		: channel.stalled
+		? stopped(channel.host)
+		: channel.state === "archived"
+			&& (channel.owner === user
+				? "Archived. Unarchive it from the sidebar to send messages."
+				: "Archived. Only its owner can unarchive it.");
 	const waiting = stalled
 		? `Waiting for ${desktop ? "Ace Helper" : "your host"}`
 		: channel.stalled
