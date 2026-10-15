@@ -56,8 +56,10 @@ can be the child of another chat in the same channel; killing a parent kills its
 _Avoid_: session, thread, conversation (except for pi's conversation record)
 
 **Tab**:
-A view inside a channel: Chat, Plan, Diff, Browse, Terminal, or Browser Preview. A Chat tab shows
-one chat; other tabs are views, not durable units.
+A view inside a channel: Chat, Diff, or Terminal. A new tab starts blank until one is chosen. A
+Chat tab shows one chat; other tabs are views, not durable units. File
+([#22](https://github.com/githubnext/ace/issues/22)) and Browser Preview
+([#16](https://github.com/githubnext/ace/issues/16)) tabs are planned.
 
 **Lane**:
 An isolated Git worktree for one unit of work, such as "implement auth". A chat may start or
