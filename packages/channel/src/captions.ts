@@ -158,7 +158,7 @@ export function isStale(group: Group, stored?: { calls: string[]; done: boolean 
 const CAPTION =
 	`You label steps in an AI coding agent's work log. Each step is a group of tool calls that the log folds under one line. Write that line: what the agent did in this step, and toward what, in sentence case. Keep it under seven words; shorter is better.
 
-Name the specific thing (component, file, feature, or goal), never generic phrases like "Ran commands" or "Used tools". Describe this step, not the whole task. Reply with the line only: no quotes, preamble, or trailing punctuation.`;
+Name the specific thing (component, file, feature, or goal), never generic phrases like "Ran commands" or "Used tools". Describe this step, not the whole task. A call whose result starts with "error:" failed, so describe only what the other calls did. Reply with the line only: no quotes, preamble, or trailing punctuation.`;
 
 const RUNNING =
 	`The step is still running: start with a present participle, as in "Investigating whether the editor causes the bug", "Editing the composer", or "Updating the repo and opening a PR".`;
