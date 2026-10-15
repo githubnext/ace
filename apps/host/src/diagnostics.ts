@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 
 import * as directory from "./directory";
-import { shellError } from "./environment";
+import { shell as environment } from "./environment";
 import type { Diagnostics } from "./protocol";
 import * as tailnet from "./tailnet";
 
@@ -27,7 +27,7 @@ async function shell(): Promise<Diagnostics["tools"][number]> {
 	const path = process.env.SHELL || "/bin/sh";
 	try {
 		await access(path, constants.X_OK);
-		return { name: "Shell", path, error: shellError };
+		return { name: "Shell", path };
 	} catch {
 		return { name: "Shell", path, error: "The login shell is not executable." };
 	}
@@ -38,5 +38,5 @@ export async function diagnostics(): Promise<Diagnostics> {
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(),
 	]);
-	return { tools, tailscale, directory: directory.status() };
+	return { tools, tailscale, directory: directory.status(), shell: { ...environment } };
 }

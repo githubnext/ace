@@ -37,6 +37,8 @@ export type Diagnostics = {
 		error?: string;
 	};
 	directory: { url?: string; synced?: number; error?: string };
+	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
+	shell: { state: "adopted" | "pending" | "failed"; error?: string };
 };
 
 /** `offline`: the channel's host is unreachable. Hosted channels are never offline. */

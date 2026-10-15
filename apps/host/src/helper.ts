@@ -9,9 +9,7 @@ declare const ACE_PROFILE: string | undefined;
 
 const worker = process.argv[2] === "--worker";
 if (!worker) {
-	adoptLoginShell();
-	// Agents and the commit hooks they run use the lane CLI this bundle ships and was built against.
-	process.env.PATH = `${join(dirname(process.execPath), "..", "Helpers")}:${process.env.PATH}`;
+	adoptLoginShell(join(dirname(process.execPath), "..", "Helpers"));
 }
 
 const { config, desktop } = await import("./config");

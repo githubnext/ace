@@ -10,7 +10,7 @@ import { Connection } from "./client";
 import { config } from "./config";
 import { diagnostics } from "./diagnostics";
 import * as directory from "./directory";
-import { shellError } from "./environment";
+import { retryLoginShell, shell } from "./environment";
 import { GatewayClient, type Watch } from "./gateway-client";
 import * as github from "./github";
 import { seal } from "./keys";
@@ -676,7 +676,16 @@ export async function serve(port: number): Promise<never> {
 	await resume();
 	const server = owner(port);
 	log("info", "host.start", { port: server.port, user: catalog.user, bun: Bun.version });
-	if (shellError) log("warn", "host.shell", { error: shellError });
+	if (shell.state === "pending") {
+		log("warn", "host.shell", { error: shell.error });
+		void retryLoginShell(() => {
+			// The shell's environment can carry credentials again; they must leave it before tools run.
+			seal();
+			log("info", "host.shell.adopted");
+		}).then(() => {
+			if (shell.state === "failed") log("error", "host.shell", { error: shell.error });
+		});
+	}
 	const servers = [server];
 	const cleanup: (() => void)[] = [];
 	// A blocked event loop fails the desktop's health check, which then cannot tell a busy helper from a stopped one.
