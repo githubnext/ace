@@ -524,12 +524,15 @@ async function handle(
 				const target = await connection(client, request.channel);
 				return target.request(forwarded, watch, trace);
 			}
-			const machine = !client.peer && peers.find(request.channel);
-			// A hosted channel outlives its host's reachability: the directory or that host's last listing says where it runs.
-			const hosted = !client.peer && !machine
-				&& [...directory.read().channels, ...peers.unreachable()].find((value) =>
-					value.id === request.channel && value.hosted
-				);
+			// A hosted channel outlives its host's reachability, so connect to its service directly rather than
+			// through the host. A reachable host's listing is current; otherwise the directory or that host's
+			// last listing says where it runs.
+			const known = !client.peer
+				&& (peers.listings().find((value) => value.id === request.channel)
+					|| [...directory.read().channels, ...peers.unreachable()].find((value) =>
+						value.id === request.channel && value.hosted
+					));
+			const hosted = known && known.hosted ? known : undefined;
 			if (hosted) {
 				if (request.request.op === "kill" && client.user !== hosted.owner) {
 					throw new Error("Only the channel's owner can kill it");
@@ -540,6 +543,7 @@ async function handle(
 				const target = await connection(client, request.channel, hosted.hosted);
 				return target.request(forwarded, watch, trace);
 			}
+			const machine = !client.peer && peers.find(request.channel);
 			if (!machine) throw new Error("No reachable host runs that channel");
 			const target = await remote(client, machine.name);
 			return target.channel(request.channel, request.request, watch, trace);
