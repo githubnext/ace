@@ -1,6 +1,6 @@
 import type { ElectrobunConfig } from "electrobun";
 
-import { version } from "./package.json";
+import { current } from "./scripts/version";
 
 const channel = process.env.ACE_BUILD_CHANNEL || "dev";
 
@@ -8,7 +8,9 @@ export default {
 	app: {
 		name: "Ace",
 		identifier: channel === "stable" ? "dev.ace.desktop" : `dev.ace.desktop.${channel}`,
-		version,
+		// Electrobun writes this to CFBundleVersion and version.json; the helper script moves it to
+		// CFBundleShortVersionString and sets the orderable bundle version.
+		version: current(channel).display,
 	},
 	build: {
 		// Electrobun's bundled runtime matches its native FFI; Ace Helper carries its own Bun.

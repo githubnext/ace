@@ -3,15 +3,16 @@ import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, writeFileSy
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { version } from "../package.json";
 import { notices } from "./notices";
 import { lane, run, sparkle } from "./downloads";
+import { current } from "./version";
 
 const build = process.env.ELECTROBUN_BUILD_DIR;
 const channel = process.env.ELECTROBUN_BUILD_ENV;
 const identifier = process.env.ELECTROBUN_APP_IDENTIFIER;
 if (!build || !channel || !identifier) throw new Error("Run this script through Electrobun");
 if (process.env.ELECTROBUN_OS !== "macos") throw new Error("Ace Helper currently supports macOS");
+const { bundle, display: version } = current(channel);
 const compiler = Bun.which("bun");
 if (!compiler) throw new Error("Building Ace Helper requires Bun 1.4 or newer on PATH");
 const runtime = Bun.spawnSync([compiler, "--version"]);
@@ -55,6 +56,23 @@ run([
 	"LSMinimumSystemVersion",
 	"-string",
 	"15.0",
+	join(contents, "Info.plist"),
+]);
+// Sparkle orders by CFBundleVersion and shows CFBundleShortVersionString.
+run([
+	"/usr/bin/plutil",
+	"-replace",
+	"CFBundleVersion",
+	"-string",
+	bundle,
+	join(contents, "Info.plist"),
+]);
+run([
+	"/usr/bin/plutil",
+	"-insert",
+	"CFBundleShortVersionString",
+	"-string",
+	version,
 	join(contents, "Info.plist"),
 ]);
 // Electrobun names non-stable bundles "Ace-<channel>", which macOS shows in the menu bar.

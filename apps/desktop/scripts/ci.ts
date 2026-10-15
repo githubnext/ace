@@ -5,11 +5,12 @@ import { parseArgs } from "node:util";
 
 import { root } from "./build";
 import { archiveName, type Release } from "./release";
+import { bundlePattern } from "./version";
 
 const workflow = "desktop-release.yml";
 const help = `Signed desktop builds from an Ace channel or terminal. Requires gh auth login.
 
-  bun desktop ci canary|stable [--publish]  build the current, clean, pushed lane
+  bun desktop ci canary|stable [--publish]  build the current, clean, pushed lane (stable: on main)
   bun desktop ci status <run-id>           show progress and failed steps
   bun desktop ci download <run-id>         download and verify a successful build
 
@@ -37,13 +38,16 @@ function start(repo: string, channel: string, publish: boolean): void {
 	if (output(["git", "status", "--porcelain"])) {
 		throw new Error("Commit the lane's changes before starting a release build");
 	}
-	const branch = output(["git", "symbolic-ref", "--short", "HEAD"]);
 	const revision = output(["git", "rev-parse", "HEAD"]);
-	const remote = JSON.parse(api(`repos/${repo}/branches/${encodeURIComponent(branch)}`)) as {
-		commit: { sha: string };
-	};
-	if (remote.commit.sha !== revision) {
-		throw new Error(`Push this lane so ${repo}'s ${branch} matches ${revision}`);
+	// The stable environment admits only runs from main; the workflow checks main contains the revision.
+	const branch = channel === "stable" ? "main" : output(["git", "symbolic-ref", "--short", "HEAD"]);
+	if (channel === "canary") {
+		const remote = JSON.parse(api(`repos/${repo}/branches/${encodeURIComponent(branch)}`)) as {
+			commit: { sha: string };
+		};
+		if (remote.commit.sha !== revision) {
+			throw new Error(`Push this lane so ${repo}'s ${branch} matches ${revision}`);
+		}
 	}
 	const run = JSON.parse(api(
 		`repos/${repo}/actions/workflows/${workflow}/dispatches`,
@@ -86,7 +90,7 @@ function download(repo: string, id: string, run: Run): void {
 	output(["gh", "run", "download", id, "--repo", repo, "--name", artifact.name, "--dir", path]);
 	const release = JSON.parse(readFileSync(join(path, "release.json"), "utf8")) as Release;
 	if (
-		!/^\d+\.\d+\.\d+$/.test(release.version)
+		!bundlePattern.test(release.version)
 		|| artifact.name !== `ace-${release.channel}-macos-arm64`
 		|| release.archive !== archiveName(release.channel, release.version)
 		|| !/^[a-f0-9]{40}$/.test(release.revision)
@@ -98,7 +102,9 @@ function download(repo: string, id: string, run: Run): void {
 	const dmg = join(path, release.archive);
 	const sha256 = createHash("sha256").update(readFileSync(dmg)).digest("hex");
 	if (sha256 !== release.sha256) throw new Error("The downloaded DMG checksum does not match");
-	console.log(`Verified Ace ${release.channel} ${release.version} from ${release.revision}.`);
+	console.log(
+		`Verified Ace ${release.channel} ${release.display} (${release.version}) from ${release.revision}.`,
+	);
 	console.log(dmg);
 }
 
