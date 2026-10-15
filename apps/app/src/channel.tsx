@@ -29,6 +29,7 @@ import { host } from "./host";
 import { CHAT, Layout } from "./layout/layout";
 import { Diff, GROUPS } from "./panels/diff";
 import { Terminal } from "./panels/terminal";
+import { placement } from "./placement";
 import type { Item } from "./transcript";
 
 // Channels have one chat today; its tabs follow the chat the Chat tab shows.
@@ -95,6 +96,18 @@ function subagents(items: Item[], busy: boolean): DetailsSubagent[] {
 	);
 }
 
+function where(channel: Listing): DetailsFact[] {
+	const place = placement(channel);
+	if (place.kind === "local") return [{ label: "Host", value: place.host }];
+	const hosted = { label: "Hosted", value: place.service, title: channel.hosted };
+	if (place.kind === "hosted") return [hosted, { label: "Workspace", value: place.workspace }];
+	return [hosted, {
+		label: "Workspace",
+		value: `cloud (${place.service})`,
+		title: `A Linux container on ${place.service}`,
+	}];
+}
+
 function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 	const root = info?.chats.find((value) => value.id === chat);
 	const model = root?.model || channel.model;
@@ -113,12 +126,7 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 			value: channel.repo || channel.project.split("/").at(-1) || channel.project,
 			title: channel.project,
 		},
-		...(channel.hosted
-			? [
-				{ label: "Hosted", value: new URL(channel.hosted).host, title: channel.hosted },
-				{ label: "Workspace", value: channel.host },
-			]
-			: [{ label: "Host", value: channel.host }]),
+		...where(channel),
 		{ label: "Owner", value: channel.owner.split("@")[0]!, title: channel.owner },
 		...(model
 			? [{
@@ -143,12 +151,17 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
  * from the workspace can say it is unreachable.
  */
 function workspace(channel: Listing, channels: Listing[]): string | undefined {
-	if (!channel.hosted) return;
-	const away = channels.some((value) => value.host === channel.host && value.state === "offline");
-	if (away) {
-		return `${channel.host} is offline, so tools fail until it's back. Chat and model-only runs continue.`;
+	const place = placement(channel);
+	if (place.kind === "local") return;
+	if (place.kind === "cloud") {
+		return `Tools run in this channel's cloud container on ${place.service}, without macOS permissions, and fail while it's stopped. Chat and model-only runs continue.`;
 	}
-	return `Tools run on ${channel.host} and fail while it's offline. Chat and model-only runs continue.`;
+	const { workspace } = place;
+	const away = channels.some((value) => value.host === workspace && value.state === "offline");
+	if (away) {
+		return `${workspace} is offline, so tools fail until it's back. Chat and model-only runs continue.`;
+	}
+	return `Tools run on ${workspace} and fail while it's offline. Chat and model-only runs continue.`;
 }
 
 // Last read per repo and branch, so switching back to a channel shows its pull request at once.
@@ -244,6 +257,7 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 export function Channel(
 	{ channel, channels, user, remote, draft, onDraftLoaded, onSettings, onOpen }: Props,
 ) {
+	const place = placement(channel);
 	const [changed, setChanged] = useState<boolean>();
 	const check = useRef({ busy: false, again: false });
 
@@ -278,7 +292,9 @@ export function Channel(
 	return (
 		<Layout
 			id={channel.id}
-			name={channel.hosted
+			name={place.kind === "cloud"
+				? `${channel.name} · cloud`
+				: place.kind === "hosted"
 				? `${channel.name} · hosted`
 				: remote
 				? `${channel.name} · ${channel.host}`

@@ -18,6 +18,31 @@ import { IconBot, IconMonitor } from "@ace/ui/icons";
 
 import { useDetails } from "./details";
 import { host } from "./host";
+import { placement } from "./placement";
+
+/**
+ * What collaborators' runs can reach. A cloud container has no desktop tools and no macOS
+ * permissions, so its copy names neither.
+ */
+function reach(channel: Listing): { agents: string; confirm: string; desktop: boolean } {
+	const place = placement(channel);
+	if (place.kind === "cloud") {
+		return {
+			agents:
+				`Allow collaborators to invoke agents, which run commands in this channel's cloud container on ${place.service}, with its GitHub access to the repository. No macOS permissions apply. Turning this off leaves chat available and active runs continue.`,
+			confirm:
+				"Teammates can run commands in this channel's cloud container, with its GitHub access to the repository. No macOS permissions apply.",
+			desktop: false,
+		};
+	}
+	return {
+		agents:
+			"Allow collaborators to invoke agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue.",
+		confirm:
+			"Teammates can run commands as you on this machine, with Ace's macOS permissions such as Screen Recording.",
+		desktop: true,
+	};
+}
 
 function AccessToggle({ label, value, live, owner, pending, description, children, onClick }: {
 	label: string;
@@ -66,6 +91,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 	const [confirming, setConfirming] = useState(false);
 	const [changingDesktop, setChangingDesktop] = useState(false);
 	const owner = channel.owner === user;
+	const copy = reach(channel);
 
 	// Render only watch-confirmed values, never an optimistic permission grant.
 	function share() {
@@ -97,30 +123,32 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 				live={sharedLive}
 				owner={owner}
 				pending={sharing}
-				description="Allow collaborators to invoke agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue."
+				description={copy.agents}
 				onClick={() => shared ? share() : setConfirming(true)}
 			>
 				<IconBot aria-hidden />
 			</AccessToggle>
-			<AccessToggle
-				label="Channel desktop tools"
-				value={desktop}
-				live={desktopLive}
-				owner={owner}
-				pending={changingDesktop}
-				description="Allow native computer use in this channel, including owner and collaborator runs. Turning this off refuses new desktop calls only. Shell commands keep Ace's macOS permissions, such as Screen Recording, so this isn't a security boundary."
-				onClick={computer}
-			>
-				<IconMonitor aria-hidden />
-			</AccessToggle>
+			{copy.desktop && (
+				<AccessToggle
+					label="Channel desktop tools"
+					value={desktop}
+					live={desktopLive}
+					owner={owner}
+					pending={changingDesktop}
+					description="Allow native computer use in this channel, including owner and collaborator runs. Turning this off refuses new desktop calls only. Shell commands keep Ace's macOS permissions, such as Screen Recording, so this isn't a security boundary."
+					onClick={computer}
+				>
+					<IconMonitor aria-hidden />
+				</AccessToggle>
+			)}
 			<Dialog open={confirming} onOpenChange={setConfirming}>
 				<DialogContent className="gap-3 sm:max-w-80" showCloseButton={false}>
 					<DialogHeader>
 						<DialogTitle>Let collaborators invoke agents?</DialogTitle>
 						<DialogDescription>
-							Teammates can run commands as you on this machine, with Ace's macOS permissions such
-							as Screen Recording.
-							{desktop && " Desktop tools are on, so they can also operate your apps."}
+							{copy.confirm}
+							{copy.desktop && desktop
+								&& " Desktop tools are on, so they can also operate your apps."}
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
