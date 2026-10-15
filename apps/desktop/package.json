@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"license": "MIT",
-	"version": "0.0.31",
+	"version": "0.0.32",
 	"exports": { "./protocol": "./src/protocol.ts" },
 	"scripts": {
 		"stage": "bun scripts/stage.ts",
