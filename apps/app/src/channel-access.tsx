@@ -97,7 +97,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 				live={sharedLive}
 				owner={owner}
 				pending={sharing}
-				description="Allow collaborators to invoke agents, which run commands as you on this machine. Turning this off leaves chat available and active runs continue."
+				description="Allow collaborators to invoke agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue."
 				onClick={() => shared ? share() : setConfirming(true)}
 			>
 				<IconBot aria-hidden />
