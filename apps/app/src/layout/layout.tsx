@@ -63,6 +63,10 @@ import { useResize } from "./use-resize";
 
 export { CHAT, type Content };
 
+/** The mounted channel's tabs, for switchers outside its tree; a window shows one channel. */
+export const switcher: { current?: { window: () => WindowState; show: (uid: string) => void } } =
+	{};
+
 type Icon = ComponentType<{ className?: string }>;
 type Choice = Exclude<Kind, "blank">;
 
@@ -701,10 +705,14 @@ function useLayout({ id, name, chat, changed, onTabClose, opener }: Props) {
 		return snapshot();
 	});
 
+	const show = useEffectEvent((uid: string) => activate(uid));
+
 	useLayoutEffect(() => {
 		host.onRename = command;
+		switcher.current = { window: snapshot, show };
 		return () => {
 			host.onRename = undefined;
+			switcher.current = undefined;
 			host.request({ op: "window", value: null }).catch(() => {});
 		};
 	}, []);
