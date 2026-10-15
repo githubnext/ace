@@ -90,6 +90,8 @@ export type Listing = {
 	state: ChannelState;
 	/** The hosting service's base URL, for a hosted channel; `host` is then its workspace. */
 	hosted?: string;
+	/** The hosting service is the cloud compute beta's, whose container is the workspace. */
+	compute?: true;
 	/** Where a move under way is taking the channel: a hosting service's host, or this host's name. */
 	moving?: string;
 	/** Its peer host stopped answering while relaying a request or watch here; absent on older hosts. */
@@ -253,10 +255,12 @@ export type HostRequest =
 	/** Owner actions; tailnet peers create, archive, and delete channels on their own hosts. */
 	/**
 	 * `cloud` creates the channel on the cloud compute beta's service, with its workspace there;
-	 * `compute-start` then starts that workspace and answers once it is connected.
+	 * `compute-start` then starts that workspace and answers once it is connected, and
+	 * `compute-stop` checkpoints and stops it.
 	 */
 	| { op: "create"; project: string; name?: string; model?: ModelRef; cloud?: true }
 	| { op: "compute-start"; channel: string }
+	| { op: "compute-stop"; channel: string }
 	| { op: "archive"; channel: string; archived: boolean }
 	/** Archive the project's channels on this host that have no work in progress. */
 	| { op: "archive-inactive"; project: string }

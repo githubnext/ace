@@ -213,9 +213,31 @@ export class Compute extends DurableObject<Env> {
 		await this.#channel("thaw");
 	}
 
+	/**
+	 * Deleting is permanent, so the container goes without a checkpoint. Each step tolerates a
+	 * previous attempt having done it, so a retry after a partial failure finishes the job.
+	 */
+	async #delete(id: string) {
+		if (this.ctx.container!.running) await this.ctx.container!.destroy();
+		const channel = this.env.CHANNEL.getByName(id);
+		// A frozen channel refuses deletion; a thaw refused because it is active or gone is harmless.
+		await channel.fetch(`https://channel/channels/${id}/transfer`, {
+			method: "POST",
+			body: JSON.stringify({ action: "thaw" }),
+		});
+		const response = await channel.fetch(`https://channel/channels/${id}`, { method: "DELETE" });
+		if (!response.ok && response.status !== 404) throw new Error(await response.text());
+		await this.ctx.storage.deleteAll();
+	}
+
 	async #handle(request: Request): Promise<Response> {
 		const url = new URL(request.url);
-		const [, , id, action = "status"] = url.pathname.split("/");
+		const [, , id, named] = url.pathname.split("/");
+		if (request.method === "DELETE" && !named) {
+			await this.#delete(id);
+			return Response.json({ deleted: true });
+		}
+		const action = named || "status";
 		if (action === "status" && request.method === "GET") {
 			return Response.json({
 				running: this.ctx.container!.running,

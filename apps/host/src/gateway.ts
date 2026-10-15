@@ -124,6 +124,7 @@ async function local(): Promise<Listing[]> {
 		listing.root = root;
 		if (repo) listing.repo = repo;
 		if (hosted) listing.hosted = hosted;
+		if (record.compute) listing.compute = true;
 		if (record.moving && moves.has(id)) {
 			listing.moving = record.moving.to === "local" ? name : new URL(record.moving.to).host;
 		}
@@ -335,6 +336,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"preferences",
 	"compute",
 	"compute-start",
+	"compute-stop",
 	"update-prepare",
 	"update-cancel",
 	// A terminal is a shell as this host's user, so only its owner opens one.
@@ -513,6 +515,8 @@ async function handle(
 			return computeSettings();
 		case "compute-start":
 			return compute.start(request.channel, (waiting) => send({ id, waiting }));
+		case "compute-stop":
+			return compute.stop(request.channel);
 		case "archive":
 			if (request.archived) terminals.closeChannel(request.channel);
 			await archive(request.channel, request.archived);

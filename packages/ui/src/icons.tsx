@@ -76,6 +76,7 @@ import {
 	Pencil,
 	Pin,
 	PinOff,
+	Play,
 	Plus,
 	RotateCw,
 	Rows2,
@@ -184,6 +185,7 @@ export const IconPaintBucket = outline(PaintBucket);
 export const IconPencil = outline(Pencil);
 export const IconPin = outline(Pin);
 export const IconPinOff = outline(PinOff);
+export const IconPlay = outline(Play);
 export const IconPlus = outline(Plus);
 export const IconPointer = outline(MousePointer2);
 export const IconPullRequest = outline(GitPullRequest);

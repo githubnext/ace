@@ -15,7 +15,14 @@ export type AgentSelection = {
 };
 
 /** Session actions the viewer may perform. */
-export type Capabilities = { rename: boolean; archive: boolean; delete?: boolean; move?: boolean };
+export type Capabilities = {
+	rename: boolean;
+	archive: boolean;
+	delete?: boolean;
+	move?: boolean;
+	/** The channel's workspace is a cloud container its host can stop and start. */
+	compute?: boolean;
+};
 
 /** A tool call from an agent. */
 export type Tool = {

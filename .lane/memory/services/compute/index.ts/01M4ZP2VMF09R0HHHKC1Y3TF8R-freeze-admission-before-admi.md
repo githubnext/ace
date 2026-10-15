@@ -4,9 +4,9 @@ anchor: class Compute
 created: 2026-10-15T11:45:12Z
 norm: '1'
 sig: 3b062341dbce15d0
-body_hash: a1bd6e745ad66ec6
-raw_hash: 92a6e59ffaacbee3
-vouched: 2026-10-15T12:04:25Z
+body_hash: d07e20bc0582f189
+raw_hash: 99147994bd2de0d4
+vouched: 2026-10-15T12:20:01Z
 lines: 49-325
 ---
 

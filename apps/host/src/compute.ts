@@ -72,6 +72,13 @@ export async function create(
 	return catalog.save(record);
 }
 
+/** Checkpoints the workspace and stops its container; the chat stays readable while stopped. */
+export async function stop(id: string): Promise<void> {
+	const { hosted, compute } = catalog.read(id);
+	if (!compute) throw new Error("The channel does not run on cloud compute");
+	await call(`${hosted}/workspaces/${id}/stop`, { method: "POST", body: "{}" });
+}
+
 /** Starting again after a failure is the retry: the service replaces an incomplete start. */
 export async function start(id: string, waiting: (text: string | null) => void): Promise<void> {
 	const { hosted, compute } = catalog.read(id);

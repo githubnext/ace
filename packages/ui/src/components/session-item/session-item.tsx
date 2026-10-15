@@ -48,6 +48,8 @@ export type SessionItemProps = ComponentPropsWithRef<"button"> & {
 	onRename?: (data: SidebarRow) => void;
 	onMoveTargets?: (data: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (data: SidebarRow, target: MoveTarget) => Promise<void>;
+	/** Offered on rows whose capabilities include `compute`. */
+	onCompute?: (data: SidebarRow, action: "start" | "stop") => void;
 };
 
 function avatar(member: SidebarRow["online"][number]) {
@@ -199,6 +201,7 @@ type RowActions = Pick<
 	| "onRebuild"
 	| "onMoveTargets"
 	| "onMove"
+	| "onCompute"
 >;
 
 function actions(data: SidebarRow, props: RowActions): RowActions {
@@ -221,6 +224,7 @@ function actions(data: SidebarRow, props: RowActions): RowActions {
 		...(data.capabilities?.move
 			? { onMoveTargets: props.onMoveTargets, onMove: props.onMove }
 			: {}),
+		...(data.capabilities?.compute ? { onCompute: props.onCompute } : {}),
 	};
 }
 
@@ -278,6 +282,7 @@ export function SessionItem(
 		onRename,
 		onMoveTargets,
 		onMove,
+		onCompute,
 		className,
 		ref,
 		onMouseEnter,
@@ -297,6 +302,7 @@ export function SessionItem(
 		onRebuild,
 		onMoveTargets,
 		onMove,
+		onCompute,
 	});
 	let hasActions = hasVisibleActions({ pinned, onPin: actionPin, onUnpin: actionUnpin });
 	let [hovered, setHovered] = useState(false);
