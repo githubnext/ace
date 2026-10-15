@@ -1,10 +1,37 @@
-import type { People } from "@ace/host/protocol";
+import type { Listing, People } from "@ace/host/protocol";
 import type { Event } from "@ace/ui";
 
 import type { Item, Tool } from "./transcript";
 
 const AGENT = "ace:agent";
 const MENTION = /(?<=^|\s)@([a-zA-Z0-9_-]+)/g;
+
+/**
+ * Channels on the viewed channel's host keyed by the author their agent's messages carry. The prefix
+ * outlives renames, so messages sent before one still find their channel.
+ */
+export function sources(channels: Listing[], host: string): Map<string, Listing> {
+	return new Map(
+		channels.flatMap((channel) =>
+			channel.host === host && channel.prefix ? [[`agent@${channel.prefix}`, channel]] : []
+		),
+	);
+}
+
+/**
+ * Human authors are Tailscale logins; without a known GitHub login, the name before the domain
+ * reads as a handle. Agent authors name the chat or channel after the `@`, so they stay whole.
+ */
+export function authorName(
+	author: string,
+	people: People,
+	channels: Map<string, Listing>,
+): string {
+	const source = channels.get(author);
+	if (source) return `#${source.name}`;
+	if (author.startsWith("agent@")) return author;
+	return people[author] || author.split("@")[0]!;
+}
 
 function text(value: string): Event.Message.Content.Text {
 	const parts = [...value.matchAll(MENTION)].map((match) => ({
@@ -57,6 +84,7 @@ export function toEvents(
 	busy: boolean,
 	draft: { text: string; model?: string },
 	people: People,
+	channels: Map<string, Listing>,
 	captions: Record<string, string>,
 	recaps: Record<string, string>,
 ): Event[] {
@@ -71,12 +99,10 @@ export function toEvents(
 		if (item.kind === "message") {
 			return {
 				...base,
-				// Authors are Tailscale logins; without a known GitHub login, the name before the domain
-				// reads as a handle.
 				sender: {
 					kind: "user",
 					value: item.author,
-					display: people[item.author] || item.author.split("@")[0]!,
+					display: authorName(item.author, people, channels),
 				},
 				content: [
 					text(item.invoked && !/(^|\s)@ace\b/i.test(item.text) ? `@ace ${item.text}` : item.text),

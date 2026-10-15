@@ -654,11 +654,13 @@ export function App() {
 								<Channel
 									key={channel.id}
 									channel={channel}
+									channels={channels}
 									user={hello.user}
 									remote={channel.host !== hello.host}
 									draft={draft}
 									onDraftLoaded={() => setDraft(undefined)}
 									onSettings={() => setSettings(true)}
+									onOpen={select}
 								/>
 							)
 							: (

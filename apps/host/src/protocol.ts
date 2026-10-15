@@ -44,6 +44,11 @@ export type Listing = {
 	/** The machine running the channel, by its tailnet name. */
 	host: string;
 	name: string;
+	/**
+	 * The channel's original name, which stays unique on its host across renames. Messages its agent
+	 * sends other channels are authored `agent@<prefix>`. Older hosts omit it.
+	 */
+	prefix?: string;
 	summary?: string;
 	/** Revision of the channel's projected name and summary. */
 	revision?: number;

@@ -7,24 +7,27 @@ import { Composer } from "./composer";
 import { publish } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
-import { toEvents } from "./timeline";
+import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
 import { Usage } from "./usage";
 
 type Props = {
 	channel: Listing;
+	/** Every listed channel, to name and open the channels that message this one. */
+	channels: Listing[];
 	chat: number;
 	user: string;
 	draft?: string;
 	onDraftLoaded: () => void;
 	onSettings?: () => void;
+	onOpen: (channel: Listing) => void;
 	/** Called once the chat loads and whenever its agent may have changed files since. */
 	onWork?: () => void;
 };
 
 /** One chat's timeline and composer over its transcript; the content of a Chat tab. */
 export function Conversation(
-	{ channel, chat: id, user, draft, onDraftLoaded, onSettings, onWork }: Props,
+	{ channel, channels, chat: id, user, draft, onDraftLoaded, onSettings, onOpen, onWork }: Props,
 ) {
 	const transcript = useTranscript(
 		channel.id,
@@ -35,6 +38,7 @@ export function Conversation(
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
+	const senders = useMemo(() => sources(channels, channel.host), [channels, channel.host]);
 	const events = useMemo(
 		() =>
 			toEvents(
@@ -46,6 +50,7 @@ export function Conversation(
 					model: model?.modelId,
 				},
 				people,
+				senders,
 				transcript.captions,
 				transcript.recaps,
 			),
@@ -56,6 +61,7 @@ export function Conversation(
 			transcript.draft,
 			model,
 			people,
+			senders,
 			transcript.captions,
 			transcript.recaps,
 		],
@@ -111,6 +117,10 @@ export function Conversation(
 							working={transcript.busy || undefined}
 							currentUser={{ login: user }}
 							avatars={avatars}
+							openSender={(sender) => {
+								const source = senders.get(sender);
+								return source && (() => onOpen(source));
+							}}
 							intro={{ name: channel.name, createdAt: Math.floor(channel.created / 1000) }}
 						/>
 					)
@@ -128,7 +138,9 @@ export function Conversation(
 					)}
 			</div>
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
-				{transcript.live && <MessageQueue messages={transcript.queue} people={people} />}
+				{transcript.live && (
+					<MessageQueue messages={transcript.queue} people={people} channels={senders} />
+				)}
 				<Composer
 					channel={channel}
 					chat={id}
