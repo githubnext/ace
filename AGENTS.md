@@ -79,7 +79,7 @@ bun install
 lane install hooks  # once per clone; captures `Why: <path>[#<anchor>] | <text>` commit trailers as notes
 bun ace --help   # CLI
 bun ace tabs --json  # discover open windows and tabs before targeting a tab rename
-bun ace backup <channel> <new-directory>  # local channel data, including committed WAL entries
+bun ace backup <channel> <new-directory>  # local or hosted channel data; `ace restore` adds it as a new channel
 bun types        # type checks
 bun run ci       # dprint + oxlint
 bun run fix      # apply formatting and lint fixes

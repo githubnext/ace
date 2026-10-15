@@ -189,8 +189,9 @@ Reachable peers forward the live listing; directory-only fallback listings clear
 animating from a stale cache, even for hosted channels.
 
 Channel data survives app replacement and upgrades. `ace backup` takes a verified SQLite snapshot
-of a local channel while it runs, alongside its catalog record. Project files and lane worktrees
-have their own repository backup. Stored format changes require migrations; see [data](data.md).
+of a local channel while it runs, or a hosted or compute channel's transfer snapshot from its
+service without freezing it, alongside its catalog record. `ace restore` adds a backup as a new
+local channel with a new ID. Project files and lane worktrees have their own repository backup. Stored format changes require migrations; see [data](data.md).
 
 Opening a folder adds a project to the host's `projects.json`, independently of channel creation
 or model credentials. This is a list of local folders, not channel history. Channels start only in

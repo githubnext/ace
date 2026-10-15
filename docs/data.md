@@ -27,31 +27,64 @@ started before Ace used it. SQLite may have
 committed data in `channel.sqlite-wal`, so copying only a live `channel.sqlite` is not a backup.
 The socket, worker PID, and logs are process state, not durable channel content.
 
-## Back up a local channel
+## Back up a channel
 
 Run `bun ace backup <channel> <new-directory>` from the checkout, or `ace backup` (`ace-canary backup`
-for Canary) from the command the app installs. The destination's parent must exist; the destination itself must be new. Backups include
-archived channels and work without starting dormant workers or loading provider credentials.
+for Canary) from the command the app installs. It works for local, hosted, and cloud compute
+channels this host owns. The destination's parent must exist; the destination itself must be new.
+Backups include archived channels and work without freezing the channel or stopping its work. Failed backups remove only their newly created
+output, and the directory and files are private to the current OS user. Store backups with the
+same care as the original chats and tool output.
 
-The command uses SQLite's [VACUUM INTO](https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause)
-to capture a consistent snapshot, including committed WAL entries, while a worker continues
-running. It opens the source read-only, checks the output's integrity, and writes:
+Every backup writes:
 
-- `channel.json`: the channel's identity, owner, project, optional initial model, and when its
-  transcript last grew.
-- `channel.sqlite`: all pi state at the snapshot point, if the channel has been opened before.
+- `channel.json`: the channel's catalog record: identity, owner, project, optional initial model,
+  when its transcript last grew, and for a hosted channel its service URL.
+- The channel's pi state at the snapshot point, if it has any (below).
 - `backup.json`: format version, source paths, creation time, and SHA-256 checksums. This file is
-  written last to mark a complete backup. Failed backups remove only their newly created output.
+  written last to mark a complete backup.
 
-The directory and files are private to the current OS user. Store backups with the same care as
-the original chats and tool output. Hosted channels need backups from their hosting service;
-their local catalog entry is insufficient.
+**Local channels.** The command uses SQLite's
+[VACUUM INTO](https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause) to capture a
+consistent snapshot, including committed WAL entries, while a worker continues running. It opens
+the source read-only, checks the output's integrity, and writes `channel.sqlite`. It needs no
+provider credentials and does not start dormant workers.
+
+**Hosted and cloud compute channels.** The host asks the hosting service for the channel's pi
+state with `POST /channels/:id/transfer` `{ "action": "backup" }`, authenticated with the team's
+`ACE_SECRET`, and writes the answer as `snapshot.json`. This is the same version 1 snapshot format
+moves use: every pi table, with a SHA-256 digest of its canonical encoding, which `backup.json`
+also records. The service reads it in one transaction on the channel's Durable Object, where all
+pi reads and writes run one at a time, so the snapshot is consistent without freezing the channel;
+clients stay connected and runs continue. A snapshot is limited to 32 MiB, and a larger channel is
+refused with that reason. A service deployed before this action existed is reported as needing a
+redeploy. Inactive copies left by an unfinished move are refused, since they are not the channel.
+
+A backup taken during a run records the run as unfinished, as a local snapshot does.
 
 Project files, lane worktrees (including uncommitted and untracked changes), repository Git data,
-opened-project preferences, and Keychain items need their own backups. A channel snapshot keeps
-the original working-directory paths; it is not a way to move lanes to another machine.
+opened-project preferences, and Keychain items need their own backups. A cloud compute channel's
+workspace files are in its container and are covered by its
+[checkpoint](https://github.com/githubnext/ace/issues/413), not by `ace backup`. A channel snapshot
+keeps the original working-directory paths; it is not a way to move lanes to another machine.
 
-## Recover on the same machine
+## Restore as a new channel
+
+`ace restore <backup-directory> [--project <dir>]` verifies every file against `backup.json`, then
+adds the backup as a new local channel on this host, in the recorded project or `--project`. A
+hosted snapshot is imported and checked against its digest; a local `channel.sqlite` is copied. The
+copy has a new ID and a new lane branch prefix, so it can never run as the original channel, which
+may still be live here or on its service. Its pi metadata keeps the original name, so refer to it by
+ID while both exist. The backup itself is left unchanged, and a failed restore removes only the new
+channel's directory.
+
+The restored chats keep the original working-directory and lane paths. If the backup was taken
+during a run, the copy resumes that run when it first opens, and pi reports interrupted tools that
+cannot safely be rerun. Stop the original channel's work first if both would use the same lanes.
+
+## Recover in place on the same machine
+
+To return a local channel to a snapshot under its original ID:
 
 1. Keep the backup untouched and verify its files against the SHA-256 values in `backup.json`.
 2. Stop Ace Helper in Settings and stop any command-line host for this profile. Ensure the
@@ -66,7 +99,8 @@ the original working-directory paths; it is not a way to move lanes to another m
    pi reports interrupted tools that cannot safely be rerun. Do not run a second copy of the same
    snapshot against the same lane paths.
 
-Automated restore and moving backups across machines are not implemented.
+A hosted channel is not replaced in place; restore its backup as a new channel. Moving backups
+across machines is not implemented.
 
 ## Upgrade contract
 
@@ -144,3 +178,14 @@ build they reopened shared and unshared respectively, and the unshared channel's
 revisions matched its backup. Turning desktop tools off on the channel without stored settings
 kept it shared across a worker restart. A new channel stored `shared: false` at creation, refused a
 teammate's agent invocation, and kept the setting across a restart.
+
+The October 15, 2026 hosted backup check ran local `wrangler dev` copies of `services/channel` and
+`services/compute` (containers off) with a loopback source host. A hosted channel with this host's
+workspace and a compute channel each held messages and real `openai/gpt-5-mini` runs, the hosted
+one including a `bash` tool result. `ace backup` saved both while they were active; a third backup
+taken mid-run kept the run's tasks as `waiting` and `running` while the live run finished and a
+message posted during it was admitted. `ace restore` imported each as a new local channel whose
+pi tables hashed to the backup digests. The restored copies replayed the same history and answered
+from it with a real model, and the mid-run copy reported the interrupted tool and reran it. The live
+channels kept answering afterwards, and a thaw request found both active, not frozen. With the
+previous service build, `ace backup` reported that the service needs a redeploy and left no output.
