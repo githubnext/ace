@@ -30,6 +30,12 @@ type Pending = {
 };
 export type Status = "connecting" | "open" | "closed";
 
+/** A request's failure when the socket it was sent on closed, including on a relaying host. */
+export const DISCONNECTED = "Disconnected from the host";
+
+/** Silence while a request waits before asking the host for any answer, then before calling it stalled. */
+const QUIET = 5000;
+
 /** One WebSocket to a host gateway, reconnecting with backoff until closed. */
 export class GatewayClient {
 	#socket?: WebSocket;
@@ -41,7 +47,15 @@ export class GatewayClient {
 	#timer?: ReturnType<typeof setTimeout>;
 	#closed = false;
 	#metadata = new Map<string, Metadata>();
+	#heard = 0;
+	#asked?: number;
+	#watchdog?: ReturnType<typeof setInterval>;
 	status: Status = "connecting";
+	/**
+	 * The socket is open but the host stopped answering, as while its process is suspended: TCP
+	 * keeps the connection, so only silence while a request waits reveals it. Any frame ends it.
+	 */
+	stalled = false;
 	channels: Listing[] = [];
 	projects: Project[] = [];
 	people: People = {};
@@ -73,6 +87,8 @@ export class GatewayClient {
 		this.#socket = socket;
 		socket.addEventListener("open", () => {
 			this.#retry = 250;
+			this.#heard = Date.now();
+			this.#watchdog = setInterval(() => this.#check(), 1000);
 			this.#set("open");
 			this.request<Listing[]>({ op: "channels" }).then((channels) => {
 				this.channels = this.#listings(channels);
@@ -88,9 +104,12 @@ export class GatewayClient {
 			const ended = [...this.#pending.values()];
 			this.#pending.clear();
 			this.#metadata.clear();
+			clearInterval(this.#watchdog);
+			this.#asked = undefined;
+			this.stalled = false;
 			// Listings outlive the socket so open channels stay mounted until the next connect replaces them.
 			this.#set("closed");
-			const error = "Disconnected from the host";
+			const error = DISCONNECTED;
 			for (const pending of ended) {
 				if (pending.accepted) pending.watch?.closed?.(error);
 				else pending.reject(new Error(error));
@@ -102,6 +121,12 @@ export class GatewayClient {
 	}
 
 	#receive(frame: HostFrame, socket: WebSocket) {
+		this.#heard = Date.now();
+		this.#asked = undefined;
+		if (this.stalled) {
+			this.stalled = false;
+			this.#emit();
+		}
 		if ("rename" in frame) return void this.#rename(frame.rename, socket);
 		if ("projects" in frame) {
 			this.projects = frame.projects;
@@ -133,6 +158,21 @@ export class GatewayClient {
 		if (frame.ok) return pending.resolve(frame.value);
 		if (pending.accepted) return pending.watch?.closed?.(frame.error);
 		pending.reject(new Error(frame.error));
+	}
+
+	#check() {
+		if (this.status !== "open" || this.stalled) return;
+		const now = Date.now();
+		if (now - this.#heard < QUIET) return;
+		if (this.#asked === undefined) {
+			// An idle socket is quiet by design; only a request still waiting makes silence suspicious.
+			if (![...this.#pending.values()].some((pending) => !pending.accepted)) return;
+			this.#asked = now;
+			this.request({ op: "hello" }).catch(() => {});
+		} else if (now - this.#asked >= QUIET) {
+			this.stalled = true;
+			this.#emit();
+		}
 	}
 
 	async #rename(request: TabRename, socket: WebSocket) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { Image, QueuedMessage } from "@ace/channel/protocol";
+import { DISCONNECTED } from "@ace/host/gateway-client";
 import { CHANNEL_CLOSED, type ChannelInfo, type Event } from "@ace/host/protocol";
 
 import { host, onOpen } from "./host";
@@ -188,9 +189,10 @@ const RECOVERIES = 3;
 const STABLE = 60_000;
 
 /**
- * Watches one chat of a channel. Owns the watch: re-watches after the host reconnects or the
- * watch ends, such as when the channel's worker restarts, and releases it on unmount. A failed
- * watch retries once when its channel's host comes back from `offline`.
+ * Watches one chat of a channel. Owns the watch: re-watches after the host reconnects, the watch
+ * ends, such as when the channel's worker restarts, or a relaying host's connection drops before
+ * the watch starts, and releases it on unmount. A failed watch retries once when its channel's
+ * host comes back from `offline`.
  */
 export function useTranscript(
 	channel: string | undefined,
@@ -230,6 +232,12 @@ export function useTranscript(
 			setError(undefined);
 			setRestarting(restart);
 			const current = () => active && version === generation;
+			const recover = (reason: string) => {
+				if (Date.now() - started > STABLE) recoveries = 0;
+				if (recoveries++ >= RECOVERIES) return false;
+				start(reason === CHANNEL_CLOSED);
+				return true;
+			};
 			// A re-watch replays the whole chat; the shown transcript stays until the replay is
 			// complete so the timeline, and what is expanded in it, stays mounted.
 			let replay: Transcript | undefined = EMPTY;
@@ -258,9 +266,7 @@ export function useTranscript(
 				},
 				// A released watch belongs to an old generation; a reconnecting host restarts every watch.
 				closed(reason) {
-					if (!current() || host.status !== "open") return;
-					if (Date.now() - started > STABLE) recoveries = 0;
-					if (recoveries++ < RECOVERIES) return start(reason === CHANNEL_CLOSED);
+					if (!current() || host.status !== "open" || recover(reason)) return;
 					generation++;
 					setState(EMPTY);
 					setInfo(undefined);
@@ -269,6 +275,10 @@ export function useTranscript(
 				},
 			}).catch((error: Error) => {
 				if (!current()) return;
+				// Only this app's own socket closing is handled by `onOpen`; a relay's drop leaves it open.
+				if (host.status === "open" && error.message === DISCONNECTED && recover(error.message)) {
+					return;
+				}
 				setState(EMPTY);
 				setInfo(undefined);
 				setRestarting(false);
