@@ -12,6 +12,7 @@ import {
 } from "@ace/ui";
 
 import { ChannelAccess } from "./channel-access";
+import { EFFORTS } from "./composer";
 import { Conversation } from "./conversation";
 import { forget, publish, useDetails } from "./details";
 import { host } from "./host";
@@ -85,6 +86,8 @@ function subagents(items: Item[], busy: boolean): DetailsSubagent[] {
 function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 	const root = info?.chats.find((value) => value.id === chat);
 	const model = root?.model || channel.model;
+	// "off" also stands for an always-thinking provider's default, so it isn't shown as a level.
+	const effort = root?.model && root.effort !== "off" ? root.effort : undefined;
 	const usage = info?.chats.reduce(
 		(sum, value) => ({
 			cost: sum.cost + (value.usage?.cost || 0),
@@ -101,7 +104,11 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 		{ label: "Host", value: channel.host },
 		{ label: "Owner", value: channel.owner.split("@")[0]!, title: channel.owner },
 		...(model
-			? [{ label: "Model", value: model.modelId, title: `${model.provider}/${model.modelId}` }]
+			? [{
+				label: "Model",
+				value: effort ? `${model.modelId} · ${EFFORTS[effort]}` : model.modelId,
+				title: `${model.provider}/${model.modelId}${effort ? `, ${EFFORTS[effort]} effort` : ""}`,
+			}]
 			: []),
 		...(usage?.tokens
 			? [
