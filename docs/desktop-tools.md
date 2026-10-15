@@ -36,10 +36,9 @@ Source builds need Swift 6.2 or later and a valid Apple Development or Developer
 identity to use native desktop tools. The embedded bridge authenticates its bundled client against
 the app's signing team and exact client identifier. Set the development signing identity described in
 [UI testing](desktop.md#ui-testing) when building.
-`bun desktop dev` connects its source host to the signed client in that checkout's app automatically.
-For a source host started separately, set `ACE_DESKTOP_CLIENT` to the signed app's
-`Contents/MacOS/ace-desktop-client` and use the same `ACE_HOME` as that app. Normal packaged hosts
-find the client alongside Ace Helper automatically.
+While open, Ace links its signed client as `desktop-client` beside `desktop.sock` in its data
+directory. Every worker for that data directory uses that link, whether Ace Helper, `bun desktop dev`,
+or a source `ace` CLI with the same `ACE_HOME` started it.
 
 ## Tools
 
