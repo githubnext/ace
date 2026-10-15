@@ -78,13 +78,14 @@ function send(lobby: Lobby, up: LobbyUp<Listing>) {
 }
 
 function publish(lobby: Lobby, settled = false) {
-	clearTimeout(lobby.away);
 	const presence = here.get(lobby.project) || null;
+	if (settled || !presence?.away) settle(lobby);
 	const frame = JSON.stringify(presence);
 	if (frame === lobby.sent || lobby.socket?.readyState !== WebSocket.OPEN) return;
 	const sent = lobby.sent && JSON.parse(lobby.sent) as Presence | null;
 	if (presence?.away && !settled && sent && !sent.away) {
-		lobby.away = setTimeout(() => publish(lobby, true), AWAY_AFTER);
+		// Listings publish often; restarting the wait on each would postpone away indefinitely.
+		lobby.away ??= setTimeout(() => publish(lobby, true), AWAY_AFTER);
 		return;
 	}
 	lobby.sent = frame;
@@ -102,10 +103,15 @@ function retry(lobby: Lobby, cause?: unknown) {
 	lobby.wait = Math.min(lobby.wait * 2, RETRY_MAX);
 }
 
+function settle(lobby: Lobby) {
+	clearTimeout(lobby.away);
+	lobby.away = undefined;
+}
+
 /** Forget a socket now; its close event, if it ever arrives, then changes nothing. */
 function drop(lobby: Lobby) {
 	const socket = lobby.socket;
-	clearTimeout(lobby.away);
+	settle(lobby);
 	lobby.socket = undefined;
 	lobby.sent = undefined;
 	const live = lobby.live;
