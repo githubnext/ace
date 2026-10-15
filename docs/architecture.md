@@ -473,7 +473,8 @@ the team's Cloudflare account, or celld on a team machine. The team deploys and 
 services. Each service is named for its job.
 
 `services/directory` holds the team's hosts and where each channel lives. Every host publishes its
-whole channel set on each change and every 30 seconds, then reads everyone's. It answers lookups
+whole channel set on each change and every 30 seconds, then reads everyone's; project lobbies
+below make that poll slower once they push changes. It answers lookups
 only: channel traffic goes to the channel's host over the tailnet, or to the hosted channel. So a
 channel stays listed while its host is asleep. The app shows a local channel whose host is
 unreachable as offline, and reaches a hosted channel directly. Hosts find the directory through
@@ -511,9 +512,22 @@ types live in `@ace/directory/protocol`. The `Directory` object and its contract
   every one of their hosts says so. The viewer is left out. A host reports its owner away only
   after 3 seconds without a focused window, so switching between Ace windows never reaches the
   lobby.
+- **Lifecycle pushes replace the poll.** After each successful publish to the directory, a host
+  compares its channels with its previous publication in this process and sends each change
+  (created, renamed, summarized, archived, resumed, moved, deleted, or a run's end, with the new
+  listing) to that project's lobby. It keeps the latest per channel until the lobby echoes it
+  back, resending after a reconnect, since a socket can die unnoticed. A lobby the host no longer
+  needs stays until the next publication, so a project's last deletion still reaches it. Hosts
+  apply teammates' events to their directory listings at once and rebuild listings once per
+  burst; a directory read already in flight reapplies them, and a `resync` reads the directory
+  again. While every project a host subscribes to has a live lobby, its 30-second directory poll
+  slows to every five minutes. Changes that send no event (activity alone: `active`, `busy`,
+  running or idle), changes made while a host's process was down, and changes from hosts too old
+  to send events reach teammates through that read or their peer connections.
 - **An absent lobby is harmless.** Without a directory, `ACE_SECRET`, or a Worker deployed with
   lobbies (which answers 404), each subscription retries from 5 seconds up to every 10 minutes,
-  logging only at debug level, and the app shows nobody here.
+  logging only at debug level, the app shows nobody here, and the directory poll stays at 30
+  seconds.
 - **Schema versions** are counted in the object's `version` key, because Durable Object SQLite
   refuses `PRAGMA user_version`. Migrations run in order inside one transaction.
 
