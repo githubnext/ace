@@ -68,7 +68,7 @@
 				"@tailwindcss/vite": "4.3.0"
 			},
 			"desktop": {
-				"@githubnext/desktop-tools": "github:githubnext/desktop-tools#ccb4750ded4ea4c0d365d0604b5c24eecd843bc6",
+				"@githubnext/desktop-tools": "github:githubnext/desktop-tools#d1c43047adede7ee0c3d3b91729589a31f00e67a",
 				"electrobun": "1.18.1",
 				"@types/three": "0.165.0"
 			}
