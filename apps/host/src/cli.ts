@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import type { ChannelInfo, ChatId, Event, Request } from "@ace/channel/protocol";
 
 import { appUrl, token } from "./auth";
-import { backup } from "./backup";
+import { backup, restore } from "./backup";
 import * as catalog from "./catalog";
 import { Connection, request } from "./client";
 import { config } from "./config";
@@ -32,7 +32,8 @@ const HELP = `ace — channels on this host
   ace rename <channel> <name>                   rename without changing its lanes
   ace tabs [--port <port>] [--json]              list open windows and their current channel's tabs
   ace tab rename <window> <channel> <tab> <name>  rename one tab; an empty name restores its default
-  ace backup <channel> <directory>              snapshot local channel data into a new directory
+  ace backup <channel> <directory>              snapshot a local or hosted channel's data into a new directory
+  ace restore <directory> [--project <dir>]      restore a backup as a new local channel
   ace say <channel> [--chat <id>] <text…>        post without invoking the agent
   ace ask <channel> [--chat <id>] [--model <provider/id>] [--detach] <text…>
   ace watch <channel> [--chat <id>]
@@ -331,6 +332,13 @@ async function main() {
 				);
 			}
 			return;
+		}
+		case "restore": {
+			if (positionals.length !== 2) {
+				throw new Error("ace restore <backup-directory> [--project <dir>]");
+			}
+			const record = await restore(ref!, flags.project);
+			return console.log(`${record.name}\t${record.id}`);
 		}
 		case "models": {
 			for (const m of await models()) console.log(`${m.provider}/${m.modelId}`);

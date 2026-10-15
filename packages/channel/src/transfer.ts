@@ -93,8 +93,9 @@ const SEED = JSON.stringify({
 	durable_schema: [[1, SCHEMA]],
 	durable_metadata: [[1, "2", 1]],
 });
-// Durable Objects keep their KV API in `__cf_kv`; SQLite keeps its own `sqlite_*` tables.
-const INTERNAL = /^(sqlite_|_cf_|__cf_)/i;
+// Durable Objects keep their KV API in `__cf_kv`, local `wrangler dev` adds `__miniflare_do_name`,
+// and SQLite keeps its own `sqlite_*` tables.
+const INTERNAL = /^(sqlite_|_cf_|__cf_|__miniflare_)/i;
 
 function encode(value: unknown): Cell {
 	if (value === null || typeof value === "string") return value;
@@ -151,7 +152,11 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 async function seal(body: Omit<Snapshot, "digest">): Promise<Snapshot> {
 	const bytes = new TextEncoder().encode(canonical(body));
 	if (bytes.byteLength > MAX_SNAPSHOT) {
-		throw new Error(`Channel snapshot exceeds ${MAX_SNAPSHOT} bytes; moving it is not supported`);
+		throw new Error(
+			`The channel is larger than the ${
+				MAX_SNAPSHOT / 1024 / 1024
+			} MiB snapshot limit, so it cannot be moved or backed up`,
+		);
 	}
 	return { ...body, digest: await sha256(bytes) };
 }
@@ -219,6 +224,15 @@ export async function exportSnapshot(db: SqliteDatabase, channel: string): Promi
 		}
 		return read(tx, channel);
 	});
+}
+
+/**
+ * One consistent read of a channel database, including unfinished work: a backup records the
+ * channel as it is, and a restored copy resumes that work when it opens.
+ */
+export async function backupSnapshot(db: SqliteDatabase, channel: string): Promise<Snapshot> {
+	pinned();
+	return db.transaction((tx) => read(tx, channel));
 }
 
 function validate(snapshot: Snapshot): void {

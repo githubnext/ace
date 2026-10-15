@@ -4,6 +4,7 @@ import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
 import { Channel, type Envelope, type Frame, type Log, type ModelRef } from "@ace/channel";
 import {
+	backupSnapshot,
 	exportSnapshot,
 	importSnapshot,
 	isUnsettled,
@@ -54,6 +55,7 @@ type Transfer =
 	| { action: "activate"; digest: string }
 	| { action: "freeze" }
 	| { action: "export" }
+	| { action: "backup" }
 	| { action: "thaw" };
 
 const MOVED = 4009;
@@ -350,6 +352,17 @@ export class HostedChannel extends DurableObject<Env> {
 			case "export":
 				if (state !== "frozen") return refused("Only a frozen channel can be exported");
 				return Response.json(await exportSnapshot(this.#db, config!.id));
+			case "backup": {
+				if (state !== "active" && state !== "frozen") return refused("Nothing to back up here");
+				// Every pi read and write goes through #db, which runs this transaction alone, so the
+				// snapshot is consistent without freezing the channel.
+				try {
+					return Response.json(await backupSnapshot(this.#db, config!.id));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					return refused(`Backup failed: ${message}`);
+				}
+			}
 			case "thaw":
 				if (state !== "frozen") return refused("Only a frozen channel can be thawed");
 				this.ctx.storage.kv.put("state", "active");
