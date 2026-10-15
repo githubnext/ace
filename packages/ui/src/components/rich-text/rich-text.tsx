@@ -257,7 +257,7 @@ type Props =
 		onSuggest?: (state: SuggestState) => void;
 		/** Called when a mention is inserted (via autocomplete or popup). */
 		onMention?: (name: string) => void;
-		/** Receives pasted images. If omitted, pasted files are ignored. */
+		/** Receives pasted files. If omitted, pasted files are ignored. */
 		onFiles?: (files: File[]) => void;
 		/** Users for @mention autocomplete. */
 		mentions?: Mention[];
@@ -440,8 +440,8 @@ function useEditor(
 		if (!files.length) return false;
 		// Unhandled, WebKit inserts a pasted image into the editor DOM outside the schema.
 		e.preventDefault();
-		let images = files.filter(file => file.type.startsWith("image/"));
-		if (onFiles && images.length) onFiles(images);
+		// Like a drop, every file becomes a chip, so one the channel can't take is visible, not lost.
+		onFiles?.(files);
 		return true;
 	});
 	let keydown = useEffectEvent((v: EditorView, e: KeyboardEvent) => {
