@@ -138,17 +138,17 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 }
 
 /**
- * A hosted channel's chat and model-only runs continue without its workspace; its tools wait for
- * it (#349). Hosted listings never go offline, so only another listing from the workspace can say
- * it is unreachable.
+ * A hosted channel's chat and model-only runs continue without its workspace; its tools fail
+ * until it answers again (#349, #372). Hosted listings never go offline, so only another listing
+ * from the workspace can say it is unreachable.
  */
 function workspace(channel: Listing, channels: Listing[]): string | undefined {
 	if (!channel.hosted) return;
 	const away = channels.some((value) => value.host === channel.host && value.state === "offline");
 	if (away) {
-		return `${channel.host} is offline, so tools wait for it. Chat and model-only runs continue.`;
+		return `${channel.host} is offline, so tools fail until it's back. Chat and model-only runs continue.`;
 	}
-	return `Tools run on ${channel.host} and wait while it's offline. Chat and model-only runs continue.`;
+	return `Tools run on ${channel.host} and fail while it's offline. Chat and model-only runs continue.`;
 }
 
 // Last read per repo and branch, so switching back to a channel shows its pull request at once.
