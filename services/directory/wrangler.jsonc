@@ -4,9 +4,15 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-09-25",
 	"durable_objects": {
-		"bindings": [{ "name": "DIRECTORY", "class_name": "Directory" }],
+		"bindings": [
+			{ "name": "DIRECTORY", "class_name": "Directory" },
+			{ "name": "LOBBY", "class_name": "Lobby" },
+		],
 	},
 	// Workers Logs keeps console output, searchable by its JSON fields.
 	"observability": { "enabled": true },
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Directory"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["Directory"] },
+		{ "tag": "v2", "new_sqlite_classes": ["Lobby"] },
+	],
 }

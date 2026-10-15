@@ -18,7 +18,7 @@ is the sole authority for team membership and collaboration access; see [the tea
 | `apps/host`          | on every machine (Bun)  | The `ace` CLI, channel workers, the channel catalog, local transport |
 | `apps/desktop`       | on macOS                | The desktop client and packaging for Ace Helper                      |
 | `services/channel`   | Cloudflare Workers      | Hosted channels: one Durable Object per channel                      |
-| `services/directory` | Cloudflare Workers      | The team's list of hosts and where each channel lives                |
+| `services/directory` | Cloudflare Workers      | The team's list of hosts and where each channel lives, and lobbies   |
 
 Clients (the CLI and desktop app) attach to channels; a channel is not a client.
 
@@ -479,7 +479,26 @@ checks a new URL and secret against the directory before saving them, and it sav
 for the CLI too: macOS lets the program that saved an item read it without asking, so a secret
 saved by another program would make Ace Helper wait on a Keychain prompt.
 
-Lobbies (presence, notifications) are not built. Until then each app notices its own person's
+The same Worker runs one lobby per project: a `Lobby` Durable Object named by the project ID
+the app selects projects by (`@ace/host/protocol` `projectId`), at `GET /lobbies/<project>`
+behind the same `ACE_SECRET`. Lobbies require this deployed cell; a team without it has no
+project presence. Hosts are the only lobby clients and keep one WebSocket per project; the wire
+types live in `@ace/directory/protocol`. The `Directory` object and its contract are unchanged.
+
+- **Presence is never stored.** Each host replaces its owner's presence in the project (GitHub
+  login, the project's channels open in their windows, and whether all of them are unfocused) and
+  the lobby keeps it in the socket's hibernation attachment, sending everyone the whole list on
+  each change. Hosts ping every 30 seconds; the lobby answers without waking and an alarm closes
+  sockets silent for 90 seconds, so a host that slept without closing TCP stops being here.
+- **Lifecycle events are a resume buffer.** Hosts send channel lifecycle events and the lobby
+  numbers them with one `seq` per project. A host reconnects with the newest `seq` it applied and
+  receives the events after it; when those are gone (pruned, older than the lobby's storage, or a
+  first visit) it is told to read listings again. Events are pruned after 30 days and beyond the
+  newest 2,000. Listings and catalogs stay authoritative; losing the log loses only promptness.
+- **Schema versions** are counted in the object's `version` key, because Durable Object SQLite
+  refuses `PRAGMA user_version`. Migrations run in order inside one transaction.
+
+Notifications are not built. Each app notices its own person's
 finished and failed runs from listings: it keeps the run ends it has shown or announced per host
 and participant in browser storage, starting from its first visit. A run end that arrives while
 another channel is open pulses the window's glow; one that arrives while the window is unfocused
@@ -538,6 +557,6 @@ or kills.
 
 ## Not yet built
 
-Terminals and previews, attachments, lobby cells, and external harnesses (Claude Code, Codex).
+Terminals and previews, attachments, lobby notifications, and external harnesses (Claude Code, Codex).
 Hosted channels cannot message other channels yet. Projects without a GitHub remote are still keyed
 by a host's main checkout, so a teammate's copy of the same folder shows as a separate project.

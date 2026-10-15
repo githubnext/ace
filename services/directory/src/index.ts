@@ -1,7 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
 
+import type { Lobby } from "./lobby";
+
+export { Lobby } from "./lobby";
+
 type Env = {
 	DIRECTORY: DurableObjectNamespace<Directory>;
+	/** One lobby per project, named by the project ID that hosts and apps share. */
+	LOBBY: DurableObjectNamespace<Lobby>;
 	/** Bearer secret shared by the team's hosts. */
 	ACE_SECRET?: string;
 };
@@ -86,12 +92,17 @@ function authorized(request: Request, env: Env): boolean {
 }
 
 const HOST = /^\/hosts\/([A-Za-z0-9._-]{1,128})$/;
+const LOBBY = /^\/lobbies\/([^/]{1,1024})$/;
 
 export default {
 	async fetch(request, env) {
 		if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 });
-		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		const { pathname } = new URL(request.url);
+		const lobby = LOBBY.exec(pathname);
+		if (lobby && request.headers.get("upgrade") === "websocket") {
+			return env.LOBBY.get(env.LOBBY.idFromName(decodeURIComponent(lobby[1]!))).fetch(request);
+		}
+		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") return Response.json(await directory.read());
 		const host = HOST.exec(pathname);
 		if (host && request.method === "PUT") {
