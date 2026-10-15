@@ -29,7 +29,7 @@ import {
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 
-import { type Directory, messaging, Subagent } from "./agents";
+import { type Directory, messaging, subagent } from "./agents";
 import { type Browser, browser } from "./browser";
 import {
 	caption,
@@ -52,6 +52,7 @@ import { failure, type Log, logging, scoped } from "./log";
 import { metadata, MetadataDoc, validateName } from "./metadata";
 import { available, choose, usable } from "./models";
 import { progress } from "./progress";
+import { answer, Questions } from "./questions";
 import type {
 	ChannelInfo,
 	Chat,
@@ -158,6 +159,8 @@ export class Channel {
 		registry.install(CodingTools);
 		const handoffs = new Handoffs(options.directory);
 		registry.install(handoffs.extension);
+		const questions = new Questions((chat) => void channel.#asked(chat));
+		registry.install(questions.extension);
 		const execute = options.desktop;
 		if (execute) {
 			registry.install(desktop(async (request, context) => {
@@ -177,7 +180,7 @@ export class Channel {
 		if (options.images) registry.install(images(options.images));
 		if (options.tabs) registry.install(tabs(options.tabs));
 		registry.install(lanes({ ...options, name: options.prefix || options.name }));
-		registry.install(Subagent);
+		registry.install(subagent(questions.extension));
 		registry.install(metadata((value) => channel.#changed(value)));
 		registry.install(messaging(options.directory));
 		registry.install(
@@ -232,6 +235,7 @@ export class Channel {
 					const { scope } = change.record;
 					if (scope.kind === "conversation") {
 						handoffs.inbox(scope.conversationId, change.value as InboxState | null);
+						questions.inbox(scope.conversationId, change.value as InboxState | null);
 					}
 					continue;
 				}
@@ -298,6 +302,12 @@ export class Channel {
 				return this.#ask(request);
 			case "chat":
 				return this.#chat(request);
+			case "answer": {
+				this.#author(request.author);
+				await this.#mayInvoke(request.author);
+				const { id } = await this.#conversation(request.chat);
+				return answer(this.#harness, id, request.call, request.author, request.answers, context);
+			}
 			case "stop":
 				return (await this.#conversation(request.chat)).abort(context);
 			case "kill":
@@ -432,11 +442,29 @@ export class Channel {
 			: last.reason === "aborted"
 			? "stopped"
 			: "failed";
+		await this.#publishRun(chat, inputs.map((id) => settled.get(id)?.entry), outcome);
+	}
+
+	/** A run waiting on a question needs the same attention as one that ended. */
+	async #asked(chat: ConversationId): Promise<void> {
+		const inputs = this.#runs.get(chat);
+		if (!inputs) return;
+		const entries = await Promise.all(inputs.map(async (id) => {
+			const submission = await this.#harness.submission(id, context);
+			return (await submission?.status(context))?.entry;
+		}));
+		await this.#publishRun(chat, entries, "question");
+	}
+
+	async #publishRun(
+		chat: ConversationId,
+		entries: (SubmissionRecord["entry"])[],
+		outcome: RunEnd["outcome"],
+	): Promise<void> {
 		try {
 			// The newest human input names who is waiting; agents' inputs are their parents' work.
 			const author = await this.#harness.commit(async (tx) => {
-				for (const id of inputs.toReversed()) {
-					const entry = settled.get(id)?.entry;
+				for (const entry of entries.toReversed()) {
 					const human = entry === undefined ? undefined : room.human((await tx.entry(entry))!);
 					if (human && !room.isAgent(human.author)) return human.author;
 				}
@@ -526,13 +554,7 @@ export class Channel {
 	async #admit(request: Extract<Request, { op: "ask" }>) {
 		this.#author(request.author);
 		room.checkImages(request.images);
-		const settings = await this.#harness.snapshot(SettingsDoc, context);
-		const isOwner = request.author === this.#options.owner;
-		// Hosts rewrite every client's author, so an agent author is another channel's agent on this
-		// host, already running as the owner's user. Sharing gates teammates, not those handoffs.
-		if (!isOwner && !room.isAgent(request.author) && settings?.shared === false) {
-			throw new Error("Only the owner can invoke agents here");
-		}
+		await this.#mayInvoke(request.author);
 		const conversation = await this.#conversation(request.chat);
 		await this.#select(conversation, request.model, request.effort);
 		const submission = await conversation.submit({
@@ -542,6 +564,16 @@ export class Channel {
 			...(request.requestId ? { requestId: request.requestId } : {}),
 		}, context);
 		return { submission: submission.id };
+	}
+
+	async #mayInvoke(author: string) {
+		const settings = await this.#harness.snapshot(SettingsDoc, context);
+		// Hosts rewrite every client's author, so an agent author is another channel's agent on this
+		// host, already running as the owner's user. Sharing gates teammates, not those handoffs.
+		if (author === this.#options.owner || room.isAgent(author) || settings?.shared !== false) {
+			return;
+		}
+		throw new Error("Only the owner can invoke agents here");
 	}
 
 	/** Model and effort apply to a whole run, never just its later turns. */

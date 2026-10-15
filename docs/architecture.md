@@ -103,6 +103,12 @@ is one pi conversation in that Session.
   continues with it and reruns nothing. Other tools may be mid-change and are left to finish; a
   person's messages never interrupt, since they have Stop. Agents wait for another channel by
   ending their run, not by polling in the shell.
+- **Questions wait in pi.** The `question` tool records its questions in a conversation document
+  keyed by call and waits for an answer there, so a rerun after a restart finds the question or
+  its answer instead of asking again. The app shows the pending call's card above the composer;
+  an `answer` request from anyone who may invoke the agent writes the answer once, and the first
+  wins. Stop and Kill abort the wait. An invoked message queued in the chat dismisses the
+  question, so the run reads it instead of blocking it. Subagents' chats have no question tool.
 - **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
   of each running call's output from pi's live tool slots, at most every half second per watch,
   each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable
@@ -151,7 +157,8 @@ is one pi conversation in that Session.
   settlement pi commits with it (answered, stopped, or failed) and the newest human input the run
   answered. Runs only agents invoked, such as subagents' chats, publish nothing. `onRun` projects
   the latest end into the catalog record and listing as `ran`, carried over the workspace socket
-  for hosted channels. Losing it loses only a pending hint; pi keeps the runs.
+  for hosted channels. A run that starts waiting on a question publishes `question` the same way,
+  before it ends. Losing it loses only a pending hint; pi keeps the runs.
 
 `packages/channel` must stay runtime-neutral: no `node:*`, `bun:*`, or Workers imports. The host
 injects storage, models, and the execution environment. This keeps hosted channels (a channel
@@ -570,10 +577,11 @@ types live in `@ace/directory/protocol`. The `Directory` object and its contract
   refuses `PRAGMA user_version`. Migrations run in order inside one transaction.
 
 Notifications are not built. Each app notices its own person's
-finished and failed runs from listings: it keeps the run ends it has shown or announced per host
+finished and failed runs, and runs waiting on a question, from listings: it keeps the run ends it has shown or announced per host
 and participant in browser storage, starting from its first visit. A run end that arrives while
 another channel is open pulses the window's glow; one that arrives while the window is unfocused
-sends a desktop notification. The channel's row keeps a dot (finished) or attention mark (failed)
+sends a desktop notification. The channel's row keeps a dot (finished) or attention mark (failed
+or waiting on a question)
 until the person opens it in a focused window. Stopped runs need no attention.
 
 ## The team

@@ -154,9 +154,12 @@ function row(
 			: "idle",
 		host: channel.host,
 		stopped: place.kind === "cloud" && place.stopped,
-		agent: channel.state === "running" && channel.busy ? "thinking" : "idle",
+		// A run waiting on a question is still busy, but the row should show it waiting on them.
+		agent: channel.state === "running" && channel.busy && outcome !== "question"
+			? "thinking"
+			: "idle",
 		unreadCount: outcome === "done" ? 1 : 0,
-		needsAttention: outcome === "failed",
+		needsAttention: outcome === "failed" || outcome === "question",
 		mentionCount: 0,
 		lastActivityAt: Math.floor((channel.active || channel.created) / 1000),
 		online,

@@ -16,6 +16,12 @@ type State = { since: number; seen: Record<string, number>; told: Record<string,
 
 export type Outcome = Exclude<RunEnd["outcome"], "stopped">;
 
+const NOTICES: Record<Outcome, string> = {
+	done: "Agent finished",
+	failed: "Agent run failed",
+	question: "Agent is waiting for your answer",
+};
+
 /** The pulse holds its glow this long, then keeps these props until it has faded out. */
 export const glow = { hold: 1800, props: { glowOpacity: 0.6, glowFadeIn: 0.8, glowFadeOut: 1.3 } };
 
@@ -28,8 +34,9 @@ function pending(channel: Listing, user: string, state: State): Outcome | undefi
 }
 
 /**
- * Runs this person invoked that ended while they were not watching the channel. Each end pulses
- * the window's glow or sends one desktop notification, then marks its row until they open it.
+ * Runs this person invoked that ended, or that wait on a question, while they were not watching the
+ * channel. Each pulses the window's glow or sends one desktop notification, then marks its row
+ * until they open it.
  */
 export function useAttention(channels: Listing[], user: string, open: string | undefined) {
 	const [state, setState] = useLocalStorage<State | null>(
@@ -59,8 +66,7 @@ export function useAttention(channels: Listing[], user: string, open: string | u
 			told[id] = ran.at;
 			if (watching) setPulse("on");
 			else {
-				desktop?.notify(channel.name, outcome === "failed" ? "Agent run failed" : "Agent finished")
-					.catch(() => {});
+				desktop?.notify(channel.name, NOTICES[outcome]).catch(() => {});
 			}
 		}
 		if (!Object.keys(seen).length && !Object.keys(told).length) return;

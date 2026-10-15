@@ -34,54 +34,56 @@ function model(value: string | undefined) {
 /**
  * A subagent works in a child chat owned by this tool call's task, so stopping or killing the parent
  * reaches the child. The child stays in the channel afterwards for people to read or continue.
+ * `without` lists extensions a child chat must not have, such as questions nobody would see.
  */
-export const Subagent: Extension = defineExtension({
-	name: "ace-subagent",
-	tools: [
-		defineTool({
-			name: "subagent",
-			description:
-				"Delegate a self-contained piece of work to a subagent in a new chat of this channel and wait for its answer. It does not see this chat, so give it everything it needs. It starts in your current lane; tell it to start its own lane for separate work.",
-			parameters: Type.Object({
-				task: Type.String({ description: "What the subagent should do" }),
-				model: Type.Optional(
-					Type.String({ description: "provider/model-id; defaults to your model" }),
-				),
+export const subagent = (...without: Extension[]): Extension =>
+	defineExtension({
+		name: "ace-subagent",
+		tools: [
+			defineTool({
+				name: "subagent",
+				description:
+					"Delegate a self-contained piece of work to a subagent in a new chat of this channel and wait for its answer. It does not see this chat, so give it everything it needs. It starts in your current lane; tell it to start its own lane for separate work.",
+				parameters: Type.Object({
+					task: Type.String({ description: "What the subagent should do" }),
+					model: Type.Optional(
+						Type.String({ description: "provider/model-id; defaults to your model" }),
+					),
+				}),
+				// A rerun after a crash finds the child it created and the submission it made.
+				replay: "safe",
+				execute: async (args, api, context) => {
+					const change = model(args.model);
+					const child = await api.commit(async (tx) => {
+						const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
+						if (existing) return existing.id;
+						const created = await tx.createConversation({
+							ownership: { kind: "task", taskId: api.taskId },
+						});
+						await configure(tx, created.id, {
+							extensions: { remove: [subagent(), MetadataExtension, ...without] },
+							...(change ? { model: change } : {}),
+						});
+						return created.id;
+					}, context);
+					await api.details({ chat: child }, context);
+					const handle = (await api.conversation(child, context))!;
+					const author = `agent@${api.conversationId}`;
+					const request = {
+						type: "input",
+						content: room.content(author, args.task),
+						requestId: `subagent:${api.taskId}`,
+					} as const;
+					const settled = await (await handle.submit(request, context)).wait(context);
+					if (settled.status !== "done" || settled.type !== "input") {
+						throw new Error(`Subagent chat ${child} ended ${settled.status}`);
+					}
+					const text = await answer(api, settled.answer, context);
+					return { content: [{ type: "text", text }], details: { chat: child } };
+				},
 			}),
-			// A rerun after a crash finds the child it created and the submission it made.
-			replay: "safe",
-			execute: async (args, api, context) => {
-				const change = model(args.model);
-				const child = await api.commit(async (tx) => {
-					const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 1)).items[0];
-					if (existing) return existing.id;
-					const created = await tx.createConversation({
-						ownership: { kind: "task", taskId: api.taskId },
-					});
-					await configure(tx, created.id, {
-						extensions: { remove: [Subagent, MetadataExtension] },
-						...(change ? { model: change } : {}),
-					});
-					return created.id;
-				}, context);
-				await api.details({ chat: child }, context);
-				const handle = (await api.conversation(child, context))!;
-				const author = `agent@${api.conversationId}`;
-				const request = {
-					type: "input",
-					content: room.content(author, args.task),
-					requestId: `subagent:${api.taskId}`,
-				} as const;
-				const settled = await (await handle.submit(request, context)).wait(context);
-				if (settled.status !== "done" || settled.type !== "input") {
-					throw new Error(`Subagent chat ${child} ended ${settled.status}`);
-				}
-				const text = await answer(api, settled.answer, context);
-				return { content: [{ type: "text", text }], details: { chat: child } };
-			},
-		}),
-	],
-});
+		],
+	});
 
 export type Directory = {
 	self: { id: string; name: string };
