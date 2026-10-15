@@ -11,8 +11,11 @@ async function git(): Promise<Diagnostics["tools"][number]> {
 	if (!path) return { name: "Git", error: "Install Git to use project folders." };
 	// Apple's git shim opens an installer; a diagnostic must only report missing tools.
 	if (process.platform === "darwin" && path === "/usr/bin/git") {
-		const tools = Bun.spawnSync(["/usr/bin/xcode-select", "--print-path"], { stderr: "ignore" });
-		if (!tools.success) {
+		const tools = Bun.spawn(["/usr/bin/xcode-select", "--print-path"], {
+			stdout: "ignore",
+			stderr: "ignore",
+		});
+		if (await tools.exited !== 0) {
 			return { name: "Git", path, error: "Install Xcode Command Line Tools to use Git." };
 		}
 	}

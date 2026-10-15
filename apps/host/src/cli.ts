@@ -239,7 +239,7 @@ async function main() {
 			return;
 		}
 		case "new": {
-			const dir = project(resolve(flags.project || "."));
+			const dir = await project(resolve(flags.project || "."));
 			const model = flags.model ? parseModel(flags.model) : undefined;
 			const record = flags.hosted
 				? await host(dir, model, flags.name, flags.hosted)

@@ -57,7 +57,7 @@ async function call(path: string, init?: RequestInit): Promise<Response> {
  */
 export function watch(
 	self: () => Omit<Host, "seen">,
-	channels: () => Listing[],
+	channels: () => Promise<Listing[]>,
 	onChange: () => void,
 ) {
 	const controller = new AbortController();
@@ -69,7 +69,7 @@ export function watch(
 			const host = self();
 			await call(`/hosts/${encodeURIComponent(host.name)}`, {
 				method: "PUT",
-				body: JSON.stringify({ ...host, channels: channels() }),
+				body: JSON.stringify({ ...host, channels: await channels() }),
 				signal: controller.signal,
 			});
 			known = await (await call("/", { signal: controller.signal })).json();

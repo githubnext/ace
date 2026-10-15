@@ -66,8 +66,10 @@ const pending = new Set<Promise<unknown>>();
 /** Deleting kills the worker first; the watches that ends must not start it again. */
 const deleting = new Set<string>();
 
-function local(): Listing[] {
-	return catalog.list().map((record) => {
+async function local(): Promise<Listing[]> {
+	const records = catalog.list();
+	const checkouts = await Promise.all(records.map((record) => projects.checkout(record.project)));
+	return records.map((record, index) => {
 		const state = record.archived ? "archived" : isRunning(record.id) ? "running" : "dormant";
 		const {
 			id,
@@ -99,7 +101,7 @@ function local(): Listing[] {
 		};
 		if (active) listing.active = active;
 		if (ran) listing.ran = ran;
-		const { root, repo } = projects.checkout(project);
+		const { root, repo } = checkouts[index]!;
 		listing.root = root;
 		if (repo) listing.repo = repo;
 		if (hosted) listing.hosted = hosted;
@@ -124,7 +126,8 @@ function listed(seen: Set<string>): Listing[] {
 		);
 }
 
-function listings(client: Client, own = local()): Listing[] {
+async function listings(client: Client, own?: Listing[]): Promise<Listing[]> {
+	own ||= await local();
 	if (client.peer) return own;
 	const reachable = [...own, ...peers.listings()];
 	return [...reachable, ...listed(new Set(reachable.map((value) => value.id)))];
@@ -132,25 +135,40 @@ function listings(client: Client, own = local()): Listing[] {
 
 const sockets = new Set<ServerWebSocket<Client>>();
 
+let frames = Promise.resolve();
+
+/**
+ * Listings wait on Git, so frames go out in the order they were asked for: an older listing that
+ * took longer must never replace a newer one. A failed frame is logged and never blocks later ones.
+ */
+function queue(send: () => Promise<void>): Promise<void> {
+	frames = frames.then(send).catch((error) => log("error", "gateway.frame.failed", failure(error)));
+	return frames;
+}
+
 /**
  * This host's channels changed. Peers receive only that, so their own broadcasts never echo back:
  * two hosts relaying each other's frames would loop forever, starving both event loops.
  */
-function broadcast() {
-	const own = local();
-	const frame = JSON.stringify({ channels: own } satisfies HostFrame);
-	for (const socket of sockets) if (socket.data.peer) socket.send(frame);
-	ownersChanged(own);
+function broadcast(): Promise<void> {
+	return queue(async () => {
+		const own = await local();
+		const frame = JSON.stringify({ channels: own } satisfies HostFrame);
+		for (const socket of sockets) if (socket.data.peer) socket.send(frame);
+		await owners(own);
+	});
+}
+
+function ownersChanged(): Promise<void> {
+	return queue(() => owners());
 }
 
 /** Peer and directory listings reach only the owner's app; peers never see them. */
-function ownersChanged(own?: Listing[]) {
+async function owners(own?: Listing[]): Promise<void> {
 	let frame: string | undefined;
 	for (const socket of sockets) {
 		if (socket.data.peer) continue;
-		frame ??= JSON.stringify(
-			{ channels: listings(socket.data, own || local()) } satisfies HostFrame,
-		);
+		frame ??= JSON.stringify({ channels: await listings(socket.data, own) } satisfies HostFrame);
 		socket.send(frame);
 	}
 	peopleChanged();
@@ -175,9 +193,11 @@ function peopleChanged(): void {
 	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
 }
 
-function projectsChanged(): void {
-	const frame = JSON.stringify({ projects: projects.list() } satisfies HostFrame);
-	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
+function projectsChanged(): Promise<void> {
+	return queue(async () => {
+		const frame = JSON.stringify({ projects: await projects.list() } satisfies HostFrame);
+		for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
+	});
 }
 
 function settingsChanged(): void {
@@ -324,18 +344,18 @@ async function handle(
 		case "projects":
 			return projects.list();
 		case "project-open": {
-			const project = projects.open(request.path);
-			projectsChanged();
+			const project = await projects.open(request.path);
+			await projectsChanged();
 			return project;
 		}
 		case "project-init": {
-			const project = projects.init(request.path);
-			projectsChanged();
+			const project = await projects.init(request.path);
+			await projectsChanged();
 			return project;
 		}
 		case "project-clone": {
 			const project = await projects.setup(request.repo, request.path);
-			projectsChanged();
+			await projectsChanged();
 			return project;
 		}
 		case "project-repo": {
@@ -350,10 +370,9 @@ async function handle(
 				);
 			}
 			const known = client.peer
-				? catalog.list().some((channel) =>
-					projects.checkout(channel.project).root === request.project
-				)
-				: projects.list().some((project) => project.path === request.project);
+				? (await Promise.all(catalog.list().map((channel) => projects.checkout(channel.project))))
+					.some(({ root }) => root === request.project)
+				: (await projects.list()).some((project) => project.path === request.project);
 			if (!known) throw new Error("Open this project in Ace first");
 			return github.project(request.project);
 		}
@@ -387,11 +406,11 @@ async function handle(
 			return models();
 		case "create": {
 			const record = catalog.create(
-				project(request.project),
+				await project(request.project),
 				request.model,
 				request.name || undefined,
 			);
-			broadcast();
+			await broadcast();
 			return record;
 		}
 		case "archive":
@@ -401,7 +420,7 @@ async function handle(
 		case "archive-inactive": {
 			const archived = await archiveInactive(request.project);
 			for (const channel of archived) terminals.closeChannel(channel);
-			broadcast();
+			await broadcast();
 			return archived.length;
 		}
 		case "move-targets":
@@ -501,10 +520,11 @@ function websocket(): Bun.WebSocketHandler<Client> {
 		open(socket) {
 			sockets.add(socket);
 			log("info", "gateway.open", { user: socket.data.user, peer: socket.data.peer });
-			if (!socket.data.peer) {
-				socket.send(JSON.stringify({ projects: projects.list() } satisfies HostFrame));
+			if (socket.data.peer) return;
+			void queue(async () => {
+				socket.send(JSON.stringify({ projects: await projects.list() } satisfies HostFrame));
 				socket.send(JSON.stringify({ people: people() } satisfies HostFrame));
-			}
+			});
 		},
 		async message(socket, raw) {
 			const { id, trace: given, ...request } = JSON.parse(String(raw)) as HostEnvelope;
@@ -721,7 +741,7 @@ export async function serve(port: number): Promise<never> {
 	const publish = directory.watch(
 		() => ({ name, login: catalog.user, github: github.login(peopleChanged), ...address }),
 		local,
-		() => ownersChanged(),
+		() => void ownersChanged(),
 	);
 	log("info", "host.tailnet", machine ? { name, address: machine.address } : { tailscale: false });
 	cleanup.push(publish.stop);
@@ -729,7 +749,7 @@ export async function serve(port: number): Promise<never> {
 		servers.push(team(machine, { port, secure: false }));
 		console.log(`Sharing with the tailnet on ${machine.address}:${port} as ${machine.login}`);
 		console.log(`Your devices can open http://${machine.dns}:${port}`);
-		cleanup.push(peers.watch(() => ownersChanged()));
+		cleanup.push(peers.watch(() => void ownersChanged()));
 		const tls = await web.tls(machine);
 		if (tls && !closing) {
 			const listener = { port: config.webPort ?? port + 1000, secure: true };
@@ -743,9 +763,9 @@ export async function serve(port: number): Promise<never> {
 	// Workers create and remove their sockets; tell clients when a channel starts or retires.
 	const watcher = watch(join(catalog.home, "channels"), { recursive: true }, (_, file) => {
 		if (closing || updating) return;
-		if (file?.endsWith("channel.sock") || file?.endsWith("channel.json")) broadcast();
+		if (file?.endsWith("channel.sock") || file?.endsWith("channel.json")) void broadcast();
 		if (file?.endsWith("channel.json")) {
-			projectsChanged();
+			void projectsChanged();
 			workspace.sync();
 			void publish.sync();
 		}
@@ -761,7 +781,9 @@ export async function serve(port: number): Promise<never> {
 			if (!record.hosted && record.busy && !isWorkerAlive(record.id)) current.add(record.id);
 		}
 		// Do not overwrite a replacement worker's projection after observing its predecessor die.
-		if (current.size !== crashed.size || [...current].some((id) => !crashed.has(id))) broadcast();
+		if (current.size !== crashed.size || [...current].some((id) => !crashed.has(id))) {
+			void broadcast();
+		}
 		crashed = current;
 	}, 5000);
 	cleanup.push(() => clearInterval(liveness));
