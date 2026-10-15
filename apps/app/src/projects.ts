@@ -2,11 +2,14 @@ import type { Listing, Project } from "@ace/host/protocol";
 
 /**
  * `host` and `path` are the checkout that creates channels and reads GitHub: this host's own
- * checkout when it has one. `checkouts` holds every known checkout's ID on any host.
+ * checkout when it has one, else one whose host can answer for it. `reachable` is whether it can:
+ * a peer answers only for a project its own listing shows a live channel in.
+ * `checkouts` holds every known checkout's ID on any host.
  */
 export type AppProject = Project & {
 	id: string;
 	host: string;
+	reachable: boolean;
 	hosts: Set<string>;
 	checkouts: Set<string>;
 };
@@ -38,7 +41,15 @@ export const label = (project: AppProject, host: string) =>
 
 export function projects(opened: Project[], channels: Listing[], host: string): AppProject[] {
 	const values = new Map<string, AppProject>();
-	function add(at: string, path: string, name: string, repo?: string, git?: false) {
+	const rank = (at: string, reachable: boolean) => at === host ? 2 : reachable ? 1 : 0;
+	function add(
+		at: string,
+		path: string,
+		name: string,
+		reachable: boolean,
+		repo?: string,
+		git?: false,
+	) {
 		const id = projectId(at, path, repo);
 		const checkout = checkoutId(at, path);
 		const value = values.get(id);
@@ -48,6 +59,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 				host: at,
 				path,
 				name,
+				reachable,
 				hosts: new Set([at]),
 				checkouts: new Set([checkout]),
 			};
@@ -57,19 +69,23 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 		}
 		value.hosts.add(at);
 		value.checkouts.add(checkout);
-		if (value.host === host || at !== host) return;
+		if (rank(at, reachable) <= rank(value.host, value.reachable)) return;
 		value.host = at;
 		value.path = path;
+		value.reachable = reachable;
 	}
 	if (host) {
 		for (const project of opened) {
-			add(host, project.path, project.name, project.repo, project.git);
+			add(host, project.path, project.name, true, project.repo, project.git);
 		}
 	}
 	for (const channel of channels) {
 		const path = root(channel);
 		const name = channel.repo?.split("/")[1] || path.replace(/\/+$/, "").split("/").pop() || path;
-		add(channel.host, path, name, channel.repo);
+		// Directory-only listings are offline or archived, and a hosted channel's host is a workspace.
+		const reachable = channel.host === host
+			|| !channel.hosted && (channel.state === "running" || channel.state === "dormant");
+		add(channel.host, path, name, reachable, channel.repo);
 	}
 	return [...values.values()];
 }

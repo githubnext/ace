@@ -126,21 +126,25 @@ async function load(value: Entry, force = false): Promise<void> {
 }
 
 let refreshing: Promise<void> | undefined;
+/**
+ * The sidebar's projects that a host can answer for. Saved and page-only queries stay out, so
+ * projects that left the sidebar or moved hosts aren't asked again; a Set visits additions mid-loop.
+ */
+const wanted = new Set<Entry>();
 
 /** Warm both pages without mounting them, and serialize background GitHub requests. */
 function refresh(force = false): Promise<void> {
 	if (refreshing) return refreshing;
 	refreshing = (async () => {
 		await ready;
-		for (const value of cache.values()) {
+		for (const value of wanted) {
 			if (host.status !== "open") break;
 			await load(value, force);
-			if (value.request.op !== "project-repo") continue;
 			const repo = value.snapshot.value as string | null | undefined;
 			if (!repo) continue;
 			for (const kind of ["issues", "prs"] as const) {
 				for (const state of ["open", "closed", "all"] as const) {
-					entry({ op: "github-list", repo, kind, state, search: "", limit: 50 });
+					await load(entry({ op: "github-list", repo, kind, state, search: "", limit: 50 }), force);
 				}
 			}
 		}
@@ -151,13 +155,16 @@ function refresh(force = false): Promise<void> {
 }
 
 export function useGithubRefresh(projects: AppProject[]) {
-	const source = JSON.stringify(projects.map(({ host, path }) => ({
-		op: "project-repo",
-		host,
-		project: path,
-	})));
+	const source = JSON.stringify(
+		projects.filter((project) => project.reachable).map(({ host, path }) => ({
+			op: "project-repo",
+			host,
+			project: path,
+		})),
+	);
 	useEffect(() => {
-		for (const request of JSON.parse(source) as Request[]) entry(request);
+		wanted.clear();
+		for (const request of JSON.parse(source) as Request[]) wanted.add(entry(request));
 		void refresh();
 	}, [source]);
 	useEffect(() => {

@@ -411,6 +411,7 @@ export function App() {
 			...value,
 			id,
 			host: hello.host,
+			reachable: true,
 			hosts: new Set([hello.host]),
 			checkouts: new Set([checkoutId(hello.host, value.path)]),
 		};
