@@ -6,12 +6,12 @@ import {
 	type CommandPaletteItem,
 	type CommandPaletteShortcut,
 } from "@ace/ui";
-import type { Listing, WindowState } from "@ace/host/protocol";
+import { channelProject, type Listing, type WindowState } from "@ace/host/protocol";
 
 import type { Outcome } from "./attention";
 import { desktop } from "./desktop";
 import { switcher } from "./layout/layout";
-import { type AppProject, channelProject, label } from "./projects";
+import { type AppProject, label } from "./projects";
 
 function action(
 	id: string,

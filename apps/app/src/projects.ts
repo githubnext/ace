@@ -1,4 +1,4 @@
-import type { Listing, Project } from "@ace/host/protocol";
+import { checkoutId, type Listing, type Project, projectId, root } from "@ace/host/protocol";
 
 /**
  * `host` and `path` are the checkout that creates channels and reads GitHub: this host's own
@@ -15,22 +15,6 @@ export type AppProject = Project & {
 	hosts: Set<string>;
 	checkouts: Set<string>;
 };
-
-/** Hosts before project roots list each checkout as its own project. */
-export const root = (channel: Pick<Listing, "project" | "root">) => channel.root || channel.project;
-
-/** Also the project ID that earlier app versions saved for every project. */
-export const checkoutId = (host: string, path: string) => JSON.stringify([host, path]);
-
-/**
- * GitHub repository names are case-insensitive and hosts already strip `.git`, so every checkout
- * of one repository is one project. A folder without a GitHub remote belongs to its host.
- */
-export const projectId = (host: string, path: string, repo?: string) =>
-	repo ? `github:${repo.toLowerCase()}` : checkoutId(host, path);
-
-export const channelProject = (channel: Pick<Listing, "host" | "project" | "root" | "repo">) =>
-	projectId(channel.host, root(channel), channel.repo);
 
 /**
  * A GitHub project is the same project wherever it is checked out. A folder without one is only

@@ -95,6 +95,23 @@ export type Listing = {
 	stalled?: boolean;
 };
 
+/** Hosts before project roots list each checkout as its own project. */
+export const root = (channel: Pick<Listing, "project" | "root">) => channel.root || channel.project;
+
+/** Also the project ID that earlier app versions saved for every project. */
+export const checkoutId = (host: string, path: string) => JSON.stringify([host, path]);
+
+/**
+ * GitHub repository names are case-insensitive and hosts already strip `.git`, so every checkout
+ * of one repository is one project. A folder without a GitHub remote belongs to its host. Apps
+ * select projects by this ID and hosts name the project's lobby with it, so both must agree.
+ */
+export const projectId = (host: string, path: string, repo?: string) =>
+	repo ? `github:${repo.toLowerCase()}` : checkoutId(host, path);
+
+export const channelProject = (channel: Pick<Listing, "host" | "project" | "root" | "repo">) =>
+	projectId(channel.host, root(channel), channel.repo);
+
 /** Channels idle this long are inactive until their transcript grows again. */
 const INACTIVE_AFTER = 6 * 60 * 60_000;
 

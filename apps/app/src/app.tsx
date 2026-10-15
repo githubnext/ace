@@ -22,6 +22,8 @@ import {
 } from "@ace/ui";
 import { IconHash, IconPlus } from "@ace/ui/icons";
 import {
+	channelProject,
+	checkoutId,
 	type Hello,
 	type HostRequest,
 	isInactive,
@@ -29,6 +31,7 @@ import {
 	type MoveTarget,
 	type People,
 	type Project,
+	projectId,
 } from "@ace/host/protocol";
 
 import { chosen, deployed, remember } from "./address";
@@ -45,15 +48,7 @@ import { MoveChannel } from "./move-channel";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import { Palette } from "./palette";
-import {
-	type AppProject,
-	channelProject,
-	checkoutId,
-	label,
-	projectId,
-	projects,
-	title,
-} from "./projects";
+import { type AppProject, label, projects, title } from "./projects";
 import { Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { UpdateNotice } from "./updates";
