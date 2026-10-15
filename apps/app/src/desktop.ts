@@ -19,6 +19,7 @@ export const desktop = view && token
 		project: () => rpc.request.project({ token }),
 		lights: (expanded: boolean) => rpc.request.lights({ token, expanded }),
 		zoom: () => rpc.request.zoom({ token }),
+		window: () => rpc.request.window({ token }),
 		helper: (action: HelperAction) => rpc.request.helper({ token, action }),
 		native: (action: NativeAction) => rpc.request.native({ token, action }),
 		updates: (action: UpdateAction) => rpc.request.updates({ token, action }),

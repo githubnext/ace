@@ -63,6 +63,7 @@ export type DesktopRPC = {
 			project: { params: { token: string }; response: string | null };
 			lights: { params: { token: string; expanded: boolean }; response: null };
 			zoom: { params: { token: string }; response: null };
+			window: { params: { token: string }; response: null };
 			helper: { params: { token: string; action: HelperAction }; response: HelperState };
 			native: { params: { token: string; action: NativeAction }; response: NativeState };
 			updates: { params: { token: string; action: UpdateAction }; response: UpdateState };
