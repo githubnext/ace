@@ -7,6 +7,7 @@ import { join } from "node:path";
 
 import * as catalog from "./catalog";
 import { hostedAuth } from "./client";
+import { refusal } from "./http";
 import { failure, log } from "./log";
 import type { Listing } from "./protocol";
 
@@ -68,13 +69,15 @@ export async function check(base: string, secret: string): Promise<void> {
 	} catch {
 		throw new Error(`Could not reach ${base}. Check the URL and your connection.`);
 	}
-	if (!response.ok) {
+	if (response.status === 401) {
 		await response.body?.cancel();
 		throw new Error(
-			response.status === 401
-				? "The directory rejected this secret. Ask whoever set it up for the team's secret."
-				: `The directory answered HTTP ${response.status}. Check the URL.`,
+			"The directory rejected this secret. Ask whoever set it up for the team's secret.",
 		);
+	}
+	if (!response.ok) {
+		const reason = await refusal(response, "The directory");
+		throw new Error(response.status < 500 ? `${reason} Check the URL.` : reason);
 	}
 	const body = await response.json().catch(() => undefined) as { hosts?: unknown } | undefined;
 	if (!Array.isArray(body?.hosts)) throw new Error("This URL is not a team directory.");
@@ -113,13 +116,15 @@ async function call(
 		if (signal.aborted) throw cause;
 		throw new Error(`Could not reach ${base}. Check the URL and your connection.`, { cause });
 	}
-	if (!response.ok) {
+	if (response.status === 401) {
 		await response.body?.cancel();
 		throw new Error(
-			response.status === 401
-				? "The directory rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret."
-				: `The directory answered HTTP ${response.status}. Check the URL.`,
+			"The directory rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret.",
 		);
+	}
+	if (!response.ok) {
+		const reason = await refusal(response, "The directory");
+		throw new Error(response.status < 500 ? `${reason} Check the URL.` : reason);
 	}
 	return response;
 }

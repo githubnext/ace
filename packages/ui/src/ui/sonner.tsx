@@ -26,7 +26,8 @@ function Toaster({
 				classNames: {
 					toast: "group toast squircle bg-popover text-popover-foreground shadow-popover",
 					title: "text-sm font-medium",
-					description: "text-xs text-muted-foreground",
+					// Errors from services can be whole pages; the host log keeps the full text.
+					description: "line-clamp-6 text-xs break-words text-muted-foreground",
 					actionButton: "bg-primary text-primary-foreground squircle text-xs font-medium",
 					cancelButton: "bg-secondary text-secondary-foreground squircle text-xs font-medium",
 					closeButton: "bg-popover text-popover-foreground shadow-surface",
