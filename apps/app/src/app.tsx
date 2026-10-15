@@ -148,6 +148,9 @@ function row(channel: Listing, user: string, host: string, outcome?: Outcome): S
 	};
 }
 
+/** Teammates appear by GitHub login where their host knows it. */
+const person = (people: People, owner: string) => people[owner] || owner;
+
 /** Pins belong to the person, not the channel, so teammates never see them. */
 function pinnedGroup(
 	channels: Listing[],
@@ -201,7 +204,7 @@ function projectGroups(
 		}
 		let owned = team.get(channel.owner);
 		if (!owned) {
-			owned = { name: people[channel.owner] || channel.owner, rows: [], archived: [] };
+			owned = { name: person(people, channel.owner), rows: [], archived: [] };
 			team.set(channel.owner, owned);
 		}
 		(stored ? owned.archived : owned.rows).push(next);
@@ -293,7 +296,6 @@ export function App() {
 	useGithubRefresh(available);
 	const allProjects = all && page === "channels";
 	const listings = new Map(channels.map((channel) => [channel.id, channel]));
-	const allSelected = listings.get(selected[ALL_PROJECTS]);
 	const byId = useMemo(() => {
 		const values = new Map<string, AppProject>();
 		for (const value of available) {
@@ -308,7 +310,8 @@ export function App() {
 		? channels.filter((channel) => channelProject(channel) === current.id)
 		: [];
 	// The saved checkout ID names the selection an earlier version made among merged checkouts.
-	const channel = allProjects ? allSelected : current && [
+	// All Projects shares this selection, so switching views keeps the open channel.
+	const channel = current && [
 		current.id,
 		project,
 		...current.checkouts,
@@ -349,24 +352,50 @@ export function App() {
 			if (rows) rows.push(value);
 			else byProject.set(id, [value]);
 		}
-		groups = available.map((value) => {
+		// Like a project's own view, teammates' channels sit under their name, after the project's.
+		groups = available.flatMap((value): SessionSidebarGroup[] => {
 			const id: SessionSidebarGroupId = `project:${value.id}`;
-			const rows = (byProject.get(value.id) || []).sort((a, b) =>
+			const name = label(value, hello.host);
+			const mine: SidebarRow[] = [];
+			const team = new Map<string, SidebarRow[]>();
+			const recent = (byProject.get(value.id) || []).sort((a, b) =>
 				(b.active || b.created) - (a.active || a.created)
 				|| b.created - a.created || b.id.localeCompare(a.id)
-			).slice(0, RECENT_CHANNELS).map((value) =>
-				row(value, hello.user, hello.host, attention.get(value.id))
-			);
-			return {
-				id,
-				label: label(value, hello.host),
-				rows,
-				sort: "none",
-				collapsed: collapsed[id],
-				onNewSession: connected && (value.host === hello.host || value.repo)
-					? () => void create(undefined, undefined, value)
-					: undefined,
-			};
+			).slice(0, RECENT_CHANNELS);
+			for (const channel of recent) {
+				const next = row(channel, hello.user, hello.host, attention.get(channel.id));
+				if (channel.owner === hello.user) {
+					mine.push(next);
+					continue;
+				}
+				const rows = team.get(channel.owner);
+				if (rows) rows.push(next);
+				else team.set(channel.owner, [next]);
+			}
+			return [
+				{
+					id,
+					label: name,
+					rows: mine,
+					sort: "none",
+					collapsed: collapsed[id],
+					onNewSession: connected && (value.host === hello.host || value.repo)
+						? () => void create(undefined, undefined, value)
+						: undefined,
+				},
+				...[...team].map(([owner, rows]) => ({ owner, name: person(people, owner), rows }))
+					.sort((a, b) => a.name.localeCompare(b.name))
+					.map(({ owner, name: teammate, rows }): SessionSidebarGroup => {
+						const group: SessionSidebarGroupId = `${id}:team:${owner}`;
+						return {
+							id: group,
+							label: `${name} · ${teammate}`,
+							rows,
+							sort: "none",
+							collapsed: collapsed[group],
+						};
+					}),
+			];
 		});
 		groups.unshift(pinnedGroup(channels, pins, hello, collapsed, attention));
 	}
@@ -381,11 +410,7 @@ export function App() {
 		const id = channelProject(value);
 		setProject(id);
 		if (!allProjects) setAll(false);
-		setSelected((previous) => ({
-			...previous,
-			[id]: value.id,
-			...(allProjects ? { [ALL_PROJECTS]: value.id } : {}),
-		}));
+		setSelected((previous) => ({ ...previous, [id]: value.id }));
 		setPage("channels");
 	}
 
