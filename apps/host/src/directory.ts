@@ -5,6 +5,8 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { Lifecycle } from "@ace/directory/protocol";
+
 import * as catalog from "./catalog";
 import { hostedAuth } from "./client";
 import { refusal } from "./http";
@@ -12,6 +14,8 @@ import { failure, log } from "./log";
 import type { Listing } from "./protocol";
 
 const HEARTBEAT = 30_000;
+/** While every known project's lobby is live, polling only discovers new projects and hosts. */
+const DISCOVERY = 5 * 60_000;
 
 /** `github` is the owner's GitHub login, so clients can show avatars for their messages. */
 type Host = { name: string; login: string; github?: string; address?: string; seen: number };
@@ -82,6 +86,8 @@ export async function check(base: string, secret: string): Promise<void> {
 	const body = await response.json().catch(() => undefined) as { hosts?: unknown } | undefined;
 	if (!Array.isArray(body?.hosts)) throw new Error("This URL is not a team directory.");
 }
+/** Lifecycle events applied while a read is in flight; that read may predate them. */
+let reading: Lifecycle<Listing>[] | undefined;
 
 export function status() {
 	return { url: url(), synced, error, failed };
@@ -95,6 +101,20 @@ export function sync(): Promise<void> {
 /** The directory's last answer; empty until it first responds or without a directory. */
 export function read() {
 	return known;
+}
+
+function patch(channels: Listing[], event: Lifecycle<Listing>): Listing[] {
+	const kept = channels.filter((channel) => channel.id !== event.channel);
+	return event.listing ? [...kept, event.listing] : kept;
+}
+
+/**
+ * A lobby pushed a channel's change, which its host sent only after publishing it here, so the
+ * next read agrees; until then the event stands in for it.
+ */
+export function apply(event: Lifecycle<Listing>) {
+	reading?.push(event);
+	known = { ...known, channels: patch(known.channels, event) };
 }
 
 async function call(
@@ -129,27 +149,40 @@ async function call(
 	return response;
 }
 
+type Options = {
+	self(): Omit<Host, "seen">;
+	channels(): Promise<Listing[]>;
+	/** After each refresh. */
+	changed(): void;
+	/** After each publish; `before` is this process's previous publication, if any. */
+	published(before: Listing[] | undefined, after: Listing[]): void;
+	/** Every project this host knows has a live lobby pushing its changes. */
+	covered(): boolean;
+};
+
 /**
- * Publish this host's channels, then refresh what the directory knows. `onChange` runs after each
- * refresh. Failures keep the last answer, so an unreachable directory never hides channels.
+ * Publish this host's channels, then refresh what the directory knows. Failures keep the last
+ * answer, so an unreachable directory never hides channels.
  */
-export function watch(
-	self: () => Omit<Host, "seen">,
-	channels: () => Promise<Listing[]>,
-	onChange: () => void,
-) {
+export function watch({ self, channels, changed, published, covered }: Options) {
 	const controller = new AbortController();
-	let running: { base: string; done: Promise<void> } | undefined;
+	let running: { base: string; done: Promise<void>; again?: Promise<void> } | undefined;
+	let before: Listing[] | undefined;
 	const attempt = async (base: string) => {
 		try {
 			const host = self();
+			const after = await channels();
 			await call(base, `/hosts/${encodeURIComponent(host.name)}`, controller.signal, {
 				method: "PUT",
-				body: JSON.stringify({ ...host, channels: await channels() }),
+				body: JSON.stringify({ ...host, channels: after }),
 			});
-			const answer = await (await call(base, "/", controller.signal)).json();
+			published(before, after);
+			before = after;
+			reading = [];
+			const answer: typeof known = await (await call(base, "/", controller.signal)).json();
 			// The directory changed while this sync was under way; its answer belongs to the old one.
 			if (url() !== base) return;
+			for (const event of reading) answer.channels = patch(answer.channels, event);
 			known = answer;
 			synced = Date.now();
 			error = undefined;
@@ -158,21 +191,23 @@ export function watch(
 				hosts: known.hosts.length,
 				channels: known.channels.length,
 			});
-			onChange();
+			changed();
 		} catch (cause) {
 			if (controller.signal.aborted || url() !== base) return;
 			error = (cause as Error).message;
 			failed = Date.now();
 			log("warn", "directory.failed", { url: base, ...failure(cause) });
+		} finally {
+			reading = undefined;
 		}
 	};
-	const sync = (): Promise<void> => {
+	const join = (): Promise<void> => {
 		const base = url();
 		if (!base || controller.signal.aborted) return Promise.resolve();
 		if (running?.base === base) return running.done;
 		// A sync for the old URL may wait on a keychain prompt; don't hold a directory change on it.
 		if (running) {
-			void running.done.then(sync);
+			void running.done.then(join);
 			return Promise.resolve();
 		}
 		const done = attempt(base).finally(() => {
@@ -181,9 +216,18 @@ export function watch(
 		running = { base, done };
 		return done;
 	};
-	active = { sync, changed: onChange };
-	void sync();
-	const interval = setInterval(() => void sync(), HEARTBEAT);
+	/** For a change: the sync under way may have read channels before it, so one more follows. */
+	const sync = (): Promise<void> => {
+		if (!running || running.base !== url()) return join();
+		return running.again ??= running.done.then(join);
+	};
+	active = { sync: join, changed };
+	void join();
+	const interval = setInterval(() => {
+		// A failed publish keeps retrying every heartbeat; lobbies only carry what was published.
+		if (covered() && !error && Date.now() - (synced || 0) < DISCOVERY) return;
+		void join();
+	}, HEARTBEAT);
 	return {
 		sync,
 		stop() {

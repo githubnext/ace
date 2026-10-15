@@ -886,11 +886,13 @@ export async function serve(port: number, loopback = false): Promise<never> {
 	if (closing) return new Promise(() => {});
 	if (machine) name = machine.name;
 	const address = machine ? { address: machine.address } : {};
-	const publish = loopback ? undefined : directory.watch(
-		() => ({ name, login: catalog.user, github: github.login(loginChanged), ...address }),
-		local,
-		() => void ownersChanged(),
-	);
+	const publish = loopback ? undefined : directory.watch({
+		self: () => ({ name, login: catalog.user, github: github.login(loginChanged), ...address }),
+		channels: local,
+		changed: () => void ownersChanged(),
+		published: (before, after) => before && lobby.published(before, after),
+		covered: lobby.isCovered,
+	});
 	if (publish) {
 		log(
 			"info",
@@ -898,7 +900,12 @@ export async function serve(port: number, loopback = false): Promise<never> {
 			machine ? { name, address: machine.address } : { tailscale: false },
 		);
 		cleanup.push(publish.stop);
-		cleanup.push(lobby.watch({ host: () => name, changed: presenceChanged }));
+		cleanup.push(lobby.watch({
+			host: () => name,
+			changed: presenceChanged,
+			listed: () => void ownersChanged(),
+			resync: () => void publish.sync(),
+		}));
 		void queue(() => lobbyProjects());
 	}
 	if (machine) {
