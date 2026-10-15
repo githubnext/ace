@@ -71,6 +71,15 @@ function tool(
 				},
 			}
 			: {}),
+		...(!tool.result && tool.progress
+			? {
+				result: {
+					content: tool.progress.truncated
+						? `… earlier output not shown\n${tool.progress.text}`
+						: tool.progress.text,
+				},
+			}
+			: {}),
 	};
 }
 

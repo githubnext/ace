@@ -85,6 +85,10 @@ is one pi conversation in that Session.
   committed changes, including passive human writes but excluding internal writes. The app shows
   these messages above the composer until pi consumes or withdraws them; reconnect reads pi again.
   There is no additional queue store or change to admission and steering behavior.
+- **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
+  of each running call's output from pi's live tool slots, at most every half second per watch,
+  each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable
+  result, with its truncation notice and full-output path, supersedes them. Nothing else stores them.
 - **Subagents are child chats.** A subagent's chat is owned by the parent's tool task, so killing
   the parent kills the child. Agents in different channels only exchange messages.
 - **Lanes are Git worktrees** created by the chat's agent for each unit of work. A chat's working

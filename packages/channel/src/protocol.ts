@@ -206,6 +206,8 @@ export type Request =
 		queue?: boolean;
 		/** Include caption and recap events; older clients do not understand them. */
 		captions?: boolean;
+		/** Include progress events; older clients do not understand them. */
+		progress?: boolean;
 	};
 
 export type Event =
@@ -244,6 +246,12 @@ export type Event =
 		name: string;
 		args: unknown;
 	}
+	/**
+	 * The bounded tail of a running tool call's output, sent on attachment and as it grows, at most
+	 * every half second. Each replaces the call's previous one; its `result` supersedes them all.
+	 * `truncated` when earlier output is not shown. Not stored: only pi's live state backs it.
+	 */
+	| { kind: "progress"; chat: ChatId; call: string; text: string; truncated?: boolean }
 	/** `interrupted` when the channel restarted while the tool ran, so it may have partially run. */
 	| {
 		kind: "result";

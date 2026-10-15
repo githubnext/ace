@@ -48,6 +48,7 @@ import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
 import { metadata, MetadataDoc, validateName } from "./metadata";
 import { available, choose, usable } from "./models";
+import { progress } from "./progress";
 import type {
 	ChannelInfo,
 	Chat,
@@ -291,7 +292,7 @@ export class Channel {
 			case "rename":
 				return this.#rename(request);
 			case "watch":
-				return this.#watch(request.chat, send, request.queue, request.captions);
+				return this.#watch(request, send);
 			case "changes": {
 				const { cwd, lane } = await this.#place(request.chat);
 				return changes(this.#options.env(cwd), cwd, this.#options.project, lane, context);
@@ -736,32 +737,29 @@ export class Channel {
 	}
 
 	/** Replays the chat's active transcript, then streams. Resolves when the stream ends. */
-	async #watch(
-		chat: ChatId | undefined,
-		send: Send,
-		includeQueue = false,
-		includeCaptions = false,
-	) {
-		const conversation = await this.#conversation(chat);
+	async #watch(request: Extract<Request, { op: "watch" }>, send: Send) {
+		const conversation = await this.#conversation(request.chat);
 		const stream = await watchEvents(this.#harness, conversation.id, context);
+		const tools = request.progress ? progress(conversation.id, send) : undefined;
 		// Agent events expose only inbox IDs. The shared conversation mount carries their content,
 		// including an atomic initial snapshot and updates when the inbox is first created.
-		const view = includeQueue
+		const view = request.queue
 			? await conversation.watch(context).catch(async (error) => {
 				await stream.stop();
 				throw error;
 			})
 			: undefined;
-		const listener = { chat: conversation.id, send, captions: includeCaptions };
+		const listener = { chat: conversation.id, send, captions: !!request.captions };
 		this.#listeners.add(listener);
 		void stream.closed.then(() => {
 			this.#listeners.delete(listener);
+			tools?.stop();
 			return view?.stop();
 		});
 		void view?.closed.then(() => stream.stop());
 		send(this.#event(conversation.id));
 		for (const entry of stream.snapshot.entries) for (const event of events(entry)) send(event);
-		if (includeCaptions) {
+		if (request.captions) {
 			const captions = await this.#harness.snapshot(CaptionsDoc, conversation.id, context);
 			for (const { calls, text } of Object.values(captions?.groups || {})) {
 				send({ kind: "caption", chat: conversation.id, calls, text });
@@ -771,6 +769,7 @@ export class Channel {
 			}
 		}
 		if (stream.snapshot.run) send({ kind: "run", chat: conversation.id, state: "start" });
+		tools?.snapshot(stream.snapshot.tools);
 		if (view) {
 			send({ kind: "queue", chat: conversation.id, messages: queue(view.value) });
 			let inbox = view.value.docs[InboxDoc.definition.kind];
@@ -783,11 +782,16 @@ export class Channel {
 		}
 		send({ kind: "live", chat: conversation.id });
 		stream.start(async (batch) => {
-			for (const event of batch) for (const mapped of live(conversation.id, event)) send(mapped);
+			for (const event of batch) {
+				if (event.type === "snapshot") tools?.snapshot(event.tools);
+				else tools?.update(event);
+				for (const mapped of live(conversation.id, event)) send(mapped);
+			}
 		});
 		return {
 			stop: async () => {
 				this.#listeners.delete(listener);
+				tools?.stop();
 				await view?.stop();
 				return stream.stop();
 			},
