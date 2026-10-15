@@ -127,6 +127,7 @@ async function local(): Promise<Listing[]> {
 		if (repo) listing.repo = repo;
 		if (hosted) listing.hosted = hosted;
 		if (record.compute) listing.compute = true;
+		if (record.stopped) listing.stopped = true;
 		const transition = computing.get(id);
 		if (transition) listing.computing = transition;
 		if (record.moving && moves.has(id)) {

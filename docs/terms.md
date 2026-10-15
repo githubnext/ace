@@ -22,7 +22,9 @@ workspace. Hosted describes where the channel runs; Ace does not operate a hosti
 The execution environment that runs a hosted channel's tools, from lanes on its filesystem.
 Today this is a host; the hosted-compute pilot also runs one in a team-deployed Linux container.
 It connects out to the channel. While it is offline, the channel's tools wait for it; chat and
-model-only runs continue.
+model-only runs continue. Stop compute checkpoints a cloud workspace and removes its container; the
+workspace is then stopped until Start compute resumes it from that checkpoint. This is not Stop,
+which aborts a run.
 Not a project or a checkout.
 
 **Project**:
