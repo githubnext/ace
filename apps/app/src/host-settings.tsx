@@ -52,6 +52,13 @@ export function HostStatus({ active }: { active: boolean }) {
 		};
 	}, [active, status, retry]);
 
+	// The helper retries loading its shell environment in the background; clear the warning once it does.
+	useEffect(() => {
+		if (!active || checks.value?.shell.state !== "pending") return;
+		const timer = setTimeout(() => setRetry((value) => value + 1), 5000);
+		return () => clearTimeout(timer);
+	}, [active, checks]);
+
 	useEffect(() => {
 		if (!active || !helper.value?.unresponsive) return;
 		const timer = setTimeout(() => setRetry((value) => value + 1), 2000);
@@ -182,6 +189,19 @@ export function HostStatus({ active }: { active: boolean }) {
 							/>
 						</Group>
 						<Group title="Tools">
+							<Row
+								label="Shell environment"
+								description={checked.shell.state === "adopted"
+									? "Tools resolve from your login shell's PATH."
+									: checked.shell.state === "pending"
+									? "Not loaded yet, so tools resolve from a minimal PATH and may be reported missing. Ace Helper keeps retrying in the background."
+									: "Not loaded, so tools resolve from a minimal PATH and may be reported missing. Restart Ace Helper to try again."}
+								footer={checked.shell.error && <Problem>{checked.shell.error}</Problem>}
+							>
+								<span className="text-xs text-muted-foreground">
+									{checked.shell.state === "adopted" ? "Loaded" : "Needs attention"}
+								</span>
+							</Row>
 							{checked.tools.map((tool) => (
 								<Row
 									key={tool.name}
