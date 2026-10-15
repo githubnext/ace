@@ -130,7 +130,6 @@
       "name": "@ace/channel-service",
       "dependencies": {
         "@ace/channel": "workspace:*",
-        "@earendil-works/chord": "catalog:pi",
         "@earendil-works/pi-ai": "catalog:pi",
         "@earendil-works/pi-durable": "catalog:pi",
       },

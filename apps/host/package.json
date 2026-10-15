@@ -3,9 +3,6 @@
 	"private": true,
 	"type": "module",
 	"license": "MIT",
-	"bin": {
-		"ace": "./src/cli.ts"
-	},
 	"scripts": {
 		"types": "tsgo --noEmit"
 	},
@@ -21,13 +18,10 @@
 		"@types/bun": "catalog:bun"
 	},
 	"exports": {
-		".": "./src/cli.ts",
 		"./protocol": "./src/protocol.ts",
 		"./gateway-client": "./src/gateway-client.ts",
-		"./gateway": "./src/gateway.ts",
 		"./config": "./src/config.ts",
 		"./auth": "./src/auth.ts",
-		"./health": "./src/health.ts",
-		"./keys": "./src/keys.ts"
+		"./health": "./src/health.ts"
 	}
 }
