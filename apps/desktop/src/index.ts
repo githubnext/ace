@@ -6,6 +6,7 @@ import Electrobun, { ApplicationMenu, BrowserView, BrowserWindow, Utils } from "
 import { appUrl, token } from "@ace/host/auth";
 import { config, desktop } from "@ace/host/config";
 
+import { command } from "./command";
 import { helper as control } from "./helper";
 import { native as inspection } from "./native";
 import type { DesktopRPC } from "./protocol";
@@ -23,6 +24,11 @@ const lane = desktop(identifier, profile);
 const helper = control(identifier, !!lane);
 const updates = updater(helper, version, channel);
 const native = inspection(profile ? `${identifier}.${profile}` : identifier);
+const cli = command(
+	channel === "stable" ? "ace" : `ace-${channel}`,
+	join(dirname(process.execPath), "Ace Helper"),
+	join(homedir(), ".local", "bin"),
+);
 const url = appUrl();
 const secret = token();
 const windows = new Set<BrowserWindow>();
@@ -73,6 +79,12 @@ function controls(target: () => BrowserWindow) {
 				native: ({ token, action }) => {
 					authorize(token);
 					return native.act(action);
+				},
+				command: ({ token, action }) => {
+					authorize(token);
+					// A checkout's build has no Ace Helper of its own; its CLI is bun ace from that checkout.
+					if (lane) throw new Error("Use bun ace from this build's checkout.");
+					return cli.act(action);
 				},
 				notify: ({ token, title, body }) => {
 					authorize(token);

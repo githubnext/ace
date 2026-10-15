@@ -58,6 +58,18 @@ export type UpdateAction =
 	| { op: "status" | "check" | "install" | "cancel" | "recover" }
 	| { op: "automatic"; value: boolean };
 
+export type CommandState = {
+	/** `ace` for stable; other apps add their channel, so each app's command targets its own data. */
+	name: string;
+	path: string;
+	/** `other` is a file Ace didn't link; `stale` links to another or a moved Ace. */
+	link: "installed" | "missing" | "other" | "stale";
+	/** What the person's interactive login shell runs for `name`. */
+	shell?: string;
+};
+
+export type CommandAction = "status" | "install" | "remove";
+
 /** Native actions are separate from the host and never available to tailnet peers. */
 export type DesktopRPC = {
 	bun: {
@@ -69,6 +81,7 @@ export type DesktopRPC = {
 			helper: { params: { token: string; action: HelperAction }; response: HelperState };
 			native: { params: { token: string; action: NativeAction }; response: NativeState };
 			updates: { params: { token: string; action: UpdateAction }; response: UpdateState };
+			command: { params: { token: string; action: CommandAction }; response: CommandState };
 			notify: { params: { token: string; title: string; body: string }; response: null };
 		};
 		messages: {};

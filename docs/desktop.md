@@ -30,6 +30,12 @@ channel sidebar. Project paths are scoped to their host until repository-based i
   re-enabled. Sleep and logout can take local channels offline.
 - CLI and desktop use the same catalog and credentials. Keep `~/.local/state/ace` for channel data;
   store nonsecret preferences under `~/Library/Application Support/Ace` on macOS.
+- The app's command line tool is Ace Helper itself: started under any other name, it runs the CLI
+  with its app's data directory, port, and Keychain service, and spawns workers as Ace Helper.
+  Settings → This Mac links `~/.local/bin/ace`, or `ace-<channel>` for other channels, to the
+  bundle's helper. It needs no administrator rights, adds no second compiled runtime, and keeps
+  `Contents/Helpers`, which is first on agents' `PATH`, limited to lane. Install replaces only a
+  link to another Ace and refuses other files; a translocated app can't install a link.
 - Resolve application resources from the bundle and keep writable state outside it. Development
   builds have a distinct service identity so they do not replace the installed helper.
 
@@ -269,8 +275,9 @@ available as `ace tabs` and `ace tab rename` when the CLI is on `PATH`.
 The Chat tab keeps the channel's name; use `ace rename` to change that name instead.
 
 The commands connect to an already running local host and never start one. Use its `ACE_HOME`
-profile and pass `--port <port>` when it differs from `ACE_PORT` or the default 4140. For example,
-the installed canary uses `ACE_HOME="$HOME/.local/state/ace-canary"` and `--port 4142`; the development
+profile and pass `--port <port>` when it differs from `ACE_PORT` or the default 4140. The command the
+installed app links from Settings → This Mac, such as `ace-canary tabs`, already targets its app. For
+a source CLI, the installed canary uses `ACE_HOME="$HOME/.local/state/ace-canary"` and `--port 4142`; the development
 app uses `ACE_HOME="$HOME/.local/state/ace-dev"` and `--port 4141`. Authentication checks the host's
 identity and protocol before connecting. Listing or renaming tabs over the tailnet is unavailable.
 

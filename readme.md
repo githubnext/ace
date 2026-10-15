@@ -62,7 +62,11 @@ and creates no channel. Dashboard and Channels share the project picker; start a
 the project's dashboard or sidebar. Each project remembers its selected channel.
 
 Settings → This Mac shows Git, shell, and Tailscale status, joins the
-[team directory](#team-directory), and has Start, Stop, and Restart controls for Ace Helper.
+[team directory](#team-directory), has Start, Stop, and Restart controls for Ace Helper, and installs
+the command line tool. Install links `ace` for stable, or `ace-canary` for Canary, in
+`~/.local/bin` to the app's own Ace Helper, so it uses that app's channels and port with no
+environment variables and stays current with app updates. Settings says whether your shell finds it
+and, if not, what to add to your `PATH`. Remove deletes only that link.
 Quitting the UI leaves hosting available. Stopping the helper takes local channels offline and suspends
 their work; restarting it and reopening a channel resumes that work.
 

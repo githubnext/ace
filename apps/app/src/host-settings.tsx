@@ -4,6 +4,7 @@ import { Button } from "@ace/ui";
 import type { HelperAction, HelperState } from "@ace/desktop/protocol";
 import type { Diagnostics } from "@ace/host/protocol";
 
+import { CommandLine } from "./command-settings";
 import { desktop } from "./desktop";
 import { TeamDirectory } from "./directory-settings";
 import { host } from "./host";
@@ -180,6 +181,7 @@ export function HostStatus({ active }: { active: boolean }) {
 								</>
 							)}
 					</Row>
+					<CommandLine active={active} />
 				</Group>
 			)}
 			{status !== "open"
