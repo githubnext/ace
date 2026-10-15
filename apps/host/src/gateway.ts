@@ -71,6 +71,7 @@ function local(): Listing[] {
 		const {
 			id,
 			name: channel,
+			prefix,
 			summary,
 			revision,
 			owner,
@@ -85,6 +86,7 @@ function local(): Listing[] {
 			id,
 			host: name,
 			name: channel,
+			prefix,
 			summary,
 			revision,
 			owner,

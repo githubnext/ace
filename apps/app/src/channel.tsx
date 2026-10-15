@@ -28,11 +28,13 @@ export type ChannelDraft = { channel: string; text: string };
 
 type Props = {
 	channel: Listing;
+	channels: Listing[];
 	user: string;
 	remote: boolean;
 	draft?: ChannelDraft;
 	onDraftLoaded: () => void;
 	onSettings?: () => void;
+	onOpen: (channel: Listing) => void;
 };
 
 const LINK = /https?:\/\/[^\s<>()[\]{}"'`]+/g;
@@ -197,7 +199,9 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 }
 
 /** A channel's tabs: its chat, plus Diff and Terminal views of that chat's lane. */
-export function Channel({ channel, user, remote, draft, onDraftLoaded, onSettings }: Props) {
+export function Channel(
+	{ channel, channels, user, remote, draft, onDraftLoaded, onSettings, onOpen }: Props,
+) {
 	const [changed, setChanged] = useState<boolean>();
 	const check = useRef({ busy: false, again: false });
 
@@ -242,11 +246,13 @@ export function Channel({ channel, user, remote, draft, onDraftLoaded, onSetting
 					return (
 						<Conversation
 							channel={channel}
+							channels={channels}
 							chat={chat}
 							user={user}
 							draft={draft?.channel === channel.id ? draft.text : undefined}
 							onDraftLoaded={onDraftLoaded}
 							onSettings={!remote && !channel.hosted ? onSettings : undefined}
+							onOpen={onOpen}
 							onWork={inspect}
 						/>
 					);

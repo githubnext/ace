@@ -612,6 +612,7 @@ type GroupProps = {
 	onRowLeave?: () => void;
 	onReact?: (uid: string, emoji: string) => void;
 	onLink?: (href: string) => void;
+	openSender?: TimelineProps["openSender"];
 	onFileOpen?: (file: string) => void;
 	onDiffFileOpen?: (file: string) => void;
 	onReviewChanges?: () => void;
@@ -621,8 +622,18 @@ type GroupProps = {
 };
 
 function frame(
-	{ group, turn, width, currentUser, alignment, avatars, hover, openWorking, settlingWorking }:
-		GroupProps,
+	{
+		group,
+		turn,
+		width,
+		currentUser,
+		alignment,
+		avatars,
+		hover,
+		openWorking,
+		settlingWorking,
+		openSender,
+	}: GroupProps,
 ) {
 	let content = width - PAD * 2 - AVATAR - AVATAR_GAP;
 	let text = content - BUBBLE_PAD_X * 2;
@@ -633,6 +644,9 @@ function frame(
 		? group.display || String(group.sender || "User")
 		: group.display || (group.run ? "Ace" : "ace");
 	let name = label;
+	let open = group.role === "user" && group.sender != null
+		? openSender?.(String(group.sender))
+		: undefined;
 	let hasByline = group.rows.length > 0;
 	let own = !!currentUser && group.role === "user"
 		&& (currentUser.own
@@ -667,6 +681,7 @@ function frame(
 		workingSettling,
 		label,
 		name,
+		open,
 		hasByline,
 		own,
 		mine,
@@ -784,7 +799,7 @@ function GroupAvatar({ props, state }: GroupRender) {
 }
 
 function GroupByline({ state }: { state: GroupState }) {
-	let { hasByline, mine, name, agent, tone, title, date, edit, editTitle } = state;
+	let { hasByline, mine, name, open, agent, tone, title, date, edit, editTitle } = state;
 	return (
 		<>
 			{hasByline && (
@@ -800,9 +815,22 @@ function GroupByline({ state }: { state: GroupState }) {
 						paddingInlineEnd: mine ? 4 : 0,
 					}}
 				>
-					<span className="min-w-0 truncate font-medium text-foreground" title={name}>
-						{name}
-					</span>
+					{open
+						? (
+							<button
+								type="button"
+								className="min-w-0 truncate font-medium text-foreground hover:underline"
+								title={name}
+								onClick={open}
+							>
+								{name}
+							</button>
+						)
+						: (
+							<span className="min-w-0 truncate font-medium text-foreground" title={name}>
+								{name}
+							</span>
+						)}
 					{agent && (
 						<span
 							className="min-w-0 truncate text-[0.625rem] font-medium"
@@ -1067,6 +1095,8 @@ type TimelineProps =
 		target?: string;
 		/** Called when the user clicks a rendered message link. */
 		onLink?: (href: string) => void;
+		/** How to open a sender whose name links somewhere, such as the channel that sent it. */
+		openSender?: (sender: string) => (() => void) | undefined;
 		/** Called when the user clicks a resolved document reference. */
 		onDocumentOpen?: (uid: DocumentCandidate["uid"]) => void;
 		/** Called when the user clicks the reserved Plan reference. */
@@ -1117,6 +1147,7 @@ function useTimeline(
 		onReact,
 		target,
 		onLink,
+		openSender,
 		onDocumentOpen,
 		onPlanOpen,
 		onFileOpen,
@@ -1482,6 +1513,7 @@ function useTimeline(
 		onRowLeave,
 		onReact,
 		onLink,
+		openSender,
 		onFileOpen,
 		onDiffFileOpen,
 		onReviewChanges,
@@ -1530,6 +1562,7 @@ function Timeline(input: TimelineProps) {
 		onRowLeave,
 		onReact,
 		onLink,
+		openSender,
 		onFileOpen,
 		onDiffFileOpen,
 		onReviewChanges,
@@ -1631,6 +1664,7 @@ function Timeline(input: TimelineProps) {
 									onRowLeave={onRowLeave}
 									onReact={onReact}
 									onLink={onLink}
+									openSender={openSender}
 									onFileOpen={onFileOpen}
 									onDiffFileOpen={onDiffFileOpen}
 									onReviewChanges={onReviewChanges}
