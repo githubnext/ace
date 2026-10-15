@@ -179,10 +179,11 @@ export function Composer(
 		name: value.modelId,
 		vendor: value.provider,
 	}));
-	if (model === "auto") choices.unshift({ id: "auto", name: "Automatic", vendor: "" });
-	else if (!choices.some((value) => value.id === model)) {
+	if (model !== "auto" && !choices.some((value) => value.id === model)) {
 		choices.unshift({ id: model, name: model.split("/").slice(1).join("/"), vendor: "" });
 	}
+	// Automatic stays offered so a chat whose model lost its key can hand the choice back.
+	choices.unshift({ id: "auto", name: "Automatic", vendor: "" });
 	const { blocked, refused, onText } = useInvocation(shared, channel.owner === user, mode);
 	const changeMode = (value: string) => {
 		chosen.set(channel.id, value);
@@ -223,7 +224,9 @@ export function Composer(
 					text: body,
 					...encoded,
 					// An unpicked model lets the channel replace a chat model whose provider lost its key.
-					...(picked ? { model: { provider: provider!, modelId: rest.join("/") } } : {}),
+					...(picked && picked !== "auto"
+						? { model: { provider: provider!, modelId: rest.join("/") } }
+						: {}),
 				});
 			} else {
 				await host.channel(channel.id, {
@@ -262,7 +265,7 @@ export function Composer(
 				mentions={MENTIONS}
 				models={choices}
 				model={model}
-				onModelChange={(value) => changePick({ model: value === "auto" ? undefined : value })}
+				onModelChange={(value) => changePick({ model: value })}
 				efforts={efforts}
 				effort={effort}
 				onEffortChange={(value) => changePick({ model: picked, effort: value as Effort })}
