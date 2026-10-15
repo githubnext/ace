@@ -672,6 +672,11 @@ async function handle(
 
 function websocket(): Bun.WebSocketHandler<Client> {
 	return {
+		// Past the limit Bun drops frames silently, and a watch that loses one, such as a run's end,
+		// stays wrong; closing makes the client reconnect and re-watch. Screenshot-heavy chats replay
+		// tens of megabytes to a renderer that reads slowly while it draws them.
+		backpressureLimit: 128 * 1024 * 1024,
+		closeOnBackpressureLimit: true,
 		open(socket) {
 			sockets.add(socket);
 			log("info", "gateway.open", { user: socket.data.user, peer: socket.data.peer });
