@@ -469,7 +469,9 @@ that keep their stored setting, and those without one stay shared. Turning shari
 teammates can run commands as the owner on this host. Turning it off prevents new collaborator
 invocations; active work continues until stopped or killed, and teammates keep reading and posting
 human messages. The teammate composer holds an invoking draft instead of sending it while sharing
-is off.
+is off. An agent's invoked message from another channel on the same host is not a collaborator
+invocation: that agent already runs as the owner's user, so it starts the target chat's agent with
+sharing off. Gateways rewrite every client's author, so only a local worker can send an agent author.
 
 A separate owner-controlled desktop-tools toggle gates native desktop tool dispatch for the entire
 channel: owner and collaborator runs, all chats, and subagents. New channels start with it off;

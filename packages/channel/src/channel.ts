@@ -510,7 +510,9 @@ export class Channel {
 		room.checkImages(request.images);
 		const settings = await this.#harness.snapshot(SettingsDoc, context);
 		const isOwner = request.author === this.#options.owner;
-		if (!isOwner && settings?.shared === false) {
+		// Hosts rewrite every client's author, so an agent author is another channel's agent on this
+		// host, already running as the owner's user. Sharing gates teammates, not those handoffs.
+		if (!isOwner && !room.isAgent(request.author) && settings?.shared === false) {
 			throw new Error("Only the owner can invoke agents here");
 		}
 		const conversation = await this.#conversation(request.chat);
