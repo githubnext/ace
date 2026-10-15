@@ -20,6 +20,8 @@ export type HostInfo = {
 	home: string;
 	pid: number;
 	helper: boolean;
+	/** Ace Helper's app version; outside the proof, so older listeners and clients stay compatible. */
+	version?: string;
 };
 
 /** A place a channel can move to: "local" for this host, or a hosting service's base URL. */
@@ -35,6 +37,8 @@ export type Diagnostics = {
 		state: "missing" | "offline" | "running" | "error";
 		name?: string;
 		error?: string;
+		/** Served with ace serve --loopback: no tailnet listener, peers, or directory entry. */
+		loopback?: boolean;
 	};
 	/**
 	 * `error` is the last directory sync's failure and `failed` when it happened; a successful sync

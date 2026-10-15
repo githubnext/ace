@@ -245,7 +245,9 @@ The helper compiles with Bun 1.4 or newer and dispatches channel workers through
 The UI keeps Electrobun's bundled Bun version to match its native FFI callbacks. The helper resolves web
 assets from its application bundle and writes its log under the channel data directory. Closing a
 window or quitting the desktop leaves the helper running; reopening the UI verifies the host's
-protocol, data directory, and a fresh proof of ownership before attaching.
+protocol, data directory, and a fresh proof of ownership before attaching. When another Ace
+answers on the port, errors name it from its PID (app, version, and bundle path, or a command-line
+host's command) and say what this caller can do. Only this app's own helper is ever offered a restart.
 
 The host stores a private owner token in `host.token` with mode 0600. The native UI supplies it only
 to its local webview; `ace open` supplies it in a URL fragment that the app immediately removes.
@@ -519,6 +521,8 @@ team's existing trust and do not define another way for a participant to join th
 Each host's gateway serves its owner's app over loopback. Its tailnet listeners name each caller
 with `tailscale whois` and accept peer hosts or the owner's browser from an allowed origin.
 Teammates use their own host to reach shared channels. Local-only settings remain on loopback.
+`ace serve --loopback`, which `bun desktop dev` uses, has no tailnet listeners, peers, or directory
+entry, since another host on the same machine would publish under its tailnet name.
 Hosts find online, untagged peers through `tailscale status`. A host shows its app every peer's
 channels and proxies their requests; the peer that runs a channel stamps every author. Only a
 channel's host creates it; only the host's owner, from any of their machines, archives, deletes,

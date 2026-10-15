@@ -1,12 +1,12 @@
 import { existsSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { Utils } from "electrobun/bun";
 
 import { token } from "@ace/host/auth";
 import { config } from "@ace/host/config";
 import { GatewayClient } from "@ace/host/gateway-client";
-import { health } from "@ace/host/health";
+import { health, HostConflict } from "@ace/host/health";
 
 import type { HelperAction, HelperState } from "./protocol";
 import { service } from "./service";
@@ -40,8 +40,33 @@ export function helper(identifier: string, lane: boolean) {
 		`This development build only uses the Ace host started by bun run dev from its checkout, on port ${config.port}.`;
 	let changing = false;
 
+	// Restarting the listener only helps when it is this app's own helper from another build.
+	function advise(conflict: HostConflict): Error {
+		const { listener } = conflict;
+		if (lane) {
+			return new Error(
+				`${conflict.message} Leave it running and start this checkout with ACE_PORT set to a free port and bun desktop dev.`,
+			);
+		}
+		if (!listener.helper) {
+			return new Error(`${conflict.message} Stop that ace serve, then reopen Ace.`);
+		}
+		if (listener.bundle === resolve(dirname(process.execPath), "..", "..")) {
+			return new Error(
+				`${conflict.message} It is this app's Ace Helper from another build. Run launchctl kickstart -k gui/${
+					process.getuid!()
+				}/${identifier}.helper in Terminal, then reopen Ace.`,
+			);
+		}
+		return new Error(
+			`${conflict.message} Leave it running and use that app, or open it, choose Stop in its Ace Helper settings, and reopen this one.`,
+		);
+	}
+
 	async function info() {
-		const found = await health(config.port);
+		const found = await health(config.port).catch((error) => {
+			throw error instanceof HostConflict ? advise(error) : error;
+		});
 		if (found && found.home !== config.home) {
 			throw new Error(
 				`Port ${config.port} belongs to an Ace host using a different data directory`,

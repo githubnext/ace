@@ -15,7 +15,7 @@ import { serve } from "./gateway";
 import type { GatewayClient, Watch } from "./gateway-client";
 import { forget, store } from "./keys";
 import { dir as logDir, failure, log, open as openLog } from "./log";
-import { health } from "./health";
+import { health, HostConflict } from "./health";
 import { type Filter, follow, print } from "./logs";
 import * as loopback from "./loopback";
 import { preference } from "./preferences";
@@ -50,7 +50,8 @@ const HELP = `ace — channels on this host
   ace directory [<url> | off]                    the team's directory, which lists every host's channels;
                                                  a running host checks it with ACE_SECRET first
   ace web [<url> | off]                          the deployed web app your devices may use with this host
-  ace serve [--port 4140]                         serve the app and its WebSocket gateway
+  ace serve [--port 4140] [--loopback]            serve the app and its WebSocket gateway;
+                                                 --loopback stays off the tailnet and the directory
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
   ace open [--port 4140]                          open this host's authenticated app
@@ -84,6 +85,7 @@ const { values: flags, positionals } = parseArgs({
 		lines: { type: "string", short: "n" },
 		follow: { type: "boolean", short: "f" },
 		json: { type: "boolean" },
+		loopback: { type: "boolean" },
 		help: { type: "boolean", short: "h" },
 	},
 });
@@ -250,6 +252,15 @@ function printTabs(windows: WindowInfo[]): void {
 	}
 }
 
+/** Another Ace's host keeps its port; this command reaches its own host on another one. */
+function advice(conflict: HostConflict): string {
+	if (conflict.reason === "owner") {
+		return `Leave it running. Pass --port for this host, or set ACE_HOME=${conflict.home} to use that one.`;
+	}
+	// Two hosts must never share a data directory, so this ace gets its own home as well as a port.
+	return "Leave it running. Use an ace from the same version, or give this ace its own host: set ACE_HOME and ACE_PORT to unused values and run ace serve --loopback.";
+}
+
 async function main() {
 	if (flags.help || !command) return console.log(HELP);
 	// Shells start background jobs with SIGINT ignored and Bun keeps that, so `kill -INT` would not
@@ -355,7 +366,7 @@ async function main() {
 			return;
 		}
 		case "serve":
-			return serve(Number(flags.port || config.port));
+			return serve(Number(flags.port || config.port), !!flags.loopback);
 		case "key": {
 			const name = rest[0];
 			if (!name || !/^[A-Z][A-Z0-9_]*$/.test(name)) {
@@ -486,6 +497,7 @@ main().then(
 	(error: Error) => {
 		log("error", "cli.failed", { command, ...failure(error) });
 		console.error(error.message);
+		if (error instanceof HostConflict) console.error(advice(error));
 		process.exit(1);
 	},
 );

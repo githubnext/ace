@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { Subprocess } from "bun";
 
 import { config, desktop } from "@ace/host/config";
-import { health } from "@ace/host/health";
+import { describe, health, HostConflict } from "@ace/host/health";
 
 import { devIdentity } from "./sign";
 import { run } from "./downloads";
@@ -82,14 +82,20 @@ async function dev(): Promise<void> {
 		throw new Error(`Port ${config.port} belongs to an installed Ace. Choose another ACE_PORT.`);
 	}
 	// Attaching to an existing listener would serve another run's or checkout's code.
-	const running = await health(config.port).catch(() => {
+	const running = await health(config.port).catch((error) => {
 		throw new Error(
-			`Port ${config.port} is used by another Ace or program. Leave it running and set ACE_PORT to run this checkout on another port.`,
+			`${
+				error instanceof HostConflict
+					? error.message
+					: `Port ${config.port} is used by another program.`
+			} Leave it running and set ACE_PORT to run this checkout on another port.`,
 		);
 	});
 	if (running) {
 		throw new Error(
-			`Port ${config.port} already has an Ace host (PID ${running.pid}) for ${running.home}. Stop it, or set ACE_PORT.`,
+			`Port ${config.port} already has this checkout's Ace host: ${
+				describe(running).text
+			}. Stop it, or set ACE_PORT.`,
 		);
 	}
 	// Other Ace settings in the environment belong to other hosts, such as directory publishing.
@@ -111,6 +117,9 @@ async function dev(): Promise<void> {
 		"--no-env-file",
 		join(root, "..", "host", "src", "cli.ts"),
 		"serve",
+		// Its port is this checkout's, so teammates couldn't reach it, and a directory entry under
+		// this machine's name would replace the installed Ace's.
+		"--loopback",
 	], { env, stdio: ["ignore", "inherit", "inherit"] });
 	try {
 		const deadline = Date.now() + 30_000;

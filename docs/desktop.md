@@ -162,7 +162,9 @@ rebuilds. A separate checkout profile, stored in the signed bundle, keeps the ex
 WebKit storage partition, and port from 4200 to 4999. The hash is derived from the checkout path;
 it is not part of the app's macOS identity. Other `ACE_*`
 settings in the environment are ignored, except `ACE_PORT` to move the run off a port used by
-another checkout and `ACE_*_API_KEY` credentials. A run refuses any listener already on its port.
+another checkout and `ACE_*_API_KEY` credentials. A run refuses any listener already on its port
+and names it: its app, version, and path, or a command-line host's PID and command. The host runs
+with `ace serve --loopback`, so it stays off the tailnet and out of the team directory.
 The profile starts without provider keys; add one in Settings or pass it in the environment. It
 persists across runs. Changing the app's identity does not move or reset channel data. WebKit
 uses a persistent `ace-dev-<hash>` partition under the shared dev identity. Old checkout-specific
@@ -233,6 +235,13 @@ registered copy. Refresh its registration with
 then open Ace and enable Ace Helper. In Settings → This Mac, try restarting the helper, then stopping
 and starting it. Keep the `ace-dev` data, preferences, and Keychain service. Changing the signing
 identity may require approving Keychain access again. This build is signed locally, not notarized.
+
+## Test hosts
+
+`ace serve --loopback` runs a host that only listens on 127.0.0.1. It doesn't bind the tailnet,
+find peers, or publish to the team directory; Settings says so under Tailscale. Give a disposable
+host its own `ACE_HOME`, `ACE_CONFIG_HOME`, `ACE_KEYCHAIN_SERVICE`, and port. A busy port's error
+names the Ace on it and never asks to restart a listener that belongs to another app or checkout.
 
 ## Browser development
 

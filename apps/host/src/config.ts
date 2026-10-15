@@ -20,6 +20,10 @@ export const config = {
 	app: process.env.ACE_APP_DIR || fileURLToPath(new URL("../../app/dist", import.meta.url)),
 	appUrl: process.env.ACE_APP_URL,
 	helper: false,
+	/** Ace Helper's app version, reported by /health so a conflict can name the build on the port. */
+	version: undefined as string | undefined,
+	/** Set by ace serve --loopback; the host stays off the tailnet and the team directory. */
+	loopback: false,
 	worker: [
 		process.execPath,
 		"--no-env-file",

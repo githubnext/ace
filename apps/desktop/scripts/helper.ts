@@ -81,6 +81,8 @@ run([
 	`ACE_IDENTIFIER=${JSON.stringify(identifier)}`,
 	"--define",
 	`ACE_PROFILE=${JSON.stringify(profile) || "undefined"}`,
+	"--define",
+	`ACE_VERSION=${JSON.stringify(version)}`,
 	"--outfile",
 	join(bin, "Ace Helper"),
 ]);
