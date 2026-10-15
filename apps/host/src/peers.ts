@@ -15,14 +15,15 @@ export function url(machine: Machine): string {
 	return `ws://${address}:${port()}/ws`;
 }
 
-/** `github` is the peer owner's GitHub login, from its hello. */
-type Peer = { machine: Machine; client: GatewayClient; github?: string };
+type Peer = { machine: Machine; client: GatewayClient };
 
 /** One listing connection per online peer, kept only while the peer answers. */
 const hosts = new Map<string, Peer>();
 const listeners = new Set<() => void>();
 /** Each peer's channels as it last answered, listed as offline while the peer is unreachable. */
 const remembered = new Map<string, Listing[]>();
+/** Peer owners' GitHub logins by Tailscale login, from their last hello, so remembered channels keep their owner's name and avatar. */
+const named: People = {};
 
 function emit() {
 	for (const listener of listeners) listener();
@@ -44,8 +45,9 @@ async function discover(signal: AbortSignal) {
 		const host: Peer = { machine, client };
 		client.onOpen = () => {
 			client.request<Hello>({ op: "hello" }).then((hello) => {
-				if (hello.github === host.github) return;
-				host.github = hello.github;
+				// A freshly started peer answers before `gh` has told it its owner's login.
+				if (!hello.github || named[machine.login] === hello.github) return;
+				named[machine.login] = hello.github;
 				emit();
 			}, () => {});
 		};
@@ -96,11 +98,9 @@ export function unreachable(): Listing[] {
 	);
 }
 
-/** Reachable peers' owners' GitHub logins. */
+/** Peers' owners' GitHub logins as they last answered, reachable or not. */
 export function people(): People {
-	const people: People = {};
-	for (const { machine, github } of hosts.values()) if (github) people[machine.login] = github;
-	return people;
+	return named;
 }
 
 /** The peer that runs a channel, if it is reachable. */
