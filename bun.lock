@@ -139,6 +139,19 @@
         "wrangler": "catalog:cloudflare",
       },
     },
+    "services/compute": {
+      "name": "@ace/compute-pilot",
+      "dependencies": {
+        "@ace/channel": "workspace:*",
+        "@earendil-works/chord": "catalog:pi",
+        "@earendil-works/pi-durable": "catalog:pi",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "catalog:cloudflare",
+        "@types/bun": "catalog:bun",
+        "wrangler": "catalog:cloudflare",
+      },
+    },
     "services/directory": {
       "name": "@ace/directory",
       "devDependencies": {
@@ -220,6 +233,8 @@
     "@ace/channel": ["@ace/channel@workspace:packages/channel"],
 
     "@ace/channel-service": ["@ace/channel-service@workspace:services/channel"],
+
+    "@ace/compute-pilot": ["@ace/compute-pilot@workspace:services/compute"],
 
     "@ace/desktop": ["@ace/desktop@workspace:apps/desktop"],
 

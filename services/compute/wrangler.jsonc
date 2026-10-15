@@ -1,0 +1,20 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "ace-compute-pilot",
+	"main": "index.ts",
+	"compatibility_date": "2026-10-15",
+	"compatibility_flags": ["nodejs_compat"],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "CHANNEL", "class_name": "HostedChannel" },
+			{ "name": "COMPUTE", "class_name": "Compute" },
+		],
+	},
+	"containers": [{
+		"class_name": "Compute",
+		"scheduling_policy": "durable_object",
+		"images": { "base": { "dockerfile": "./Dockerfile" } },
+	}],
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["HostedChannel", "Compute"] }],
+	"observability": { "enabled": true },
+}

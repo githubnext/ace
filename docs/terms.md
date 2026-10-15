@@ -19,8 +19,10 @@ A channel that lives in a cell deployed by the team instead of on a host. Its to
 workspace. Hosted describes where the channel runs; Ace does not operate a hosting service.
 
 **Workspace**:
-The host that runs a hosted channel's tools, from lanes on its own disk. It connects out to the
-channel. While it is offline, the channel's tools wait for it; chat and model-only runs continue.
+The execution environment that runs a hosted channel's tools, from lanes on its filesystem.
+Today this is a host; the hosted-compute pilot also runs one in a team-deployed Linux container.
+It connects out to the channel. While it is offline, the channel's tools wait for it; chat and
+model-only runs continue.
 Not a project or a checkout.
 
 **Project**:
