@@ -40,6 +40,7 @@ const HELP = `ace — channels on this host
   ace kill <channel>                             stop all work in the channel now
   ace move <channel> --hosted <url> | --local    move an idle channel to a hosting service or back
   ace share <channel> on|off                     let others invoke agents
+  ace desktop <channel> on|off                   let the channel's agents use native desktop tools
   ace models
   ace model [provider/id|auto]                   show or set the model for a chat's first agent run
   ace key set <NAME>                             store a key in the OS keychain, read from stdin
@@ -437,6 +438,14 @@ async function main() {
 			if (!shared) return;
 			return console.log(
 				`Sharing is on for ${record.name}. Teammates can run commands as you on this machine.`,
+			);
+		}
+		case "desktop": {
+			const enabled = rest[0] === "on";
+			await request(record.id, { op: "desktop", author: catalog.user, enabled });
+			if (!enabled) return;
+			return console.log(
+				`Desktop tools are on for ${record.name}. Its agents can operate this machine's apps.`,
 			);
 		}
 		case "archive":
