@@ -23,6 +23,11 @@ const EXPANDED_CONTENT_PADDING_BOTTOM =
 	"data-[open=true]:pb-(--session-item-expanded-padding-bottom)";
 const TITLE_TO_EXPANDED_CONTENT_GAP = "data-[open=true]:mt-(--session-item-title-to-content-gap)";
 const EXPANDED_CONTENT_ROW_GAP = "gap-y-1";
+// The facepile and the actions sit side by side so pointing at a face never reaches pin, and
+// neither moves on hover. The 8px gap equals the spill of the pin's 40px hit area around its 24px
+// button, so that hit area ends at the facepile's edge; the facepile also stacks above it.
+const TRAILING =
+	"pointer-events-none absolute top-1/2 right-1 z-20 inline-flex -translate-y-1/2 items-center gap-2 *:pointer-events-auto";
 
 export type SessionItemProps = ComponentPropsWithRef<"button"> & {
 	data: SidebarRow;
@@ -245,7 +250,7 @@ function buttonClass(
 		hasActions
 			&& online === 0
 			&& "group-hover/row:pr-13 group-focus-within/row:pr-13 group-data-[menu-open=true]/menu:pr-13",
-		online > 0 && "pr-17",
+		online > 0 && (hasActions ? "pr-24" : "pr-17"),
 		className,
 	);
 }
@@ -400,21 +405,19 @@ export function SessionItem(
 						)
 						: line}
 				</button>
-				<span
-					className={cn(
-						"absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 transition-opacity duration-150 ease-out motion-reduce:transition-none",
-						hasActions
-							&& "group-hover/row:opacity-0 group-focus-within/row:opacity-0 group-data-[menu-open=true]/menu:opacity-0",
+				<span className={TRAILING}>
+					{data.online.length > 0 && (
+						<span className="relative z-1 inline-flex">
+							<Presence members={data.online} />
+						</span>
 					)}
-				>
-					<Presence members={data.online} />
+					<SessionActions
+						data={data}
+						pinned={pinned}
+						onPin={actionPin}
+						onUnpin={actionUnpin}
+					/>
 				</span>
-				<SessionActions
-					data={data}
-					pinned={pinned}
-					onPin={actionPin}
-					onUnpin={actionUnpin}
-				/>
 			</div>
 		</RowMenu>
 	);
