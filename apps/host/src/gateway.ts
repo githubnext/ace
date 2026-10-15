@@ -104,9 +104,14 @@ function local(): Listing[] {
 	});
 }
 
-/** Channels only the directory knows: their host is unreachable, unless they are hosted. */
+/** Channels only the directory or a peer's last answer knows: their host is unreachable, unless they are hosted. */
 function listed(seen: Set<string>): Listing[] {
-	return directory.read().channels.filter((value) => !seen.has(value.id) && value.host !== name)
+	return [...directory.read().channels, ...peers.unreachable()]
+		.filter((value) => {
+			if (seen.has(value.id) || value.host === name) return false;
+			seen.add(value.id);
+			return true;
+		})
 		.map((value) =>
 			Object.assign({}, value, {
 				state: value.state === "archived" || value.hosted ? value.state : "offline" as const,
