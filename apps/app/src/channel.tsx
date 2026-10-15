@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useReducer,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 
 import type { Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo, Listing } from "@ace/host/protocol";
@@ -11,6 +19,7 @@ import {
 	Sidebar,
 	useLayoutRight,
 } from "@ace/ui";
+import { IconCloud } from "@ace/ui/icons";
 
 import { ChannelAccess } from "./channel-access";
 import { EFFORTS } from "./composer";
@@ -104,7 +113,12 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 			value: channel.repo || channel.project.split("/").at(-1) || channel.project,
 			title: channel.project,
 		},
-		{ label: "Host", value: channel.host },
+		...(channel.hosted
+			? [
+				{ label: "Hosted", value: new URL(channel.hosted).host, title: channel.hosted },
+				{ label: "Workspace", value: channel.host },
+			]
+			: [{ label: "Host", value: channel.host }]),
 		{ label: "Owner", value: channel.owner.split("@")[0]!, title: channel.owner },
 		...(model
 			? [{
@@ -121,6 +135,20 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 			: []),
 		{ label: "Created", value: date.format(channel.created) },
 	];
+}
+
+/**
+ * A hosted channel's chat and model-only runs continue without its workspace; its tools wait for
+ * it (#349). Hosted listings never go offline, so only another listing from the workspace can say
+ * it is unreachable.
+ */
+function workspace(channel: Listing, channels: Listing[]): string | undefined {
+	if (!channel.hosted) return;
+	const away = channels.some((value) => value.host === channel.host && value.state === "offline");
+	if (away) {
+		return `${channel.host} is offline, so tools wait for it. Chat and model-only runs continue.`;
+	}
+	return `Tools run on ${channel.host} and wait while it's offline. Chat and model-only runs continue.`;
 }
 
 // Last read per repo and branch, so switching back to a channel shows its pull request at once.
@@ -163,6 +191,7 @@ function usePull(
 export function ChannelDetails({ channel }: { channel: Listing }) {
 	const right = useLayoutRight();
 	const details = useDetails(channel.id);
+	const channels = useSyncExternalStore(host.subscribe, () => host.channels);
 	const { changes, info, items } = details;
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
 	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy, right.open);
@@ -203,6 +232,7 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 				subagents={agents}
 				links={mentioned?.filter((link) => link.url !== pull?.url)}
 				facts={facts(channel, info)}
+				note={workspace(channel, channels)}
 				onDiff={details.diff}
 				onClose={() => right.setOpen(false)}
 			/>
@@ -248,7 +278,12 @@ export function Channel(
 	return (
 		<Layout
 			id={channel.id}
-			name={remote ? `${channel.name} · ${channel.host}` : channel.name}
+			name={channel.hosted
+				? `${channel.name} · hosted`
+				: remote
+				? `${channel.name} · ${channel.host}`
+				: channel.name}
+			icon={channel.hosted ? IconCloud : undefined}
 			chat={chat}
 			changed={changed}
 			opener={opener}

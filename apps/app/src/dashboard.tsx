@@ -8,7 +8,7 @@ import {
 	serialize,
 	type SessionSidebarRepo,
 } from "@ace/ui";
-import { IconChevronDown, IconHash, IconPlus } from "@ace/ui/icons";
+import { IconChevronDown, IconCloud, IconHash, IconPlus } from "@ace/ui/icons";
 import type { Listing } from "@ace/host/protocol";
 
 import { here } from "./desktop";
@@ -182,7 +182,14 @@ export function Dashboard(
 									onClick={() => onChannel(channel)}
 									className="flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30"
 								>
-									<IconHash className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+									{channel.hosted
+										? (
+											<IconCloud
+												className="size-4 shrink-0 text-muted-foreground"
+												aria-label="Hosted channel"
+											/>
+										)
+										: <IconHash className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
 									<span className="min-w-0 flex-1">
 										<span className="block truncate">{channel.name}</span>
 										{channel.summary && (

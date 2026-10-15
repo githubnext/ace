@@ -16,6 +16,7 @@ import {
 	CircleDashed,
 	CircleDot,
 	CircleX,
+	Cloud,
 	Code,
 	Columns2,
 	Command,
@@ -138,6 +139,7 @@ export const IconChevronRight = outline(ChevronRight);
 export const IconCircleCheck = outline(CircleCheck);
 export const IconCircleDashed = outline(CircleDashed);
 export const IconCircleX = outline(CircleX);
+export const IconCloud = outline(Cloud);
 export const IconCode = outline(Code);
 export const IconCollapseVertical = outline(FoldVertical);
 export const IconCommand = outline(Command);
