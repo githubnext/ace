@@ -141,7 +141,7 @@ files: a dormant channel is a closed SQLite file with no process. It is process 
 security boundary: every worker runs as the host's user and can read the others' files. Agents
 have full access to that user's execution environment by design. Collaborator invocation is
 controlled separately from the channel-wide native desktop tools gate. Neither switch is a shell
-security sandbox.
+security sandbox: shell commands keep the macOS permissions granted to Ace, such as Screen Recording.
 
 ## Host
 
@@ -500,7 +500,8 @@ tells the agent to ask the owner to turn it on from the channel header or with
 `ace desktop <channel> on`. Disabling it refuses subsequent native desktop calls, even within active runs;
 it does not cancel or undo calls already dispatched. Agent invocation and non-desktop tools remain
 available according to the sharing setting. This is a native tools gate, not a shell security
-sandbox: agents still run as the host's user and shell commands can access that user's environment.
+sandbox: agents still run as the host's user and shell commands can access that user's environment,
+including the macOS permissions granted to Ace, so `screencapture` still works with the toggle off.
 There are no per-participant desktop grants or per-call approval policies.
 
 Both settings live in pi's `ace.settings` session document. Watch metadata events carry their
