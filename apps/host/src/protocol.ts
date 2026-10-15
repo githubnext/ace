@@ -94,6 +94,8 @@ export type Listing = {
 	compute?: true;
 	/** A cloud compute start or stop under way here; the service refuses the channel until it ends. */
 	computing?: "starting" | "stopping";
+	/** The cloud compute workspace is stopped; the chat stays readable. Absent on older hosts. */
+	stopped?: true;
 	/** Where a move under way is taking the channel: a hosting service's host, or this host's name. */
 	moving?: string;
 	/** Its peer host stopped answering while relaying a request or watch here; absent on older hosts. */

@@ -55,7 +55,11 @@ export async function create(
 	const root = await project(dir);
 	const repo = await repoOf(root);
 	if (!repo) throw new Error("Run in cloud needs a project with a GitHub repository.");
-	const record: catalog.Listing = { ...catalog.draft(root, model, name, url), compute: true };
+	const record: catalog.Listing = {
+		...catalog.draft(root, model, name, url),
+		compute: true,
+		stopped: true,
+	};
 	await call(`${url}/workspaces/${record.id}/init`, {
 		method: "POST",
 		body: JSON.stringify({
@@ -77,14 +81,22 @@ export async function stop(id: string): Promise<void> {
 	const { hosted, compute } = catalog.read(id);
 	if (!compute) throw new Error("The channel does not run on cloud compute");
 	await call(`${hosted}/workspaces/${id}/stop`, { method: "POST", body: "{}" });
+	catalog.write({ ...catalog.read(id), stopped: true });
 }
 
 /** Starting again after a failure is the retry: the service replaces an incomplete start. */
 export async function start(id: string, waiting: (text: string | null) => void): Promise<void> {
 	const { hosted, compute } = catalog.read(id);
 	if (!compute) throw new Error("The channel does not run on cloud compute");
-	waiting("Starting the cloud workspace and cloning the repository…");
+	// The service restores its checkpoint when it has one; only a workspace without one clones.
+	const { checkpoint } = await call<{ checkpoint?: unknown }>(`${hosted}/workspaces/${id}/status`);
+	waiting(
+		checkpoint
+			? "Resuming the cloud workspace from its checkpoint…"
+			: "Starting the cloud workspace and cloning the repository…",
+	);
 	await call(`${hosted}/workspaces/${id}/start`, { method: "POST", body: "{}" });
+	catalog.write({ ...catalog.read(id), stopped: undefined });
 	waiting("Waiting for the cloud workspace to connect…");
 	const deadline = Date.now() + CONNECT_WAIT;
 	while (Date.now() < deadline) {

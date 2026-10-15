@@ -1,4 +1,5 @@
 import {
+	type CSSProperties,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -11,6 +12,7 @@ import {
 import type { Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo, Listing } from "@ace/host/protocol";
 import {
+	Badge,
 	type DetailsChanges,
 	type DetailsFact,
 	type DetailsLink,
@@ -154,6 +156,9 @@ function workspace(channel: Listing, channels: Listing[]): string | undefined {
 	const place = placement(channel);
 	if (place.kind === "local") return;
 	if (place.kind === "cloud") {
+		if (place.stopped) {
+			return `This channel's cloud workspace on ${place.service} is stopped, so tools fail until Start compute resumes it. Chat and model-only runs continue.`;
+		}
 		return `Tools run in this channel's cloud container on ${place.service}, without macOS permissions, and fail while it's stopped. Chat and model-only runs continue.`;
 	}
 	const { workspace } = place;
@@ -162,6 +167,17 @@ function workspace(channel: Listing, channels: Listing[]): string | undefined {
 		return `${workspace} is offline, so tools fail until it's back. Chat and model-only runs continue.`;
 	}
 	return `Tools run on ${workspace} and fail while it's offline. Chat and model-only runs continue.`;
+}
+
+/** The sidebar row's stopped dot, on the Chat tab's cloud icon. */
+function StoppedCloud({ className }: { className?: string }) {
+	return (
+		<Badge
+			style={{ "--badge-color": "var(--color-muted-foreground)", "--s": "5px" } as CSSProperties}
+		>
+			<IconCloud className={className} />
+		</Badge>
+	);
 }
 
 // Last read per repo and branch, so switching back to a channel shows its pull request at once.
@@ -293,13 +309,17 @@ export function Channel(
 		<Layout
 			id={channel.id}
 			name={place.kind === "cloud"
-				? `${channel.name} · cloud`
+				? `${channel.name} · ${place.stopped ? "stopped" : "cloud"}`
 				: place.kind === "hosted"
 				? `${channel.name} · hosted`
 				: remote
 				? `${channel.name} · ${channel.host}`
 				: channel.name}
-			icon={channel.hosted ? IconCloud : undefined}
+			icon={place.kind === "cloud" && place.stopped
+				? StoppedCloud
+				: channel.hosted
+				? IconCloud
+				: undefined}
 			chat={chat}
 			changed={changed}
 			opener={opener}

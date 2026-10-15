@@ -42,6 +42,9 @@ function resolveBadge(data: SidebarRow): { show: boolean; pulse: boolean; color?
 	if (data.connection === "warming") {
 		return { show: true, pulse: true, color: "var(--color-muted-foreground)" };
 	}
+	if (data.stopped) {
+		return { show: true, pulse: false, color: "var(--color-muted-foreground)" };
+	}
 	if (data.unreadCount > 0 && data.pr?.state === "draft") {
 		return { show: true, pulse: false, color: "var(--color-muted-foreground)" };
 	}
@@ -212,17 +215,20 @@ export function RowGlyph({ data, selected }: { data: SidebarRow; selected?: bool
 			{resolveIcon(data)}
 		</Badge>
 	);
-	if (data.connection !== "offline") return glyph;
-
-	// The gray dot alone doesn't say why the channel can't open (#361).
-	let offline = `Offline: ${data.host} is unreachable`;
+	// The gray dot alone doesn't say why the channel can't open (#361) or run tools.
+	let reason = data.connection === "offline"
+		? `Offline: ${data.host} is unreachable`
+		: data.stopped
+		? "Stopped: its cloud workspace isn't running"
+		: undefined;
+	if (!reason) return glyph;
 	return (
 		<Tooltip>
-			<TooltipTrigger render={<span role="img" aria-label={offline} className="grid" />}>
+			<TooltipTrigger render={<span role="img" aria-label={reason} className="grid" />}>
 				{glyph}
 			</TooltipTrigger>
 			<TooltipContent side="right" sideOffset={8}>
-				{offline}
+				{reason}
 			</TooltipContent>
 		</Tooltip>
 	);

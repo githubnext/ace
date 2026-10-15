@@ -49,6 +49,7 @@ import { MoveChannel } from "./move-channel";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import { Palette } from "./palette";
+import { placement } from "./placement";
 import { present } from "./presence";
 import { type AppProject, label, projects, title } from "./projects";
 import { Settings } from "./settings";
@@ -123,6 +124,7 @@ function row(
 	online: SidebarRow["online"],
 	outcome?: Outcome,
 ): SidebarRow {
+	const place = placement(channel);
 	return {
 		uid: channel.id,
 		kind: "session",
@@ -140,14 +142,18 @@ function row(
 			delete: channel.host === host,
 			move: channel.owner === user && channel.host === host && channel.state !== "archived"
 				&& !channel.compute,
-			compute: !!channel.compute && channel.host === host,
+			// The applicable action follows the transition's end, so none is offered during it.
+			compute: !!channel.compute && channel.host === host && !channel.computing,
 		},
-		connection: channel.state === "running"
+		connection: channel.computing
+			? "warming"
+			: channel.state === "running"
 			? "connected"
 			: channel.state === "offline"
 			? "offline"
 			: "idle",
 		host: channel.host,
+		stopped: place.kind === "cloud" && place.stopped,
 		agent: channel.state === "running" && channel.busy ? "thinking" : "idle",
 		unreadCount: outcome === "done" ? 1 : 0,
 		needsAttention: outcome === "failed",

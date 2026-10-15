@@ -44,6 +44,11 @@ export type Listing = {
 	/** The hosting service is a cloud compute service, whose own container serves the workspace. */
 	compute?: true;
 	/**
+	 * The compute workspace has no container: it was created stopped or stopped since. Only this
+	 * host's own start and stop change it; records before #426 omit it even when stopped.
+	 */
+	stopped?: true;
+	/**
 	 * A move in progress fences the channel: no worker starts and no client connects until the
 	 * move finishes or is resolved. `digest` names the snapshot an outbound move tried to activate.
 	 */

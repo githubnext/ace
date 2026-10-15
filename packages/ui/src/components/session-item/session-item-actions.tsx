@@ -358,20 +358,25 @@ export function RowMenu(
 									<>
 										<ContextMenu.Separator className={MENU_SEPARATOR} />
 										<ContextMenu.Group>
-											<ContextMenu.Item
-												className={MENU_ITEM}
-												onClick={(event) => compute(event, "stop")}
-											>
-												<Stop className="size-3.5" />
-												Stop compute
-											</ContextMenu.Item>
-											<ContextMenu.Item
-												className={MENU_ITEM}
-												onClick={(event) => compute(event, "start")}
-											>
-												<Play className="size-3.5" />
-												Start compute
-											</ContextMenu.Item>
+											{data.stopped
+												? (
+													<ContextMenu.Item
+														className={MENU_ITEM}
+														onClick={(event) => compute(event, "start")}
+													>
+														<Play className="size-3.5" />
+														Start compute
+													</ContextMenu.Item>
+												)
+												: (
+													<ContextMenu.Item
+														className={MENU_ITEM}
+														onClick={(event) => compute(event, "stop")}
+													>
+														<Stop className="size-3.5" />
+														Stop compute
+													</ContextMenu.Item>
+												)}
 										</ContextMenu.Group>
 										<ContextMenu.Separator className={MENU_SEPARATOR} />
 									</>

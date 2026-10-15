@@ -453,12 +453,17 @@ can **Run in cloud** on the team's [compute service](../services/compute/README.
 `user.name` and `user.email` as the author; it then saves the record with `hosted` set to the
 service and `compute`. The app calls `start` through the host, which waits for `runner.connected`
 in `status`, and invokes the agent only after that. Starting again is the retry after a failure.
-The channel's menu offers Stop compute (`stop`, which checkpoints first) and Start compute. The
-service freezes the hosted channel for a whole start or stop and refuses its connections, so the
-host's listing reports `computing` while one runs; the app opens the chat and reads its models only
-after it ends. Deleting the channel calls the service's `DELETE /workspaces/:id`, which removes
-the container, checkpoint, and hosted channel; if the service refuses, the host keeps the record so
-deleting can be retried.
+The record and listing carry `stopped` from creation until a start succeeds and again after a
+stop, so the channel's row and tab show it stopped and its menu offers only Start compute or Stop
+compute (`stop`, which checkpoints first). Only this host's start and stop change it: a container
+the service stops for inactivity still lists as running, and records from before `stopped` list
+as running until their next start or stop. A start reads `status` first and says it is resuming
+when the service has a checkpoint to restore; only a workspace without one clones the repository.
+The service freezes the hosted channel for a whole start or stop and refuses its connections, so
+the host's listing reports `computing` while one runs; the app opens the chat and reads its models
+only after it ends, and offers neither compute action until then. Deleting the channel calls the
+service's `DELETE /workspaces/:id`, which removes the container, checkpoint, and hosted channel; if
+the service refuses, the host keeps the record so deleting can be retried.
 The service's settings live in `settings.json` beside the default model; its secret is the team's
 `ACE_SECRET`.
 

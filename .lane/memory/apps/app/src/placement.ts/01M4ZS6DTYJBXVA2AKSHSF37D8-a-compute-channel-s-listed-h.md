@@ -4,8 +4,9 @@ anchor: function placement
 created: 2026-10-15T12:39:34Z
 norm: '1'
 sig: 2556efc053374bed
-body_hash: 2d6516ab8767d31e
-raw_hash: aead2ba4a33a6cc0
+body_hash: e5c7188d0aac1947
+raw_hash: 9aee899e18ad1fa6
+vouched: 2026-10-15T13:47:18Z
 lines: 12-17
 ---
 
