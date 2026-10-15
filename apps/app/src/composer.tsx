@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+	type ReactNode,
+	useEffect,
+	useReducer,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 
 import {
 	aceAvatar,
@@ -34,8 +41,9 @@ const EFFORTS: Record<Effort, string> = {
 	max: "Max",
 };
 const ACE = /(^|\s)@ace\b/i;
-// Channel views remount on navigation; a deliberate mode choice outlives them for this session.
+// Channel views remount on navigation; deliberate mode and model choices outlive them for this session.
 const chosen = new Map<string, string>();
+const picks = new Map<string, { model?: string; effort?: Effort }>();
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
 
@@ -146,9 +154,14 @@ export function Composer(
 			active = false;
 		};
 	}, [channel.id, mode, status, settingsVersion]);
-	const [picked, setPicked] = useState<string>();
+	const pick = `${channel.id}/${id}`;
+	const [, repick] = useReducer((count: number) => count + 1, 0);
+	const { model: picked, effort: pickedEffort } = picks.get(pick) || {};
+	const changePick = (value: { model?: string; effort?: Effort }) => {
+		picks.set(pick, value);
+		repick();
+	};
 	const model = picked || (current ? key(current) : "auto");
-	const [pickedEffort, setPickedEffort] = useState<Effort>();
 	const levels = models?.find((value) => key(value) === model)?.efforts;
 	const requestedEffort = pickedEffort
 		|| (current && key(current) === model ? currentEffort : undefined) || "off";
@@ -242,13 +255,10 @@ export function Composer(
 				mentions={MENTIONS}
 				models={choices}
 				model={model}
-				onModelChange={(value) => {
-					setPicked(value === "auto" ? undefined : value);
-					setPickedEffort(undefined);
-				}}
+				onModelChange={(value) => changePick({ model: value === "auto" ? undefined : value })}
 				efforts={efforts}
 				effort={effort}
-				onEffortChange={(value) => setPickedEffort(value as Effort)}
+				onEffortChange={(value) => changePick({ model: picked, effort: value as Effort })}
 				attachments={attached}
 				onAttachmentsChange={setAttached}
 				busy={busy}
