@@ -242,6 +242,8 @@ export type HostFrame =
 	| { id: number; ok: true; value: unknown }
 	| { id: number; ok: false; error: string }
 	| { id: number; event: Event }
+	/** What a pending request waits on, such as keychain access; null once it no longer waits. */
+	| { id: number; waiting: string | null }
 	| { rename: TabRename }
 	/** Local settings changed; clients reload model availability without receiving secrets. */
 	| { settings: true }

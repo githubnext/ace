@@ -41,6 +41,7 @@ import { useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
 import { host } from "./host";
 import { Rename } from "./layout/rename";
+import { MoveChannel } from "./move-channel";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import { Palette } from "./palette";
@@ -255,6 +256,7 @@ export function App() {
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
+	const [moving, setMoving] = useState<{ item: SidebarRow; target: MoveTarget }>();
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
 	const [pins, setPins] = useLocalStorage<string[]>("ace:pinned-channels", []);
@@ -538,12 +540,23 @@ export function App() {
 	}
 
 	async function move(item: SidebarRow, target: MoveTarget) {
-		const id = toast.loading(`Moving ${item.name} to ${target.label}…`);
+		const title = `Moving ${item.name} to ${target.label}…`;
+		const id = toast.loading(title);
 		try {
-			await host.request({ op: "move", channel: item.uid, target: target.target });
-			toast.success(`Moved ${item.name} to ${target.label}`, { id });
+			await host.move(
+				item.uid,
+				target.target,
+				(waiting) => toast.loading(title, { id, description: waiting ?? undefined }),
+			);
+			toast.success(`Moved ${item.name} to ${target.label}`, { id, description: undefined });
 		} catch (error) {
-			toast.error("Could not move channel", { id, description: (error as Error).message });
+			// A move can fail minutes after it started, so the reason stays until it is dismissed.
+			toast.error(`Could not move ${item.name}`, {
+				id,
+				description: (error as Error).message,
+				duration: Infinity,
+				action: { label: "Try again", onClick: () => void move(item, target) },
+			});
 		}
 	}
 
@@ -613,7 +626,9 @@ export function App() {
 											? (item) => setRenaming({ id: item.uid, name: item.name })
 											: undefined}
 										onMoveTargets={connected && !deployed ? moveTargets : undefined}
-										onMove={connected && !deployed ? move : undefined}
+										onMove={connected && !deployed
+											? async (item, target) => setMoving({ item, target })
+											: undefined}
 										onPin={(item) => setPins((value) => [...value, item.uid])}
 										onUnpin={(item) => setPins((value) => value.filter((id) => id !== item.uid))}
 										onToggleGroup={(id) =>
@@ -807,6 +822,18 @@ export function App() {
 							setDeleting(undefined);
 						}}
 						onCancel={() => setDeleting(undefined)}
+					/>
+				)}
+				{moving && (
+					<MoveChannel
+						name={moving.item.name}
+						target={moving.target.target}
+						label={moving.target.label}
+						onMove={() => {
+							setMoving(undefined);
+							void move(moving.item, moving.target);
+						}}
+						onCancel={() => setMoving(undefined)}
 					/>
 				)}
 				{settings && (

@@ -452,8 +452,13 @@ async function handle(
 			if (!catalog.owns(request.channel)) {
 				throw new Error("Move channels from the host that runs them");
 			}
-			await move(request.channel, request.target);
-			return broadcast();
+			try {
+				await move(request.channel, request.target, (waiting) => send({ id, waiting }));
+			} finally {
+				// A failed move lifts its fence, which listings and reopened chats must see.
+				await broadcast();
+			}
+			return;
 		case "delete":
 			terminals.closeChannel(request.channel);
 			deleting.add(request.channel);

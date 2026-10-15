@@ -73,12 +73,50 @@ export function targets(id: string): MoveTarget[] {
 /** A transfer whose answer never arrived may still have taken effect at the service. */
 class Unknown extends Error {}
 
-async function transfer<T>(url: string, id: string, body: object): Promise<T> {
+type Auth = Record<string, string>;
+
+/** Past this, a keychain prompt nobody answered fails the move instead of holding the request. */
+const KEYCHAIN_WAIT = 2 * 60_000;
+
+/**
+ * A keychain prompt holds the read until someone answers it, so credentials are read before the
+ * fence: the channel stays usable meanwhile, and `waiting` tells the app what the move waits on.
+ */
+async function credentials(waiting: (text: string | null) => void): Promise<Auth> {
+	let announced = false;
+	let timer: Timer | undefined;
+	const slow = setTimeout(() => {
+		announced = true;
+		waiting("Ace Helper is waiting for keychain access");
+	}, 1000);
+	const read = hostedAuth();
+	try {
+		return await Promise.race([
+			read,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => {
+					read.catch(() => {});
+					reject(
+						new Error(
+							"Ace Helper is still waiting for keychain access. Allow it in the keychain prompt, then retry.",
+						),
+					);
+				}, KEYCHAIN_WAIT);
+			}),
+		]);
+	} finally {
+		clearTimeout(slow);
+		clearTimeout(timer);
+		if (announced) waiting(null);
+	}
+}
+
+async function transfer<T>(auth: Auth, url: string, id: string, body: object): Promise<T> {
 	let response: Response;
 	try {
 		response = await fetch(`${url}/channels/${id}/transfer`, {
 			method: "POST",
-			headers: { ...await hostedAuth(), "content-type": "application/json" },
+			headers: { ...auth, "content-type": "application/json" },
 			body: JSON.stringify(body),
 		});
 	} catch (error) {
@@ -124,7 +162,7 @@ async function readLocal(id: string): Promise<Snapshot> {
 	}
 }
 
-async function toHosted(record: catalog.Listing, url: string): Promise<void> {
+async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promise<void> {
 	const { id } = record;
 	let digest = record.moving?.digest;
 	if (!digest) {
@@ -136,7 +174,7 @@ async function toHosted(record: catalog.Listing, url: string): Promise<void> {
 				throw new Error("The channel is too large to move yet");
 			}
 			// An import, answered or not, leaves the service inactive, so the local copy stays usable.
-			await transfer(url, id, { action: "import", config: hostedConfig(record), snapshot });
+			await transfer(auth, url, id, { action: "import", config: hostedConfig(record), snapshot });
 			digest = snapshot.digest;
 		} catch (error) {
 			catalog.write({ ...catalog.read(id), moving: undefined });
@@ -146,7 +184,7 @@ async function toHosted(record: catalog.Listing, url: string): Promise<void> {
 		catalog.write({ ...catalog.read(id), moving: { to: url, digest } });
 	}
 	try {
-		await transfer<ChannelInfo>(url, id, { action: "activate", digest });
+		await transfer<ChannelInfo>(auth, url, id, { action: "activate", digest });
 	} catch (error) {
 		if (error instanceof Unknown) {
 			throw new Error(
@@ -163,7 +201,7 @@ async function toHosted(record: catalog.Listing, url: string): Promise<void> {
 	remember(url);
 }
 
-async function toLocal(record: catalog.Listing): Promise<void> {
+async function toLocal(auth: Auth, record: catalog.Listing): Promise<void> {
 	const { id } = record;
 	const url = record.hosted!;
 	const { storage } = catalog.paths(id);
@@ -174,8 +212,8 @@ async function toLocal(record: catalog.Listing): Promise<void> {
 	try {
 		await park(id);
 		freezing = true;
-		const { digest } = await transfer<{ digest: string }>(url, id, { action: "freeze" });
-		const snapshot = await transfer<Snapshot>(url, id, { action: "export" });
+		const { digest } = await transfer<{ digest: string }>(auth, url, id, { action: "freeze" });
+		const snapshot = await transfer<Snapshot>(auth, url, id, { action: "export" });
 		if (snapshot.digest !== digest) {
 			throw new Error("The exported snapshot does not match the frozen channel");
 		}
@@ -193,7 +231,7 @@ async function toLocal(record: catalog.Listing): Promise<void> {
 		renameSync(incoming, storage);
 	} catch (error) {
 		if (freezing) {
-			await transfer(url, id, { action: "thaw" }).catch((cause: Error) =>
+			await transfer(auth, url, id, { action: "thaw" }).catch((cause: Error) =>
 				log("warn", "move.thaw.failed", { channel: id, error: cause.message })
 			);
 		}
@@ -205,20 +243,29 @@ async function toLocal(record: catalog.Listing): Promise<void> {
 	catalog.unlock(id);
 }
 
-/** Move a channel to `target`: "local" or a hosting service URL. The frozen source is kept, not deleted. */
-export async function move(id: string, target: string): Promise<void> {
+/** The channel's record, if it can move to `to` now: "local" or a canonical service URL. */
+function ready(id: string, to: string): catalog.Listing {
 	const record = catalog.read(id);
-	const to = target === "local" ? target : canonical(target);
 	// Only an outbound move whose activation went unanswered resumes; anything else starts fresh.
-	const retrying = !!record.moving?.digest && record.moving.to === to;
-	if (!retrying) movable(record);
+	if (!(record.moving?.digest && record.moving.to === to)) movable(record);
+	if (to === "local" && !record.hosted) throw new Error("The channel is already on this host");
+	if (to !== "local" && record.hosted) throw new Error("Move the channel to this host first");
+	return record;
+}
+
+/** Move a channel to `target`: "local" or a hosting service URL. The frozen source is kept, not deleted. */
+export async function move(
+	id: string,
+	target: string,
+	waiting: (text: string | null) => void = () => {},
+): Promise<void> {
+	const to = target === "local" ? target : canonical(target);
+	ready(id, to);
+	const auth = await credentials(waiting);
+	// The record may have changed during the wait; nothing from here awaits before the fence.
+	const record = ready(id, to);
 	log("info", "move.start", { channel: id, from: record.hosted || "local", to });
-	if (to === "local") {
-		if (!record.hosted) throw new Error("The channel is already on this host");
-		await toLocal(record);
-	} else {
-		if (record.hosted) throw new Error("Move the channel to this host first");
-		await toHosted(record, to);
-	}
+	if (to === "local") await toLocal(auth, record);
+	else await toHosted(auth, record, to);
 	log("info", "move.done", { channel: id, to });
 }
