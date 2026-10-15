@@ -40,11 +40,17 @@ export type Item =
 		tools: Tool[];
 		error?: string;
 		stopped?: boolean;
+		/** Queued messages withdrawn when the run was stopped. */
+		withdrawn?: QueuedMessage[];
 	};
 
 export type Transcript = {
 	items: Item[];
 	queue: QueuedMessage[];
+	/** Every message withdrawn from the queue while watched, for its author's composer. */
+	returned: QueuedMessage[];
+	/** Withdrawn messages waiting for their run's end, so the notice follows its "Stopped." */
+	withdrawn: QueuedMessage[];
 	/** Each tool call's group caption, by call ID. */
 	captions: Record<string, string>;
 	/** Each tool call's recap of the work it was part of, by call ID. */
@@ -61,6 +67,8 @@ export type Transcript = {
 const EMPTY: Transcript = {
 	items: [],
 	queue: [],
+	returned: [],
+	withdrawn: [],
 	captions: {},
 	recaps: {},
 	draft: "",
@@ -71,8 +79,16 @@ const EMPTY: Transcript = {
 /** Folds channel events into timeline items: tool calls attach to the reply that made them. */
 export function apply(state: Transcript, event: Event): Transcript {
 	switch (event.kind) {
-		case "queue":
-			return { ...state, queue: event.messages };
+		case "queue": {
+			if (!event.withdrawn) return { ...state, queue: event.messages };
+			const returned = [...state.returned, ...event.withdrawn];
+			if (state.busy) {
+				const withdrawn = [...state.withdrawn, ...event.withdrawn];
+				return { ...state, queue: event.messages, returned, withdrawn };
+			}
+			const items = withdraw(state.items, event.withdrawn);
+			return { ...state, queue: event.messages, returned, items };
+		}
 		case "message":
 			return {
 				...state,
@@ -172,8 +188,12 @@ export function apply(state: Transcript, event: Event): Transcript {
 		}
 		case "delta":
 			return { ...state, draft: state.draft + event.text };
-		case "run":
-			return { ...state, busy: event.state === "start", draft: "" };
+		case "run": {
+			const busy = event.state === "start";
+			if (busy || !state.withdrawn.length) return { ...state, busy, draft: "" };
+			const items = withdraw(state.items, state.withdrawn);
+			return { ...state, busy, draft: "", items, withdrawn: [] };
+		}
 		case "live":
 			return { ...state, live: true };
 		case "metadata": {
@@ -184,6 +204,25 @@ export function apply(state: Transcript, event: Event): Transcript {
 				: { ...state, shared, desktop };
 		}
 	}
+}
+
+/** The notice joins the stopped reply; a run stopped before replying gets a reply of its own. */
+function withdraw(items: Item[], messages: QueuedMessage[]): Item[] {
+	const last = items.at(-1);
+	if (last?.kind === "reply") {
+		const withdrawn = [...(last.withdrawn || []), ...messages];
+		return [...items.slice(0, -1), { ...last, withdrawn }];
+	}
+	const item: Item = {
+		kind: "reply",
+		key: `w${messages[0]!.submission}`,
+		at: Date.now(),
+		model: "",
+		text: "",
+		tools: [],
+		withdrawn: messages,
+	};
+	return [...items, item];
 }
 
 function pick(event: Extract<Event, { kind: "message" }>) {
