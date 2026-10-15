@@ -559,8 +559,10 @@ export class Channel {
 			);
 		}
 		if (model !== kept && !await usable(this.#options.models, model)) {
+			// getModel above found this model, so its provider is registered.
+			const name = this.#options.models.getProvider(model.provider)!.name;
 			throw new Error(
-				`Configure ${model.provider} for this channel before invoking an agent. Chat is still available.`,
+				`The ${name} API key is missing. Add it in Provider settings to invoke an agent. Chat is still available.`,
 			);
 		}
 		if (same) return;
