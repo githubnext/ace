@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import type { MoveTarget, SidebarRow } from "./session-item.types";
 import {
 	IconArchive as ArchiveContent2,
+	IconArchiveRestore as Unarchive,
 	IconExit as Leave,
 	IconFork as Fork,
 	IconInfo as Info,
@@ -127,11 +128,17 @@ export function SessionActions(
 					{pinned ? <PinSlash className="size-3.5" /> : <Pin className="size-3.5" />}
 				</ActionButton>
 			)}
-			{onArchive && (
-				<ActionButton label="Archive channel" onClick={archive}>
-					<ArchiveContent2 className="size-3.5" />
-				</ActionButton>
-			)}
+			{onArchive && (data.lifecycle === "archived"
+				? (
+					<ActionButton label="Unarchive channel" onClick={archive}>
+						<Unarchive className="size-3.5" />
+					</ActionButton>
+				)
+				: (
+					<ActionButton label="Archive channel" onClick={archive}>
+						<ArchiveContent2 className="size-3.5" />
+					</ActionButton>
+				))}
 		</span>
 	);
 }
@@ -329,14 +336,20 @@ export function RowMenu(
 							</>
 						)}
 						{!lobby && archived && (
-							<ContextMenu.Item
-								className={MENU_ITEM_DESTRUCTIVE_FULL}
-								disabled={!onDelete}
-								onClick={del}
-							>
-								<Trash className="size-3.5" />
-								Delete channel
-							</ContextMenu.Item>
+							<>
+								<ContextMenu.Item className={MENU_ITEM} disabled={!onArchive} onClick={archive}>
+									<Unarchive className="size-3.5" />
+									Unarchive channel
+								</ContextMenu.Item>
+								<ContextMenu.Item
+									className={MENU_ITEM_DESTRUCTIVE_FULL}
+									disabled={!onDelete}
+									onClick={del}
+								>
+									<Trash className="size-3.5" />
+									Delete channel
+								</ContextMenu.Item>
+							</>
 						)}
 						{lobby && (
 							<ContextMenu.Item

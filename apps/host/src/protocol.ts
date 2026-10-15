@@ -67,6 +67,17 @@ export type Listing = {
 	hosted?: string;
 };
 
+/** Channels idle this long are inactive until their transcript grows again. */
+const INACTIVE_AFTER = 6 * 60 * 60_000;
+
+/** The sidebar's Inactive group and the host's Archive inactive share this definition. */
+export function isInactive(
+	channel: Pick<Listing, "busy" | "active" | "created">,
+	now: number,
+): boolean {
+	return !channel.busy && now - (channel.active || channel.created) > INACTIVE_AFTER;
+}
+
 /** `github` is the host owner's GitHub login, when its GitHub CLI is signed in. */
 export type Hello = { user: string; host: string; github?: string };
 

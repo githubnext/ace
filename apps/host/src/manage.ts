@@ -12,6 +12,7 @@ import { config } from "./config";
 import { models as providers } from "./keys";
 import { preference } from "./preferences";
 import { checkout } from "./projects";
+import { isInactive } from "./protocol";
 
 export function parseModel(value: string): ModelRef {
 	const split = value.indexOf("/");
@@ -147,10 +148,11 @@ async function busy(id: string): Promise<boolean> {
 	}
 }
 
-/** Archives a project's channels on this host that have no work in progress; returns their IDs. */
+/** Archives a project's inactive channels on this host, judged by this host's clock; returns their IDs. */
 export async function archiveInactive(root: string): Promise<string[]> {
+	const now = Date.now();
 	const open = catalog.list().filter((record) =>
-		!record.archived && checkout(record.project).root === root
+		!record.archived && isInactive(record, now) && checkout(record.project).root === root
 	);
 	const idle = await Promise.all(open.map(async ({ id }) => (await busy(id)) ? undefined : id));
 	const ids = idle.filter((id) => id !== undefined);
