@@ -199,13 +199,16 @@ export function useTranscript(
 		let generation = 0;
 		let recoveries = 0;
 		let started = 0;
+		setState(EMPTY);
+		setInfo(undefined);
 		const start = () => {
 			const version = ++generation;
 			started = Date.now();
-			setState(EMPTY);
-			setInfo(undefined);
 			setError(undefined);
 			const current = () => active && version === generation;
+			// A re-watch replays the whole chat; the shown transcript stays until the replay is
+			// complete so the timeline, and what is expanded in it, stays mounted.
+			let replay: Transcript | undefined = EMPTY;
 			const refresh = () =>
 				host.channel<ChannelInfo>(channel, { op: "info" }).then((value) => {
 					if (current()) setInfo(value);
@@ -219,7 +222,12 @@ export function useTranscript(
 			}, {
 				event(event) {
 					if (!current()) return;
-					setState((state) => apply(state, event));
+					if (!replay) setState((state) => apply(state, event));
+					else if (event.kind !== "live") replay = apply(replay, event);
+					else {
+						setState(apply(replay, event));
+						replay = undefined;
+					}
 					if (event.kind === "run") void refresh();
 				},
 				// A released watch belongs to an old generation; a reconnecting host restarts every watch.
@@ -233,7 +241,10 @@ export function useTranscript(
 					setError(reason);
 				},
 			}).catch((error: Error) => {
-				if (current()) setError(error.message);
+				if (!current()) return;
+				setState(EMPTY);
+				setInfo(undefined);
+				setError(error.message);
 			});
 		};
 		start();

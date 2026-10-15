@@ -87,7 +87,7 @@ export class GatewayClient {
 			const ended = [...this.#pending.values()];
 			this.#pending.clear();
 			this.#metadata.clear();
-			this.channels = [];
+			// Listings outlive the socket so open channels stay mounted until the next connect replaces them.
 			this.#set("closed");
 			const error = "Disconnected from the host";
 			for (const pending of ended) {
