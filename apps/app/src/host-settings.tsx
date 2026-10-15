@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@ace/ui";
 import type { HelperAction, HelperState } from "@ace/desktop/protocol";
@@ -19,6 +19,8 @@ const tailnet = {
 export function HostStatus({ active }: { active: boolean }) {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const [retry, setRetry] = useState(0);
+	/** Refresh also syncs the team directory, so its row shows that attempt rather than a stale one. */
+	const syncing = useRef(false);
 	const [checks, setChecks] = useState<{ value?: Diagnostics; error?: string }>({});
 	const [helper, setHelper] = useState<{ value?: HelperState; error?: string }>({});
 	const [action, setAction] = useState<{ busy?: HelperAction; error?: string }>({});
@@ -28,6 +30,8 @@ export function HostStatus({ active }: { active: boolean }) {
 	useEffect(() => {
 		if (!active) return;
 		let live = true;
+		const sync = syncing.current;
+		syncing.current = false;
 		if (desktop) {
 			desktop.helper("status").then(
 				(value) => {
@@ -39,7 +43,7 @@ export function HostStatus({ active }: { active: boolean }) {
 			);
 		}
 		if (status === "open") {
-			host.request<Diagnostics>({ op: "diagnostics" }).then(
+			host.request<Diagnostics>({ op: "diagnostics", ...(sync ? { sync } : {}) }).then(
 				(value) => {
 					if (live) setChecks({ value });
 				},
@@ -57,6 +61,14 @@ export function HostStatus({ active }: { active: boolean }) {
 	useEffect(() => {
 		if (!active || checks.value?.shell.state !== "pending") return;
 		const timer = setTimeout(() => setRetry((value) => value + 1), 5000);
+		return () => clearTimeout(timer);
+	}, [active, checks]);
+
+	// The first directory sync lands in the background; show its result without a manual refresh.
+	useEffect(() => {
+		const directory = checks.value?.directory;
+		if (!active || !directory?.url || directory.synced || directory.failed) return;
+		const timer = setTimeout(() => setRetry((value) => value + 1), 3000);
 		return () => clearTimeout(timer);
 	}, [active, checks]);
 
@@ -233,7 +245,10 @@ export function HostStatus({ active }: { active: boolean }) {
 					<Button
 						variant="outline"
 						disabled={!!action.busy}
-						onClick={() => setRetry((value) => value + 1)}
+						onClick={() => {
+							syncing.current = true;
+							setRetry((value) => value + 1);
+						}}
 					>
 						Refresh status
 					</Button>

@@ -36,8 +36,17 @@ export type Diagnostics = {
 		name?: string;
 		error?: string;
 	};
-	/** `secret` is the team's ACE_SECRET, which also authenticates hosted channels. */
-	directory: { url?: string; synced?: number; error?: string; secret: CredentialStatus };
+	/**
+	 * `error` is the last directory sync's failure and `failed` when it happened; a successful sync
+	 * clears both. `secret` is the team's ACE_SECRET, which also authenticates hosted channels.
+	 */
+	directory: {
+		url?: string;
+		synced?: number;
+		error?: string;
+		failed?: number;
+		secret: CredentialStatus;
+	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
 };
@@ -180,7 +189,8 @@ export type HostRequest =
 	| { op: "github-pull"; repo: string; branch: string }
 	/** These settings belong to the local owner and are never forwarded to peers. */
 	| { op: "settings" }
-	| { op: "diagnostics" }
+	/** `sync` syncs the team directory first, so the answer shows that attempt. */
+	| { op: "diagnostics"; sync?: boolean }
 	| { op: "key-set"; provider: ProviderId; value: string }
 	| { op: "key-check"; provider: ProviderId }
 	| { op: "key-remove"; provider: ProviderId }

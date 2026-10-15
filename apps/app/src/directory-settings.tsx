@@ -15,6 +15,14 @@ const secrets = {
 	unavailable: "Keychain access needed.",
 };
 
+/** A time today, or a date and time when older, so a stale sync doesn't read as recent. */
+function when(time: number) {
+	const date = new Date(time);
+	return date.toDateString() === new Date().toDateString()
+		? date.toLocaleTimeString()
+		: date.toLocaleString();
+}
+
 /** `row` keeps each result beside the control that caused it. */
 type Action = { row?: "directory" | "secret"; busy?: string; error?: string; message?: string };
 
@@ -74,7 +82,9 @@ export function TeamDirectory(
 						{directory.url
 							? `${directory.url} · ${
 								directory.synced
-									? `Last synced ${new Date(directory.synced).toLocaleTimeString()}.`
+									? `Last synced ${when(directory.synced)}.`
+									: directory.error
+									? "Not synced yet."
 									: "Waiting for the first sync…"
 							}`
 							: "Not configured. Join the directory your team deployed to see everyone's channels, even while their hosts sleep."}
@@ -182,7 +192,12 @@ export function TeamDirectory(
 								</div>
 							</div>
 						)}
-						{directory.error && <Problem>{directory.error}</Problem>}
+						{directory.error && (
+							<Problem>
+								{directory.failed ? `Sync failed at ${when(directory.failed)}: ` : ""}
+								{directory.error}
+							</Problem>
+						)}
 						{results("directory")}
 					</>
 				}

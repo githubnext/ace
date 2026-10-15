@@ -37,7 +37,9 @@ async function shell(): Promise<Diagnostics["tools"][number]> {
 	}
 }
 
-export async function diagnostics(): Promise<Diagnostics> {
+export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
+	// A sync waiting on a keychain prompt must not hold the rest of the answer.
+	if (sync) await Promise.race([directory.sync(), Bun.sleep(25_000)]);
 	const [tools, tailscale, secret] = await Promise.all([
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(),
