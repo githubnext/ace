@@ -29,12 +29,10 @@ type Props = {
 export function Conversation(
 	{ channel, channels, chat: id, user, draft, onDraftLoaded, onSettings, onOpen, onWork }: Props,
 ) {
-	const transcript = useTranscript(
-		channel.id,
-		id,
-		channel.state === "offline",
-		channel.hosted || channel.host,
-	);
+	const offline = channel.state === "offline";
+	const transcript = useTranscript(channel.id, id, offline, channel.hosted || channel.host);
+	// The watch retries once the host is back, so its error while offline is not the user's to retry.
+	const failed = !offline && transcript.error;
 	const chat = transcript.info?.chats.find((value) => value.id === id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
@@ -127,17 +125,19 @@ export function Conversation(
 					: (
 						<div
 							className="grid h-full place-content-center justify-items-center gap-3 px-6 text-center text-sm text-muted-foreground"
-							role={transcript.error ? "alert" : "status"}
+							role={failed ? "alert" : "status"}
 						>
 							<p>
-								{transcript.error
-									|| (transcript.restarting
-										? "Channel is restarting…"
-										: channel.state === "dormant"
-										? "Starting channel…"
-										: "Loading chat…")}
+								{offline
+									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
+									: failed
+										|| (transcript.restarting
+											? "Channel is restarting…"
+											: channel.state === "dormant"
+											? "Starting channel…"
+											: "Loading chat…")}
 							</p>
-							{transcript.error && <Button onClick={transcript.retry}>Try again</Button>}
+							{failed && <Button onClick={transcript.retry}>Try again</Button>}
 						</div>
 					)}
 			</div>
