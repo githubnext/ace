@@ -14,7 +14,7 @@ import { EditorView } from "prosemirror-view";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap, chainCommands, exitCode, newlineInCode } from "prosemirror-commands";
-import { inputRules } from "prosemirror-inputrules";
+import { inputRules, undoInputRule } from "prosemirror-inputrules";
 import { createHighlightPlugin } from "prosemirror-highlight";
 import { createParser } from "prosemirror-highlight/shiki";
 import { SearchIndex } from "emoji-mart";
@@ -28,7 +28,9 @@ import {
 	backspaceCodeBlock,
 	codeBlockRule,
 	exitCodeBlock,
+	markdownRules,
 	setLink,
+	splitList,
 	toggleBold,
 	toggleBullet,
 	toggleCode,
@@ -517,7 +519,7 @@ function useEditor(
 				parser: (args) => parser ? parser(args) : ready,
 				languageExtractor: (node) => node.attrs.params || undefined,
 			}),
-			inputRules({ rules: [codeBlockRule()] }),
+			inputRules({ rules: [codeBlockRule(), ...markdownRules()] }),
 			keymap({
 				"Mod-b": toggleBold,
 				"Mod-i": toggleItalic,
@@ -529,14 +531,16 @@ function useEditor(
 				"Mod-Shift-.": toggleQuote,
 				"Mod-Alt-`": toggleCodeBlock,
 				"Mod-Enter": exitCodeBlock,
-				"Shift-Enter": chainCommands(newlineInCode, exitCode, (state, dispatch) => {
+				"Enter": splitList,
+				"Shift-Enter": chainCommands(newlineInCode, exitCode, splitList, (state, dispatch) => {
 					if (dispatch) {
 						let br = state.schema.nodes.hard_break;
 						dispatch(state.tr.replaceSelectionWith(br.create()).scrollIntoView());
 					}
 					return true;
 				}),
-				"Backspace": backspaceCodeBlock,
+				// Backspace right after a rule fires restores what was typed, for anyone who wanted it literal.
+				"Backspace": chainCommands(undoInputRule, backspaceCodeBlock),
 				"Mod-z": undo,
 				"Mod-Shift-z": redo,
 				"Mod-y": redo,

@@ -1,7 +1,7 @@
 import { lift, setBlockType, toggleMark, wrapIn } from "prosemirror-commands";
-import { InputRule } from "prosemirror-inputrules";
+import { InputRule, wrappingInputRule } from "prosemirror-inputrules";
 import { type EditorState, TextSelection } from "prosemirror-state";
-import { liftListItem, wrapInList } from "prosemirror-schema-list";
+import { liftListItem, splitListItem, wrapInList } from "prosemirror-schema-list";
 import { schema } from "./schema";
 
 function has(state: EditorState, type: typeof schema.nodes.paragraph | typeof schema.marks.em) {
@@ -177,6 +177,15 @@ function toggleOrdered() {
 	};
 }
 
+/** A new line in a list item starts the next item; on an empty item it leaves the list. */
+function splitList(state: EditorState, dispatch?: (tr: typeof state.tr) => void) {
+	let item = schema.nodes.list_item;
+	let { $from, empty } = state.selection;
+	if (!empty || $from.node(-1).type !== item) return false;
+	if (!$from.parent.content.size) return liftListItem(item)(state, dispatch);
+	return splitListItem(item)(state, dispatch);
+}
+
 function toggleQuote(state: EditorState, dispatch?: (tr: typeof state.tr) => void) {
 	let type = schema.nodes.blockquote;
 	if (has(state, type)) return lift(state, dispatch);
@@ -206,6 +215,28 @@ function codeBlockRule() {
 			.delete(start, end)
 			.setBlockType(start, start, schema.nodes.code_block, { params });
 	});
+}
+
+/** Input rules for the Markdown list and inline code markers people type, as in Slack or Notion. */
+function markdownRules() {
+	return [
+		wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list),
+		wrappingInputRule(
+			/^(\d+)\.\s$/,
+			schema.nodes.ordered_list,
+			(match) => ({ order: +match[1]! }),
+			(match, node) => node.childCount + node.attrs.order === +match[1]!,
+		),
+		// U+FFFC stands in for mentions and emoji, which inline code can't hold.
+		new InputRule(/(?:^|[^`])(`([^`\ufffc]+)`)$/, (state, match, start, end) => {
+			let from = start + match[0]!.length - match[1]!.length;
+			let code = schema.marks.code;
+			return state.tr
+				.delete(from, from + 1)
+				.addMark(from, end - 1, code.create())
+				.removeStoredMark(code);
+		}, { inCodeMark: false }),
+	];
 }
 
 /** Exit code block: Cmd+Enter creates a paragraph after and moves cursor there. */
@@ -241,7 +272,9 @@ export {
 	exitCodeBlock,
 	getLink,
 	getLinkInfo,
+	markdownRules,
 	setLink,
+	splitList,
 	toggleBold,
 	toggleBullet,
 	toggleCode,
