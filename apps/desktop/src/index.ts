@@ -25,68 +25,86 @@ const updates = updater(helper, version, channel);
 const native = inspection(profile ? `${identifier}.${profile}` : identifier);
 const url = appUrl();
 const secret = token();
-let window: BrowserWindow | undefined;
+const windows = new Set<BrowserWindow>();
+// Menu actions, the dock, and updates go to the window the person used last.
+let focused: BrowserWindow | undefined;
 let ready = false;
 
 function authorize(value: string): void {
 	if (value !== secret) throw new Error("Native controls are only available to Ace's local app");
 }
 
-const rpc = BrowserView.defineRPC<DesktopRPC>({
-	handlers: {
-		requests: {
-			lights: ({ token, expanded }) => {
-				authorize(token);
-				if (window) windowStyle.lights(window.ptr, expanded);
-				return null;
+// Each window gets its own RPC: a view takes over its RPC's transport, and native window controls
+// must act on the window whose page asked.
+function controls(target: () => BrowserWindow) {
+	return BrowserView.defineRPC<DesktopRPC>({
+		handlers: {
+			requests: {
+				lights: ({ token, expanded }) => {
+					authorize(token);
+					windowStyle.lights(target().ptr, expanded);
+					return null;
+				},
+				zoom: ({ token }) => {
+					authorize(token);
+					windowStyle.zoom(target().ptr);
+					return null;
+				},
+				window: ({ token }) => {
+					authorize(token);
+					open(target());
+					return null;
+				},
+				project: async ({ token }) => {
+					authorize(token);
+					return native.project(homedir());
+				},
+				helper: ({ token, action }) => {
+					authorize(token);
+					if (updates.busy() && ["start", "stop", "restart"].includes(action)) {
+						throw new Error("Ace Helper is being managed by the update. Wait for it to finish.");
+					}
+					return helper.act(action);
+				},
+				updates: ({ token, action }) => {
+					authorize(token);
+					return updates.act(action);
+				},
+				native: ({ token, action }) => {
+					authorize(token);
+					return native.act(action);
+				},
+				notify: ({ token, title, body }) => {
+					authorize(token);
+					Utils.showNotification({ title, body });
+					return null;
+				},
 			},
-			zoom: ({ token }) => {
-				authorize(token);
-				if (window) windowStyle.zoom(window.ptr);
-				return null;
-			},
-			project: async ({ token }) => {
-				authorize(token);
-				return native.project(homedir());
-			},
-			helper: ({ token, action }) => {
-				authorize(token);
-				if (updates.busy() && ["start", "stop", "restart"].includes(action)) {
-					throw new Error("Ace Helper is being managed by the update. Wait for it to finish.");
-				}
-				return helper.act(action);
-			},
-			updates: ({ token, action }) => {
-				authorize(token);
-				return updates.act(action);
-			},
-			native: ({ token, action }) => {
-				authorize(token);
-				return native.act(action);
-			},
-			notify: ({ token, title, body }) => {
-				authorize(token);
-				Utils.showNotification({ title, body });
-				return null;
-			},
+			messages: {},
 		},
-		messages: {},
-	},
-});
+	});
+}
+
+function dispatch(target: BrowserWindow, action: string): void {
+	target.webview.executeJavascript(
+		`window.dispatchEvent(new Event(${JSON.stringify(`ace:${action}`)}))`,
+	);
+}
 
 function show(action?: string): void {
 	if (!ready) return;
-	if (window) {
-		window.focus();
-		if (action) {
-			window.webview.executeJavascript(
-				`window.dispatchEvent(new Event(${JSON.stringify(`ace:${action}`)}))`,
-			);
-		}
-		return;
-	}
+	if (!focused) return open(undefined, action);
+	focused.activate();
+	if (action) dispatch(focused, action);
+}
+
+/** Opens a window, cascaded from `from`. The page seeds its navigation and layout from the profile copy. */
+function open(from?: BrowserWindow, action?: string): void {
 	const target = new URL(url);
 	if (action) target.hash = action;
+	const origin = from?.getFrame() || { x: 136, y: 96 };
+	const frame = { width: 1100, height: 760, x: origin.x + 24, y: origin.y + 24 };
+	const rpc = controls(() => window);
 	const view = {
 		url: target.href,
 		navigationRules: JSON.stringify(["^*", `${url.origin}/*`]),
@@ -98,12 +116,12 @@ function show(action?: string): void {
 			Object.defineProperty(window, "__ACE_DESKTOP__", { configurable: true, value: true });
 		}`,
 	};
-	window = new BrowserWindow({
+	const window = new BrowserWindow({
 		title: "Ace",
 		titleBarStyle: "hiddenInset",
 		transparent: true,
 		...(!lane ? view : {}),
-		frame: { width: 1100, height: 760, x: 160, y: 120 },
+		frame,
 	});
 	if (lane) {
 		// Electrobun 1.18.1 only forwards storage partitions through BrowserView.
@@ -112,13 +130,19 @@ function show(action?: string): void {
 			...view,
 			windowId: window.id,
 			partition: `persist:ace-dev-${lane}`,
-			frame: { width: 1100, height: 760, x: 0, y: 0 },
+			frame: { width: frame.width, height: frame.height, x: 0, y: 0 },
 		}).id;
 	}
 	windowStyle.setup(window.ptr);
 	window.setWindowButtonPosition(17, 13);
 	windowStyle.lights(window.ptr, false);
-	window.on("close", () => window = undefined);
+	windows.add(window);
+	focused = window;
+	window.on("focus", () => focused = window);
+	window.on("close", () => {
+		windows.delete(window);
+		if (focused === window) focused = [...windows].at(-1);
+	});
 }
 
 ApplicationMenu.setApplicationMenu([
@@ -142,6 +166,7 @@ ApplicationMenu.setApplicationMenu([
 	{
 		label: "File",
 		submenu: [
+			{ label: "New Window", action: "new-window", accelerator: "CmdOrCtrl+n" },
 			{ label: "Open Folder…", action: "project-open", accelerator: "CmdOrCtrl+o" },
 		],
 	},
@@ -207,6 +232,9 @@ function errorMessage(error: unknown): string {
 
 Electrobun.events.on("application-menu-clicked", ({ data }) => {
 	if (data.action === "show") return show();
+	// The page shares its navigation and layout before asking for the window, so it opens where the
+	// person is.
+	if (data.action === "new-window") return focused ? dispatch(focused, "new-window") : show();
 	if (data.action === "updates") {
 		show("updates");
 		if (["idle", "error"].includes(updates.status().phase)) {

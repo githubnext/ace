@@ -12,6 +12,7 @@ import {
 import { IconHash, IconHome, IconIssue, IconPullRequest } from "@ace/ui/icons";
 
 import { desktop } from "./desktop";
+import { share } from "./window-storage";
 
 export type Page = "dashboard" | "channels" | "issues" | "prs";
 
@@ -84,6 +85,7 @@ export function Navigation({ page, user, github, onPage, onSettings }: {
 }
 
 const ACTIONS = [
+	"new-window",
 	"project-open",
 	"settings",
 	"dashboard",
@@ -105,6 +107,9 @@ export function WindowControls({ onOpen, onSettings, onPage, connected }: {
 	const wide = useMedia("(width >= 48rem)");
 	const run = useEffectEvent((action: string) => {
 		switch (action) {
+			case "new-window":
+				share();
+				return void desktop?.window();
 			case "project-open":
 				return onOpen();
 			case "settings":
