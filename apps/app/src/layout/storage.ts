@@ -1,5 +1,7 @@
 import * as Split from "@ace/split-tabs";
 
+import { load, remove, save } from "../window-storage";
+
 /** The Chat tab's uid; it can't be closed or renamed. */
 export const CHAT = "chat";
 
@@ -64,14 +66,14 @@ function clean(state: Split.State, meta?: unknown): Meta {
 }
 
 export function read(id: string): Layout {
-	const raw = localStorage.getItem(`${STORAGE}:${id}`);
+	const raw = load(`${STORAGE}:${id}`);
 	if (raw) {
 		try {
 			const data = JSON.parse(raw) as Saved;
 			const state = Split.restore(data.state);
 			return { state, meta: clean(state, data.tabs), diff: data.diff === true };
 		} catch {
-			localStorage.removeItem(`${STORAGE}:${id}`);
+			remove(`${STORAGE}:${id}`);
 		}
 	}
 	const state = Split.initial(CHAT);
@@ -85,5 +87,5 @@ export function write(id: string, state: Split.State, meta: Meta, diff: boolean)
 		tabs: clean(state, meta),
 		diff,
 	} satisfies Saved;
-	localStorage.setItem(`${STORAGE}:${id}`, JSON.stringify(data));
+	save(`${STORAGE}:${id}`, JSON.stringify(data));
 }

@@ -53,6 +53,7 @@ import {
 import { Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { UpdateNotice } from "./updates";
+import { useWindowStorage } from "./window-storage";
 
 // Older versions saved an inline GitHub item per project; Ace now opens items on GitHub.
 localStorage.removeItem(`ace:github-targets:${host.url}`);
@@ -232,10 +233,10 @@ export function App() {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
 	const [hello, setHello] = useState<Hello>({ user: "", host: "" });
-	const [page, setPage] = useLocalStorage<Page>("ace:page", "dashboard");
-	const [project, setProject] = useLocalStorage<string | undefined>("ace:project-id", undefined);
-	const [all, setAll] = useLocalStorage("ace:all-projects", false);
-	const [selected, setSelected] = useLocalStorage<Record<string, string>>(
+	const [page, setPage] = useWindowStorage<Page>("ace:page", "dashboard");
+	const [project, setProject] = useWindowStorage<string | undefined>("ace:project-id", undefined);
+	const [all, setAll] = useWindowStorage("ace:all-projects", false);
+	const [selected, setSelected] = useWindowStorage<Record<string, string>>(
 		"ace:project-channels",
 		{},
 	);

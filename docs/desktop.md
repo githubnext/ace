@@ -264,9 +264,9 @@ the installed canary uses `ACE_HOME="$HOME/.local/state/ace-canary"` and `--port
 app uses `ACE_HOME="$HOME/.local/state/ace-dev"` and `--port 4141`. Authentication checks the host's
 identity and protocol before connecting. Listing or renaming tabs over the tailnet is unavailable.
 
-Only the explicitly selected window changes live. Names use the existing saved layout for that
-channel in the browser profile; another window sharing that profile can load the saved name on
-reload, and a later layout save from either window can overwrite the other's saved labels.
-Independent window persistence is tracked in [#45](https://github.com/githubnext/ace/issues/45).
+Only the explicitly selected window changes live. Each window owns its navigation and channel
+layouts, including tab names, and keeps them through reloads; another window's navigation or
+layout changes never replace them. A new window, or the app after a relaunch, starts from the
+most recent change made in any window.
 A tab label does not change the channel's durable name or another participant's view.
 Closed windows and windows without an open channel do not appear in the listing.
