@@ -1,11 +1,4 @@
-import {
-	type ReactNode,
-	useEffect,
-	useReducer,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	aceAvatar,
@@ -15,6 +8,7 @@ import {
 	type ChatComposerHandle,
 	serialize,
 	toast,
+	useLocalStorage,
 	useMedia,
 } from "@ace/ui";
 import type { Effort, ModelOption, ModelRef } from "@ace/channel/protocol";
@@ -41,9 +35,7 @@ const EFFORTS: Record<Effort, string> = {
 	max: "Max",
 };
 const ACE = /(^|\s)@ace\b/i;
-// Channel views remount on navigation; deliberate mode and model choices outlive them for this session.
-const chosen = new Map<string, string>();
-const picks = new Map<string, { model?: string; effort?: Effort }>();
+const UNPICKED: { model?: string; effort?: Effort } = {};
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
 
@@ -124,7 +116,9 @@ export function Composer(
 	const sending = useRef(false);
 	const [pending, setPending] = useState(false);
 	const [attached, setAttached] = useState<Attachment[]>([]);
-	const [mode, setMode] = useState(chosen.get(channel.id) || "ace");
+	// Kept beside the channel's draft so a deliberate mode and an unsent model pick survive relaunch.
+	const scope = `/channels/${channel.id}`;
+	const [mode, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
 	const [models, setModels] = useState<ModelOption[]>();
 	const [modelError, setModelError] = useState<string>();
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
@@ -154,13 +148,10 @@ export function Composer(
 			active = false;
 		};
 	}, [channel.id, mode, status, settingsVersion]);
-	const pick = `${channel.id}/${id}`;
-	const [, repick] = useReducer((count: number) => count + 1, 0);
-	const { model: picked, effort: pickedEffort } = picks.get(pick) || {};
-	const changePick = (value: { model?: string; effort?: Effort }) => {
-		picks.set(pick, value);
-		repick();
-	};
+	const [{ model: picked, effort: pickedEffort }, changePick] = useLocalStorage(
+		`ace:pick:${scope}/${id}`,
+		UNPICKED,
+	);
 	const model = picked || (current ? key(current) : "auto");
 	const levels = models?.find((value) => key(value) === model)?.efforts;
 	const requestedEffort = pickedEffort
@@ -185,10 +176,6 @@ export function Composer(
 	// Automatic stays offered so a chat whose model lost its key can hand the choice back.
 	choices.unshift({ id: "auto", name: "Automatic", vendor: "" });
 	const { blocked, refused, onText } = useInvocation(shared, channel.owner === user, mode);
-	const changeMode = (value: string) => {
-		chosen.set(channel.id, value);
-		setMode(value);
-	};
 	// A mention invokes in Chat mode too, so sending as a message drops it from the draft.
 	const toChat = () => {
 		changeMode("chat");
@@ -256,7 +243,7 @@ export function Composer(
 			<ChatComposer
 				ref={composer}
 				accessory={accessory}
-				scope={`/channels/${channel.id}`}
+				scope={scope}
 				tools={!phone}
 				modes={blocked ? BLOCKED_MODES : MODES}
 				mode={mode}
