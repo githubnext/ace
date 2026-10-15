@@ -42,17 +42,24 @@ export class Directory extends DurableObject<Env> {
 		const { channels, ...rest } = publication;
 		const host: Host = { ...rest, name, seen: Date.now() };
 		const sql = this.ctx.storage.sql;
+		// Hosts publish on every heartbeat, and Durable Objects bill each row written, so only changed
+		// channels are written.
 		this.ctx.storage.transactionSync(() => {
 			sql.exec("INSERT OR REPLACE INTO hosts VALUES (?, ?)", name, JSON.stringify(host));
-			sql.exec("DELETE FROM channels WHERE host = ?", name);
-			for (const channel of channels) {
-				sql.exec(
-					"INSERT OR REPLACE INTO channels VALUES (?, ?, ?)",
-					channel.id,
+			const stored = new Map(
+				sql.exec<{ id: string; listing: string }>(
+					"SELECT id, listing FROM channels WHERE host = ?",
 					name,
-					JSON.stringify(channel),
-				);
+				).toArray().map((row) => [row.id, row.listing]),
+			);
+			for (const channel of channels) {
+				const listing = JSON.stringify(channel);
+				if (stored.get(channel.id) !== listing) {
+					sql.exec("INSERT OR REPLACE INTO channels VALUES (?, ?, ?)", channel.id, name, listing);
+				}
+				stored.delete(channel.id);
 			}
+			for (const id of stored.keys()) sql.exec("DELETE FROM channels WHERE id = ?", id);
 		});
 	}
 
