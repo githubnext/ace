@@ -3,6 +3,9 @@
 	"private": true,
 	"type": "module",
 	"license": "MIT",
+	"exports": {
+		"./protocol": "./src/protocol.ts"
+	},
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",

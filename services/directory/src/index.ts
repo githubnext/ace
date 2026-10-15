@@ -1,7 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
 
+import type { Lobby } from "./lobby";
+
+export { Lobby } from "./lobby";
+
 type Env = {
 	DIRECTORY: DurableObjectNamespace<Directory>;
+	/** One lobby per project, named by the project ID that hosts and apps share. */
+	LOBBY: DurableObjectNamespace<Lobby>;
 	/** Bearer secret shared by the team's hosts. */
 	ACE_SECRET?: string;
 };
@@ -85,13 +91,28 @@ function authorized(request: Request, env: Env): boolean {
 		&& crypto.subtle.timingSafeEqual(given, expected);
 }
 
+function decoded(component: string): string | undefined {
+	try {
+		return decodeURIComponent(component);
+	} catch {
+		return undefined;
+	}
+}
+
 const HOST = /^\/hosts\/([A-Za-z0-9._-]{1,128})$/;
+const LOBBY = /^\/lobbies\/([^/]{1,1024})$/;
 
 export default {
 	async fetch(request, env) {
 		if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 });
-		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		const { pathname } = new URL(request.url);
+		const lobby = LOBBY.exec(pathname);
+		if (lobby && request.headers.get("upgrade") === "websocket") {
+			const project = decoded(lobby[1]!);
+			if (!project) return new Response("Malformed project ID", { status: 400 });
+			return env.LOBBY.get(env.LOBBY.idFromName(project)).fetch(request);
+		}
+		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") return Response.json(await directory.read());
 		const host = HOST.exec(pathname);
 		if (host && request.method === "PUT") {
