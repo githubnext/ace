@@ -130,7 +130,7 @@ or a source `ace` CLI with the same `ACE_HOME` started it.
   Rows contain literal title arrays, separators and supplied shortcut text. Native state can be
   cached for 2 seconds after traversal; no observation timestamp or cache-hit flag is available.
   `native_completeness` is always `unknown`: lazy submenus, unavailable AX attributes and native
-  traversal limits can omit items. `ace_truncated` and `ace_omitted` describe only Ace's separate
+  traversal limits can omit items. `truncated` and `omitted` describe only Ace's separate
   output limit, and `native_row_count` counts rows received before that limit. Enabled/checked
   flags are omitted because the native service substitutes defaults when attributes are absent.
   Menu paths are descriptive and cannot be used as action snapshots. Native AX reads are
@@ -240,7 +240,7 @@ inventory completeness and warnings.
 
 An application search reports its query, searched fields, `filter.total` native items, and
 `filter.matched` items before result bounding. Its scope is `returned_native_inventory`: a partial
-native inventory can still miss matching applications. `ace_truncated` and `ace_omitted` describe
+native inventory can still miss matching applications. `truncated` and `omitted` describe
 matching rows omitted from the filtered response; narrow the query if needed. Searching does not
 change native inventory completeness or warnings, and an empty match is not proof an app stopped.
 
