@@ -89,16 +89,16 @@ function Notice({ children, action }: { children: ReactNode; action?: ReactNode 
 
 /** Why a teammate's invoking draft is held while the owner has turned invocation off. */
 function Refusal({ mode, onChat }: { mode: string; onChat: () => void }) {
-	if (mode !== "ace") {
-		return (
-			<Notice>
-				The owner has turned off teammate agent invocation. Remove @ace to send this as a message.
-			</Notice>
-		);
-	}
 	return (
-		<Notice action={<Button size="sm" variant="ghost" onClick={onChat}>Switch to Chat</Button>}>
-			The owner has turned off teammate agent invocation. Switch to Chat to send this as a message.
+		<Notice
+			action={
+				<Button size="sm" variant="ghost" onClick={onChat}>
+					{mode === "ace" ? "Switch to Chat" : "Remove @ace"}
+				</Button>
+			}
+		>
+			The owner has turned off teammate agent invocation.{" "}
+			{mode === "ace" ? "Switch to Chat" : "Remove @ace"} to send this as a message.
 		</Notice>
 	);
 }
@@ -188,6 +188,13 @@ export function Composer(
 		chosen.set(channel.id, value);
 		setMode(value);
 	};
+	// A mention invokes in Chat mode too, so sending as a message drops it from the draft.
+	const toChat = () => {
+		changeMode("chat");
+		const doc = composer.current?.get();
+		const text = doc ? serialize(doc) : "";
+		if (ACE.test(text)) composer.current?.set(text.replace(/(^|\s)@ace\b\s*/gi, "$1").trim());
+	};
 	// Formatting tools crowd a phone's composer; they stay one tap away.
 	const phone = useMedia("(width < 40rem)");
 
@@ -270,7 +277,7 @@ export function Composer(
 				onSend={({ doc, mode, attachments }) => void send(serialize(doc), mode, attachments)}
 			/>
 			{refused
-				? <Refusal mode={mode} onChat={() => changeMode("chat")} />
+				? <Refusal mode={mode} onChat={toChat} />
 				: mode === "ace" && models?.length === 0 && (
 					<Notice
 						action={onSettings && (
