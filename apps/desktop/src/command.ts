@@ -21,7 +21,7 @@ export function command(name: string, target: string, dir: string) {
 		if (!stat.isSymbolicLink()) return "other";
 		const current = readlinkSync(path);
 		if (current === target) return "installed";
-		return /\.app\/Contents\/MacOS\/Ace Helper$/.test(current) ? "stale" : "other";
+		return current.endsWith(".app/Contents/MacOS/Ace Helper") ? "stale" : "other";
 	}
 
 	/** Shells set PATH in either profile, so ask an interactive login shell, as Terminal starts. */
