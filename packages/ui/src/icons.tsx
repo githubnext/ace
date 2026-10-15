@@ -1,5 +1,6 @@
 import {
 	Archive,
+	ArchiveRestore,
 	ArrowDownToLine,
 	ArrowUp,
 	ArrowUpRight,
@@ -122,6 +123,7 @@ function micro(Icon: LucideIcon) {
 }
 
 export const IconArchive = outline(Archive);
+export const IconArchiveRestore = outline(ArchiveRestore);
 export const IconArrowDownToLine = outline(ArrowDownToLine);
 export const IconArrowUpRight = outline(ArrowUpRight);
 export const IconBolt = outline(Zap);

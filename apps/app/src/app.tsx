@@ -21,7 +21,15 @@ import {
 	useMedia,
 } from "@ace/ui";
 import { IconHash, IconPlus } from "@ace/ui/icons";
-import type { Hello, HostRequest, Listing, MoveTarget, People, Project } from "@ace/host/protocol";
+import {
+	type Hello,
+	type HostRequest,
+	isInactive,
+	type Listing,
+	type MoveTarget,
+	type People,
+	type Project,
+} from "@ace/host/protocol";
 
 import { chosen, deployed, remember } from "./address";
 import { glow, type Outcome, useAttention } from "./attention";
@@ -103,8 +111,6 @@ function Disconnected() {
 	);
 }
 
-/** Channels idle this long fold into the Inactive group until their transcript grows again. */
-const INACTIVE_AFTER = 6 * 60 * 60_000;
 const ALL_PROJECTS = "all";
 const RECENT_CHANNELS = 10;
 
@@ -146,8 +152,9 @@ const folded = (
 ) => collapsed[id] ?? id.endsWith(":archived");
 
 /**
- * A teammate is one participant on every host, so their machines share one section. Their idle
- * and archived channels stay under their name; only they can archive or delete them.
+ * A teammate is one participant on every host, so their machines share one section, which keeps
+ * their archived channels; only they can archive or delete them. Inactive channels from every
+ * host and owner share one group until their transcripts grow again.
  */
 function projectGroups(
 	channels: Listing[],
@@ -164,9 +171,12 @@ function projectGroups(
 	for (const channel of channels) {
 		const next = row(channel, hello.user, hello.host, attention.get(channel.id));
 		const stored = channel.state === "archived";
+		if (!stored && isInactive(channel, now)) {
+			inactive.push(next);
+			continue;
+		}
 		if (channel.owner === hello.user) {
-			const idle = !channel.busy && now - (channel.active || channel.created) > INACTIVE_AFTER;
-			(stored ? archived : idle ? inactive : mine).push(next);
+			(stored ? archived : mine).push(next);
 			continue;
 		}
 		let owned = team.get(channel.owner);
@@ -454,10 +464,19 @@ export function App() {
 	async function archiveInactive(project: string) {
 		try {
 			const count = await host.request<number>({ op: "archive-inactive", project });
+			const now = Date.now();
+			const elsewhere = visible.some((channel) =>
+				channel.host !== hello.host && channel.state !== "archived" && isInactive(channel, now)
+			);
 			toast(
 				count
 					? `Archived ${count} inactive channel${count === 1 ? "" : "s"}`
-					: "No inactive channels",
+					: "No inactive channels on this host",
+				elsewhere
+					? {
+						description: "Inactive channels on other hosts stay until their owners archive them.",
+					}
+					: undefined,
 			);
 		} catch (error) {
 			toast.error("Could not archive channels", { description: (error as Error).message });
