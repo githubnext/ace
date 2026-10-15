@@ -153,6 +153,8 @@ export type Settings = {
 	model: ModelRef | null;
 	modelOverride?: ModelRef;
 	models: ModelRef[];
+	/** Some keychain reads behind `models` are still under way; `models` uses their last finished reads. */
+	waiting?: string;
 	error?: string;
 };
 
@@ -190,7 +192,8 @@ export type HostRequest =
 	| { op: "github-files"; repo: string; number: number }
 	| { op: "github-pull"; repo: string; branch: string }
 	/** These settings belong to the local owner and are never forwarded to peers. */
-	| { op: "settings" }
+	/** `fresh` reads again keys whose last read waited on a prompt; polls leave it out. */
+	| { op: "settings"; fresh?: boolean }
 	/** `sync` syncs the team directory first, so the answer shows that attempt. */
 	| { op: "diagnostics"; sync?: boolean }
 	| { op: "key-set"; provider: ProviderId; value: string }

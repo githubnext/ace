@@ -1,8 +1,9 @@
 import type { ModelRef } from "@ace/channel/protocol";
+import { available } from "@ace/channel/models";
 
 import { config } from "./config";
 import * as directory from "./directory";
-import { credential, forget, key, overriding, store } from "./keys";
+import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } from "./keys";
 import { models, parseModel } from "./manage";
 import { isModel, preference, savePreference } from "./preferences";
 import type { ProviderId, Settings } from "./protocol";
@@ -24,25 +25,24 @@ function provider(id: ProviderId) {
 	return found;
 }
 
-export async function settings(): Promise<Settings> {
-	const statuses = await Promise.all(
-		[...providers].map(async ([id, { name, key }]) =>
-			Object.assign(await credential(key), { id, name })
+/** Settings never waits on a keychain prompt; `fresh` reads again names whose last read prompted. */
+export async function settings(fresh?: boolean): Promise<Settings> {
+	const catalog = settled(fresh);
+	const [statuses, usable] = await Promise.all([
+		Promise.all(
+			[...providers].map(async ([id, { name, key }]) =>
+				Object.assign(await latest(key, fresh), { id, name })
+			),
 		),
-	);
-	let available: ModelRef[] = [];
-	let error: string | undefined;
-	try {
-		available = await models();
-	} catch (cause) {
-		error = (cause as Error).message;
-	}
+		available(catalog.models).catch((error: Error) => error),
+	]);
 	return {
 		providers: statuses,
 		model: preference(),
 		modelOverride: config.model ? parseModel(config.model) : undefined,
-		models: available,
-		error,
+		models: usable instanceof Error ? [] : usable,
+		waiting: catalog.waiting() ? KEYCHAIN_WAITING : undefined,
+		error: usable instanceof Error ? usable.message : undefined,
 	};
 }
 
@@ -116,9 +116,9 @@ export async function removeKey(id: ProviderId): Promise<void> {
 export async function setModel(model: ModelRef | null): Promise<void> {
 	if (model !== null) {
 		if (!isModel(model)) throw new Error("Choose a provider and model");
-		const available = await models();
+		const found = await models();
 		if (
-			!available.some((item) => item.provider === model.provider && item.modelId === model.modelId)
+			!found.some((item) => item.provider === model.provider && item.modelId === model.modelId)
 		) {
 			throw new Error("This model is unavailable. Add its provider key first.");
 		}

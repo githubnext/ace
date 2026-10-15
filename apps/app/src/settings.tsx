@@ -1,4 +1,4 @@
-import { type ComponentType, useEffect, useState, useSyncExternalStore } from "react";
+import { type ComponentType, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	Button,
@@ -197,6 +197,7 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 							</div>
 						</div>
 					)}
+					{provider.waiting && <Status>{provider.waiting}…</Status>}
 					{provider.error && <Problem>{provider.error}</Problem>}
 					{action.busy && <Status>Checking with {provider.name} or waiting for Keychain…</Status>}
 					{action.error && <Problem>{action.error}</Problem>}
@@ -273,6 +274,7 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 				: "Used for a chat's first agent run. Existing chats keep their model."}
 			footer={
 				<>
+					{settings?.waiting && <Status>{settings.waiting}…</Status>}
 					{action.busy && <Status>Saving default model…</Status>}
 					{action.error && <Problem>{action.error}</Problem>}
 				</>
@@ -327,6 +329,8 @@ export function Settings(
 	const [visited, setVisited] = useState(() => new Set([section]));
 	const version = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
 	const [retry, setRetry] = useState(0);
+	/** Only Refresh reads again a key whose last read waited on a Keychain prompt. */
+	const refreshing = useRef(false);
 	const [result, setResult] = useState<{ settings?: HostSettings; error?: string }>({});
 	const offline = status !== "open";
 	const current = sections.find(({ id }) => id === section)!;
@@ -348,7 +352,9 @@ export function Settings(
 	useEffect(() => {
 		if (status !== "open" || !needed) return;
 		let active = true;
-		host.request<HostSettings>({ op: "settings" }).then(
+		const fresh = refreshing.current;
+		refreshing.current = false;
+		host.request<HostSettings>({ op: "settings", ...(fresh ? { fresh } : {}) }).then(
 			(settings) => {
 				if (active) setResult({ settings });
 			},
@@ -362,13 +368,26 @@ export function Settings(
 		};
 	}, [status, version, retry, needed]);
 
+	// A Keychain read waiting on a prompt lands in the background; show its result without a refresh.
+	const waiting = !!result.settings?.waiting
+		|| !!result.settings?.providers.some((provider) => provider.waiting);
+	const shown = section === "general" || section === "providers";
+	useEffect(() => {
+		if (!shown || !waiting) return;
+		const timer = setTimeout(() => setRetry((value) => value + 1), 3000);
+		return () => clearTimeout(timer);
+	}, [shown, waiting, result]);
+
 	const reading = !result.settings && !result.error && !offline;
 	const refresh = (label: string) => (
 		<Button
 			variant="ghost"
 			size="sm"
 			disabled={offline}
-			onClick={() => setRetry((value) => value + 1)}
+			onClick={() => {
+				refreshing.current = true;
+				setRetry((value) => value + 1);
+			}}
 		>
 			{label}
 		</Button>

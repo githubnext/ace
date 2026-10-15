@@ -398,7 +398,7 @@ async function handle(
 		case "github-pull":
 			return github.pull(request.repo, request.branch);
 		case "settings":
-			return settings();
+			return settings(request.fresh);
 		case "diagnostics":
 			return diagnostics(request.sync);
 		case "key-set":
