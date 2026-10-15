@@ -1,4 +1,5 @@
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 import type { Desktop } from "@ace/channel/desktop";
 import { createDesktop, type DesktopClient } from "@githubnext/desktop-tools";
@@ -8,8 +9,12 @@ import { config } from "./config";
 let client: DesktopClient | undefined;
 
 export const desktop: Desktop = async (request, context) => {
+	// Whichever process started this worker, only the app serving this data directory's socket
+	// knows which signed client it accepts, so it publishes that client beside the socket.
+	const path = join(config.home, "desktop-client");
+	if (!existsSync(path)) throw new Error("Open Ace on this host to enable native desktop tools.");
 	client ??= createDesktop({
-		client: process.env.ACE_DESKTOP_CLIENT || join(dirname(process.execPath), "ace-desktop-client"),
+		client: path,
 		socket: join(config.home, "desktop.sock"),
 		name: "Ace",
 	});

@@ -1,3 +1,4 @@
+import { renameSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { CString, dlopen, type Pointer } from "bun:ffi";
@@ -59,6 +60,10 @@ export function native(identifier: string) {
 		},
 		start() {
 			picker.ace_project_open();
+			// Workers find the client the socket accepts here, including those a source CLI starts.
+			const link = join(config.home, "desktop-client");
+			symlinkSync(join(bin, "ace-desktop-client"), `${link}.${process.pid}`);
+			renameSync(`${link}.${process.pid}`, link);
 			symbols.desktop_tools_start(
 				Buffer.from(`${join(config.home, "desktop.sock")}\0`),
 				Buffer.from(`${identifier}.desktop-client\0`),
