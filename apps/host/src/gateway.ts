@@ -13,6 +13,7 @@ import * as directory from "./directory";
 import { retryLoginShell, shell } from "./environment";
 import { GatewayClient, type Watch } from "./gateway-client";
 import * as github from "./github";
+import { health, HostConflict } from "./health";
 import { seal } from "./keys";
 import { failure, log, open as openLog } from "./log";
 import { move, targets } from "./move";
@@ -660,6 +661,7 @@ function owner(port: number): Server<Client> {
 					home: catalog.home,
 					pid: process.pid,
 					helper: config.helper,
+					version: config.version,
 				};
 				return Response.json(info, {
 					headers: challenge ? { "x-ace-proof": access.proof(info, challenge) } : undefined,
@@ -731,6 +733,30 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 	});
 }
 
+/** A port already taken names its listener, so the person can tell which Ace holds it. */
+async function listen(port: number): Promise<Server<Client>> {
+	try {
+		return owner(port);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
+		const info = await health(port).catch((conflict: Error) => conflict);
+		if (info instanceof HostConflict) {
+			throw new Error(`${info.message} Leave it running and choose another --port.`, {
+				cause: error,
+			});
+		}
+		if (info instanceof Error) {
+			throw new Error(`${info.message}. Choose another --port.`, { cause: error });
+		}
+		throw new Error(
+			info
+				? `Port ${port} already has this host's gateway (PID ${info.pid}).`
+				: `Port ${port} is in use. Choose another --port.`,
+			{ cause: error },
+		);
+	}
+}
+
 export async function serve(port: number): Promise<never> {
 	config.port = port;
 	// Channel workers and agent shells reach this listener for the owner's windows.
@@ -739,7 +765,7 @@ export async function serve(port: number): Promise<never> {
 	seal();
 	openLog("host");
 	await resume();
-	const server = owner(port);
+	const server = await listen(port);
 	log("info", "host.start", { port: server.port, user: catalog.user, bun: Bun.version });
 	if (shell.state === "pending") {
 		log("warn", "host.shell", { error: shell.error });

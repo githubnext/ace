@@ -6,6 +6,7 @@ import { adoptLoginShell } from "./environment";
 
 declare const ACE_IDENTIFIER: string;
 declare const ACE_PROFILE: string | undefined;
+declare const ACE_VERSION: string;
 
 const worker = process.argv[2] === "--worker";
 if (!worker) {
@@ -15,6 +16,7 @@ if (!worker) {
 const { config, desktop } = await import("./config");
 desktop(ACE_IDENTIFIER, ACE_PROFILE);
 config.helper = true;
+config.version = ACE_VERSION;
 config.app = join(dirname(process.execPath), "..", "Resources", "app", "web");
 config.worker = [process.execPath, "--worker"];
 

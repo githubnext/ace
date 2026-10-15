@@ -162,7 +162,8 @@ rebuilds. A separate checkout profile, stored in the signed bundle, keeps the ex
 WebKit storage partition, and port from 4200 to 4999. The hash is derived from the checkout path;
 it is not part of the app's macOS identity. Other `ACE_*`
 settings in the environment are ignored, except `ACE_PORT` to move the run off a port used by
-another checkout and `ACE_*_API_KEY` credentials. A run refuses any listener already on its port.
+another checkout and `ACE_*_API_KEY` credentials. A run refuses any listener already on its port
+and names it: its app, version, and path, or a command-line host's PID and command.
 The profile starts without provider keys; add one in Settings or pass it in the environment. It
 persists across runs. Changing the app's identity does not move or reset channel data. WebKit
 uses a persistent `ace-dev-<hash>` partition under the shared dev identity. Old checkout-specific

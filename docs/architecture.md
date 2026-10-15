@@ -245,7 +245,9 @@ The helper compiles with Bun 1.4 or newer and dispatches channel workers through
 The UI keeps Electrobun's bundled Bun version to match its native FFI callbacks. The helper resolves web
 assets from its application bundle and writes its log under the channel data directory. Closing a
 window or quitting the desktop leaves the helper running; reopening the UI verifies the host's
-protocol, data directory, and a fresh proof of ownership before attaching.
+protocol, data directory, and a fresh proof of ownership before attaching. When another Ace
+answers on the port, errors name it from its PID (app, version, and bundle path, or a command-line
+host's command) and say what this caller can do. Only this app's own helper is ever offered a restart.
 
 The host stores a private owner token in `host.token` with mode 0600. The native UI supplies it only
 to its local webview; `ace open` supplies it in a URL fragment that the app immediately removes.

@@ -20,6 +20,8 @@ export type HostInfo = {
 	home: string;
 	pid: number;
 	helper: boolean;
+	/** Ace Helper's app version; outside the proof, so older listeners and clients stay compatible. */
+	version?: string;
 };
 
 /** A place a channel can move to: "local" for this host, or a hosting service's base URL. */

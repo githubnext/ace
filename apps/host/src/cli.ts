@@ -15,7 +15,7 @@ import { serve } from "./gateway";
 import type { GatewayClient, Watch } from "./gateway-client";
 import { forget, store } from "./keys";
 import { dir as logDir, failure, log, open as openLog } from "./log";
-import { health } from "./health";
+import { health, HostConflict } from "./health";
 import { type Filter, follow, print } from "./logs";
 import * as loopback from "./loopback";
 import { preference } from "./preferences";
@@ -248,6 +248,15 @@ function printTabs(windows: WindowInfo[]): void {
 			].join("\t"));
 		}
 	}
+}
+
+/** Another Ace's host keeps its port; this command reaches its own host on another one. */
+function advice(conflict: HostConflict): string {
+	if (conflict.reason === "owner") {
+		return `Leave it running. Pass --port for this host, or set ACE_HOME=${conflict.home} to use that one.`;
+	}
+	// Two hosts must never share a data directory, so this ace gets its own home as well as a port.
+	return "Leave it running. Use an ace from the same version, or give this ace its own host: set ACE_HOME and ACE_PORT to unused values and run ace serve.";
 }
 
 async function main() {
@@ -486,6 +495,7 @@ main().then(
 	(error: Error) => {
 		log("error", "cli.failed", { command, ...failure(error) });
 		console.error(error.message);
+		if (error instanceof HostConflict) console.error(advice(error));
 		process.exit(1);
 	},
 );
