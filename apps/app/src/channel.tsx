@@ -116,11 +116,15 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 // Last read per repo and branch, so switching back to a channel shows its pull request at once.
 const pulls = new Map<string, GithubPull | null>();
 
-/** The newest pull request from the chat's branch, read again while it can be seen. */
+/**
+ * The newest pull request from the chat's branch, read again while it can be seen. Opening a pull
+ * request doesn't move the head, so a run ending reads it again too.
+ */
 function usePull(
 	repo: string | undefined,
 	branch: string | undefined,
 	head: string | undefined,
+	busy: boolean,
 	open: boolean,
 ) {
 	const [, render] = useReducer((count: number) => count + 1, 0);
@@ -142,7 +146,7 @@ function usePull(
 			active = false;
 			clearInterval(timer);
 		};
-	}, [open, repo, branch, head]);
+	}, [open, repo, branch, head, busy]);
 	return key ? pulls.get(key) : undefined;
 }
 
@@ -151,7 +155,7 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 	const details = useDetails(channel.id);
 	const { changes, info, items } = details;
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
-	const pull = usePull(channel.repo, changes?.branch, changes?.head, right.open);
+	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy, right.open);
 	const totals = useMemo(() => {
 		if (!changes) return;
 		const sum = { adds: 0, dels: 0, files: changes.files.length };
