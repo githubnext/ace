@@ -18,7 +18,8 @@ it. pi-durable owns the database format, messages, runs, tool results, chats, an
 
 `ACE_HOME` overrides the host data directory. Canary and development preferences have the same
 `-canary` and `-dev` suffixes. A source CLI uses the stable profile unless given `ACE_HOME`; target
-the installed app's profile explicitly when backing it up.
+the installed app's profile explicitly when backing it up. The command an app installs from
+Settings → This Mac, `ace` for stable and `ace-canary` for Canary, already uses that app's profile.
 
 Each channel directory holds `channel.json` and pi's `channel.sqlite`. Lanes are worktrees in the
 project at `.lane/trees/<prefix>/<name>`, created by the lane CLI; a `lanes/` directory holds those
@@ -28,8 +29,8 @@ The socket, worker PID, and logs are process state, not durable channel content.
 
 ## Back up a local channel
 
-Run `bun ace backup <channel> <new-directory>` from the checkout, or `ace backup` from an installed
-CLI. The destination's parent must exist; the destination itself must be new. Backups include
+Run `bun ace backup <channel> <new-directory>` from the checkout, or `ace backup` (`ace-canary backup`
+for Canary) from the command the app installs. The destination's parent must exist; the destination itself must be new. Backups include
 archived channels and work without starting dormant workers or loading provider credentials.
 
 The command uses SQLite's [VACUUM INTO](https://www.sqlite.org/lang_vacuum.html#vacuum_with_an_into_clause)

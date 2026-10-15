@@ -4,8 +4,9 @@ anchor: function controls
 created: 2026-10-15T03:41:11Z
 norm: '1'
 sig: 93cc5b6836667bee
-body_hash: b7475d48d7b5221d
-raw_hash: 100601e3a1324e60
+body_hash: 858640fcc9e00b29
+raw_hash: bc3a3bbeda94ba1f
+vouched: 2026-10-15T14:10:43Z
 lines: 39-86
 ---
 
