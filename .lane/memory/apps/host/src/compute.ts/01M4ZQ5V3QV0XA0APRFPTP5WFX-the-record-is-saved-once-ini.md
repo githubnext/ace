@@ -4,8 +4,9 @@ anchor: function create
 created: 2026-10-15T12:04:18Z
 norm: '1'
 sig: 0a88af34e923cc57
-body_hash: ca1a25be08c6304d
-raw_hash: 45e9b2198135e18e
+body_hash: 6d283f39bb0af1d8
+raw_hash: 778a37e82fc5adc5
+vouched: 2026-10-15T13:47:18Z
 lines: 48-73
 ---
 

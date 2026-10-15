@@ -7,11 +7,14 @@ import type { Listing } from "@ace/host/protocol";
 export type Placement =
 	| { kind: "local"; host: string }
 	| { kind: "hosted"; service: string; workspace: string }
-	| { kind: "cloud"; service: string };
+	/** `stopped` while the workspace has no container; a start or stop under way ends it either way. */
+	| { kind: "cloud"; service: string; stopped: boolean };
 
 export function placement(channel: Listing): Placement {
 	if (!channel.hosted) return { kind: "local", host: channel.host };
 	const service = new URL(channel.hosted).host;
-	if (channel.compute) return { kind: "cloud", service };
+	if (channel.compute) {
+		return { kind: "cloud", service, stopped: !!channel.stopped && !channel.computing };
+	}
 	return { kind: "hosted", service, workspace: channel.host };
 }

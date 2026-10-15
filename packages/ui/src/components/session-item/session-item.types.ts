@@ -42,6 +42,8 @@ export type SidebarRow = {
 		| "offline";
 	/** The machine running the channel, which an offline row names. */
 	host?: string;
+	/** Its cloud workspace is stopped; the chat stays readable and Start compute resumes it. */
+	stopped?: boolean;
 
 	// Agent (only meaningful while connection === "connected")
 	agent: "idle" | "thinking" | "tool" | "streaming" | "aborting";
