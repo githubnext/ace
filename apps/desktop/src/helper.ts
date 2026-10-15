@@ -50,12 +50,28 @@ export function helper(identifier: string, lane: boolean) {
 		return found;
 	}
 
+	// A health check times out while the helper is busy; only launchd knows whether it still runs.
+	async function launched(): Promise<boolean> {
+		const child = Bun.spawn([
+			"/bin/launchctl",
+			"print",
+			`gui/${process.getuid!()}/${identifier}.helper`,
+		], {
+			stdout: "pipe",
+			stderr: "ignore",
+		});
+		const [out] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+		return /^\tpid = \d+$/m.test(out);
+	}
+
 	async function status(): Promise<HelperState> {
 		const found = await info();
+		const service = lane ? "unregistered" as const : agent.status();
 		return {
-			service: lane ? "unregistered" as const : agent.status(),
+			service,
 			running: !!found,
 			managed: !!found?.helper,
+			unresponsive: !found && service === "enabled" && await launched(),
 		};
 	}
 
