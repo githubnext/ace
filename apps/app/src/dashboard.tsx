@@ -111,12 +111,12 @@ export function Dashboard(
 					trigger={
 						<button
 							type="button"
-							aria-label={`Select project, currently ${project.name}`}
+							aria-label={`Select project, currently ${project.label}`}
 							className="group inline-flex max-w-full select-none items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground outline-none transition-[background-color,color,box-shadow] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
 						/>
 					}
 				>
-					<span className="truncate">{project.name}</span>
+					<span className="truncate">{project.label}</span>
 					<IconChevronDown className="size-3 shrink-0" aria-hidden />
 				</ProjectPicker>
 				<h1 className="text-balance text-display-xs leading-[1.2] font-medium tracking-tight sm:text-display-sm lg:text-display">
@@ -124,8 +124,8 @@ export function Dashboard(
 				</h1>
 				<p className="max-w-[34rem] text-pretty text-sm leading-[1.55] text-foreground/65">
 					{local
-						? `What would you like to work on in ${project.name}?`
-						: `Catch up on ${project.name}’s channels on ${[...project.hosts].join(", ")}. ${
+						? `What would you like to work on in ${project.label}?`
+						: `Catch up on ${project.label}’s channels on ${[...project.hosts].join(", ")}. ${
 							onSetup
 								? `Set it up on ${here} to start channels here.`
 								: "Open a checkout on this host to start channels here."
@@ -139,7 +139,7 @@ export function Dashboard(
 			</section>
 			{needsGit && (
 				<div className="mx-auto mt-9 max-w-[39rem]">
-					<InitGit name={project.name} disabled={!connected} onInit={onInit} />
+					<InitGit name={project.label} disabled={!connected} onInit={onInit} />
 				</div>
 			)}
 			{creatable && (

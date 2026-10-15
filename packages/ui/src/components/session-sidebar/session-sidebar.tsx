@@ -59,6 +59,8 @@ export type SessionSidebarRepo = {
 	name: string;
 	org: string;
 	avatar?: string;
+	/** Shown on hover, such as the project's full path. */
+	title?: string;
 };
 
 export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children" | "onSelect"> & {
@@ -144,7 +146,7 @@ function RepoAvatar({ repo, className }: { repo: SessionSidebarRepo; className?:
 	);
 }
 
-function RepoName({ name }: { name: string }) {
+function RepoName({ name, title }: { name: string; title?: string }) {
 	let root = useRef<HTMLSpanElement>(null);
 	let [label, setLabel] = useState(name);
 
@@ -169,7 +171,7 @@ function RepoName({ name }: { name: string }) {
 	return (
 		<span ref={root} className="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-medium">
 			<span
-				title={label === name ? undefined : name}
+				title={title || (label === name ? undefined : name)}
 				className="inline-block max-w-full align-bottom"
 			>
 				{label}
@@ -205,7 +207,7 @@ function RepoRow({ repo, selected, onRepoChange, onRepoRemove }: {
 				onRepoRemove(repo);
 			}}
 		>
-			<RepoName name={repo.name} />
+			<RepoName name={repo.name} title={repo.title} />
 			<span className="relative grid size-5 shrink-0 place-items-center">
 				{selected && (
 					<IconCheck className="size-3.5 transition-opacity duration-150 ease-out group-hover/repo:opacity-0 group-focus/repo:opacity-0 group-focus-within/repo:opacity-0" />
@@ -276,6 +278,7 @@ export function ProjectPicker(
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
+				title={selected.title}
 				render={trigger || (
 					<Button
 						variant="ghost"

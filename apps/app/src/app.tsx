@@ -52,6 +52,7 @@ import {
 	label,
 	projectId,
 	projects,
+	title,
 } from "./projects";
 import { Settings } from "./settings";
 import { SetupProject } from "./setup-project";
@@ -345,6 +346,7 @@ export function App() {
 			id: value.id,
 			name: label(value, hello.host),
 			org: value.repo?.split("/")[0] || "",
+			title: title(value, hello.host),
 		})),
 	];
 	const { attention, pulse } = useAttention(
@@ -470,6 +472,7 @@ export function App() {
 		const target: AppProject = {
 			...value,
 			id,
+			label: value.name,
 			host: hello.host,
 			reachable: true,
 			hosts: new Set([hello.host]),
@@ -616,7 +619,7 @@ export function App() {
 								? (
 									<ChannelsSidebar
 										className="min-h-0 w-full min-w-0 flex-1 bg-transparent"
-										projectName={allProjects ? "All Projects" : current.name}
+										projectName={allProjects ? "All Projects" : current.label}
 										repos={repos}
 										selectedRepoId={allProjects ? ALL_PROJECTS : current.id}
 										groups={groups}
@@ -744,7 +747,7 @@ export function App() {
 									<h1 className="text-base font-medium">
 										{allProjects
 											? "Choose a channel from any project"
-											: `Choose a channel in ${current.name}`}
+											: `Choose a channel in ${current.label}`}
 									</h1>
 									{allProjects && (
 										<p className="text-sm text-muted-foreground">
@@ -753,7 +756,7 @@ export function App() {
 									)}
 									{!allProjects && !local && (
 										<p className="max-w-[34rem] text-sm text-muted-foreground">
-											{current.name} is checked out on {[...current.hosts].join(", ")}.{" "}
+											{current.label} is checked out on {[...current.hosts].join(", ")}.{" "}
 											{current.repo
 												? `Set it up on ${here} to start channels here.`
 												: "Open a checkout on this host to start channels here."}
@@ -762,7 +765,7 @@ export function App() {
 									{!allProjects && needsGit && (
 										<div className="w-full max-w-[34rem]">
 											<InitGit
-												name={current.name}
+												name={current.label}
 												disabled={!connected}
 												onInit={() => init(current.path)}
 											/>
@@ -797,7 +800,7 @@ export function App() {
 					attention={attention}
 					onChannel={select}
 					onCreate={current && creatable && connected
-						? { name: current.name, run: () => void create() }
+						? { name: current.label, run: () => void create() }
 						: undefined}
 				/>
 				{adding && <OpenProject onOpen={open} onClose={() => setAdding(false)} />}

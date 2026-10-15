@@ -52,9 +52,9 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 		>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>Set up {project.name} on {here}</DialogTitle>
+					<DialogTitle>Set up {project.label} on {here}</DialogTitle>
 					<DialogDescription>
-						{project.name} is checked out on {[...project.hosts].join(", ")}. Clone {project.repo}
+						{project.label} is checked out on {[...project.hosts].join(", ")}. Clone {project.repo}
 						{" "}
 						into a folder on {here}
 						{starting ? " to start the channel here." : "."}{" "}
