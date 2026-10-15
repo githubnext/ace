@@ -14,6 +14,7 @@ import type { ChannelInfo } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
 import { Connection, hostedAuth } from "./client";
+import { KEYCHAIN_WAITING } from "./keys";
 import { log } from "./log";
 import { hostedConfig, isWorkerAlive } from "./manage";
 import type { MoveTarget } from "./protocol";
@@ -87,7 +88,7 @@ async function credentials(waiting: (text: string | null) => void): Promise<Auth
 	let timer: Timer | undefined;
 	const slow = setTimeout(() => {
 		announced = true;
-		waiting("Ace Helper is waiting for keychain access");
+		waiting(KEYCHAIN_WAITING);
 	}, 1000);
 	const read = hostedAuth();
 	try {

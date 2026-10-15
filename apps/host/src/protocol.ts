@@ -142,6 +142,8 @@ export type CredentialStatus = {
 	stored: boolean | null;
 	override?: string;
 	error?: string;
+	/** A keychain read is still under way, usually on a macOS prompt; the rest is the last finished read. */
+	waiting?: string;
 };
 
 export type ProviderSettings = CredentialStatus & { id: ProviderId; name: string };

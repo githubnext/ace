@@ -3,7 +3,7 @@ import { access } from "node:fs/promises";
 
 import * as directory from "./directory";
 import { shell as environment } from "./environment";
-import { credential } from "./keys";
+import { latest } from "./keys";
 import type { Diagnostics } from "./protocol";
 import * as tailnet from "./tailnet";
 
@@ -38,17 +38,20 @@ async function shell(): Promise<Diagnostics["tools"][number]> {
 }
 
 export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
-	// A sync waiting on a keychain prompt must not hold the rest of the answer.
-	if (sync) await Promise.race([directory.sync(), Bun.sleep(25_000)]);
-	const [tools, tailscale, secret] = await Promise.all([
+	const secret = latest("ACE_SECRET", sync);
+	if (sync) {
+		const synced = directory.sync();
+		// A sync that waits on a keychain prompt lands on a later poll instead of holding this answer.
+		if (!(await secret).waiting) await Promise.race([synced, Bun.sleep(25_000)]);
+	}
+	const [tools, tailscale] = await Promise.all([
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(),
-		credential("ACE_SECRET"),
 	]);
 	return {
 		tools,
 		tailscale,
-		directory: { ...directory.status(), secret },
+		directory: { ...directory.status(), secret: await secret },
 		shell: { ...environment },
 	};
 }

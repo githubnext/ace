@@ -64,10 +64,14 @@ export function HostStatus({ active }: { active: boolean }) {
 		return () => clearTimeout(timer);
 	}, [active, checks]);
 
-	// The first directory sync lands in the background; show its result without a manual refresh.
+	// The first directory sync and a keychain read waiting on a prompt land in the background; show
+	// their results without a manual refresh.
 	useEffect(() => {
 		const directory = checks.value?.directory;
-		if (!active || !directory?.url || directory.synced || directory.failed) return;
+		if (!active || !directory) return;
+		if (!directory.secret.waiting && (!directory.url || directory.synced || directory.failed)) {
+			return;
+		}
 		const timer = setTimeout(() => setRetry((value) => value + 1), 3000);
 		return () => clearTimeout(timer);
 	}, [active, checks]);
