@@ -162,6 +162,8 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 		term.attachCustomKeyEventHandler((event) => {
 			if (event.type !== "keydown" || event.key !== "k") return true;
 			if (!(MAC ? event.metaKey : event.ctrlKey)) return true;
+			// Claims the key from the window's command palette shortcut.
+			event.preventDefault();
 			term.clear();
 			return false;
 		});

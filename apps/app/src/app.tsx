@@ -42,6 +42,7 @@ import { host } from "./host";
 import { Rename } from "./layout/rename";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
+import { Palette } from "./palette";
 import {
 	type AppProject,
 	channelProject,
@@ -737,6 +738,17 @@ export function App() {
 					</Main>
 					{page === "channels" && channel && <ChannelDetails channel={channel} />}
 				</Layout>
+				<Palette
+					channels={channels}
+					projects={available}
+					host={hello.host}
+					project={current?.id}
+					attention={attention}
+					onChannel={select}
+					onCreate={current && creatable && connected
+						? { name: current.name, run: () => void create() }
+						: undefined}
+				/>
 				{adding && <OpenProject onOpen={open} onClose={() => setAdding(false)} />}
 				{setup && (
 					<SetupProject
