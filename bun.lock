@@ -37,7 +37,7 @@
     },
     "apps/desktop": {
       "name": "@ace/desktop",
-      "version": "0.0.23",
+      "version": "0.0.37",
       "dependencies": {
         "@ace/host": "workspace:*",
         "@githubnext/desktop-tools": "catalog:desktop",
@@ -158,7 +158,7 @@
       "wrangler": "4.140.0",
     },
     "desktop": {
-      "@githubnext/desktop-tools": "github:githubnext/desktop-tools#8efe67fbd38ed293c8e76778f01814b3bd67c5db",
+      "@githubnext/desktop-tools": "github:githubnext/desktop-tools#ccb4750ded4ea4c0d365d0604b5c24eecd843bc6",
       "@types/three": "0.165.0",
       "electrobun": "1.18.1",
     },
@@ -454,7 +454,7 @@
 
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.2.8", "", {}, "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ=="],
 
-    "@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#8efe67f", { "bin": { "desktop-tools-build": "dist/build.js" } }, "githubnext-desktop-tools-8efe67f", "sha512-aR+M+EwhRHpmOzQQVsQWlkHcdJoKUi6YcRfCXSfWyM2pqBXTn9z4LpTjuzcsMR9wvNZ1P53r/wrIECCWsz/eZg=="],
+    "@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#ccb4750", { "bin": { "desktop-tools-build": "dist/build.js" } }, "githubnext-desktop-tools-ccb4750", "sha512-ubRz+14lp39aVUZL0wEBoJbDZ3OFNgLzj5d07JoSpcwnveHe+frsuXpjuTg7q4Cd2yiLY6IonnW8LHvCNQIeNw=="],
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
