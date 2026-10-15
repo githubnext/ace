@@ -69,7 +69,7 @@ const SettingsDoc = defineDoc<Settings>({
 	kind: "ace.settings",
 	version: 2,
 	scope: "session",
-	initial: () => ({ shared: false, desktop: true }),
+	initial: () => ({ shared: false, desktop: false }),
 	migrate: (value) => ({ shared: value.shared as boolean, desktop: true }),
 });
 
@@ -156,7 +156,7 @@ export class Channel {
 				if (!channel.#settings.desktop) {
 					return {
 						text:
-							"Native desktop tools are disabled for this channel by its owner. No desktop operation was dispatched.",
+							"Native desktop tools are off for this channel, and no desktop operation was dispatched. If the task needs them, ask the channel owner to turn on Channel desktop tools in the channel header, then wait for their reply instead of working around it.",
 						isError: true,
 						outcome: "refused",
 					};

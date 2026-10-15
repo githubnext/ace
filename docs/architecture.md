@@ -472,8 +472,9 @@ human messages. The teammate composer holds an invoking draft instead of sending
 is off.
 
 A separate owner-controlled desktop-tools toggle gates native desktop tool dispatch for the entire
-channel: owner and collaborator runs, all chats, and subagents. It starts enabled, including for
-existing channels. Disabling it refuses subsequent native desktop calls, even within active runs;
+channel: owner and collaborator runs, all chats, and subagents. New channels start with it off;
+existing channels keep their stored setting, and those without one stay enabled. A refused call
+tells the agent to ask the owner to turn it on from the channel header. Disabling it refuses subsequent native desktop calls, even within active runs;
 it does not cancel or undo calls already dispatched. Agent invocation and non-desktop tools remain
 available according to the sharing setting. This is a native tools gate, not a shell security
 sandbox: agents still run as the host's user and shell commands can access that user's environment.

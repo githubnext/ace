@@ -17,8 +17,9 @@ you trust with access to your host to reach Ace over your tailnet.
 New channels start with collaborator agent invocation off: teammates can read channel history and
 post messages, but not invoke agents. Turning it on with `bun ace share <channel> on` or the
 channel header lets teammates run commands as you on its host. `bun ace share <channel> off`
-blocks new collaborator invocations; active work continues. Disabling native desktop tools does
-not restrict shell access.
+blocks new collaborator invocations; active work continues. Native desktop tools also start off;
+the owner turns them on from the channel header, and an agent that needs them asks first.
+Disabling them does not restrict shell access.
 
 Keep the host's gateway on loopback or your private tailnet. **Do not expose it to the public
 internet** through Tailscale Funnel, port forwarding, or a public reverse proxy. Protect local

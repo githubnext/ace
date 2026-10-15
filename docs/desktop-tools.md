@@ -360,8 +360,10 @@ or uncertain result, inspect the target before deciding whether another action i
 The [tailnet is the team](architecture.md#the-team). The collaborator-agent switch controls new
 collaborator invocations, not the owner's invocations or already-active work. A separate
 owner-controlled desktop-tools setting gates every native desktop dispatch in this channel,
-including reads, clipboard operations, owner runs, other chats, and subagents. Both settings
-start enabled; existing channels retain their sharing choice and gain enabled desktop tools.
+including reads, clipboard operations, owner runs, other chats, and subagents. New channels start
+with both off; existing channels keep their stored settings, and those without one stay enabled.
+A refused desktop call tells the agent to ask the owner to turn on **Channel desktop tools** in the
+channel header rather than work around it.
 
 Turning desktop tools off refuses subsequent calls before the injected desktop capability runs;
 it does not cancel or undo an operation already dispatched. Non-desktop tools remain available.
