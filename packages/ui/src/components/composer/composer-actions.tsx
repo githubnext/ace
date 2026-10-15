@@ -1,5 +1,11 @@
 import { type ComponentPropsWithRef, type ReactNode, useState } from "react";
-import { AnimatePresence, m as motion, useMotionValue, useTransform } from "motion/react";
+import {
+	AnimatePresence,
+	m as motion,
+	useIsPresent,
+	useMotionValue,
+	useTransform,
+} from "motion/react";
 
 import { cn } from "../../lib/utils";
 
@@ -33,6 +39,9 @@ const CENTER = SECONDARY + GAP + PRIMARY / 2;
  * without a background-colored masking border on the primary.
  */
 function Secondary({ revealed, children }: { revealed: boolean; children: ReactNode }) {
+	// WebKit pauses animation frames in a hidden window, so an exit can outlast the action it
+	// offered, such as Stop after a run ends; a leaving action must stop being one at once.
+	let present = useIsPresent();
 	let x = useMotionValue(HIDDEN);
 	let mask = useTransform(
 		x,
@@ -44,6 +53,7 @@ function Secondary({ revealed, children }: { revealed: boolean; children: ReactN
 	return (
 		<motion.span
 			className="flex"
+			inert={!present}
 			style={{
 				x,
 				maskImage: mask,
