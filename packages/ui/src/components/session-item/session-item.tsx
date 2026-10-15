@@ -53,22 +53,15 @@ export type SessionItemProps = ComponentPropsWithRef<"button"> & {
 function avatar(member: SidebarRow["online"][number]) {
 	return {
 		src: member.avatar || `https://github.com/${member.id}.png?size=40`,
-		alt: member.name,
+		alt: member.away ? `${member.name} (away)` : member.name,
+		dimmed: member.away,
 	};
 }
 
-function names(members: SidebarRow["online"]) {
-	let shown = members.slice(0, PRESENCE_CAP).map((member) => member.name);
-	let more = members.length - shown.length;
-	if (more > 0) shown.push(`+${more}`);
-	return shown.join(", ");
-}
-
-/** People here in a channel or project, with their names in a tooltip. */
+/** People here in a channel or project; away people are dimmed, and the tooltip names everyone. */
 export function Presence({ members }: { members: SidebarRow["online"] }) {
 	if (members.length === 0) return null;
 
-	let label = names(members);
 	let visible = members.map(avatar);
 
 	return (
@@ -76,7 +69,7 @@ export function Presence({ members }: { members: SidebarRow["online"] }) {
 			<TooltipTrigger
 				render={
 					<span
-						aria-label={`Here: ${label}`}
+						aria-label={`Here: ${visible.map((member) => member.alt).join(", ")}`}
 						className="shrink-0 rounded-full"
 					/>
 				}
@@ -84,7 +77,14 @@ export function Presence({ members }: { members: SidebarRow["online"] }) {
 				<Facepile avatars={visible} max={PRESENCE_CAP} size={PRESENCE_SIZE} />
 			</TooltipTrigger>
 			<TooltipContent side="right" sideOffset={8}>
-				{label}
+				<span className="flex flex-col">
+					{members.map((member) => (
+						<span key={member.id}>
+							{member.name}
+							{member.away && <span className="text-background/60">{" "}away</span>}
+						</span>
+					))}
+				</span>
 			</TooltipContent>
 		</Tooltip>
 	);

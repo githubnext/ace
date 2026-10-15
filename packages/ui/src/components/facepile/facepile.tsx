@@ -7,6 +7,8 @@ type Avatar = {
 	src: string;
 	/** Accessible label (usually the user's name or handle). */
 	alt?: string;
+	/** Desaturated and faded, as for someone who is away. */
+	dimmed?: boolean;
 };
 
 type Props = Omit<ComponentPropsWithRef<"div">, "children"> & {
@@ -60,7 +62,10 @@ function Facepile({
 						role="none"
 						width={size}
 						height={size}
-						className="block shrink-0 contain-strict"
+						className={cn(
+							"block shrink-0 contain-strict",
+							avatar.dimmed && "opacity-45 grayscale",
+						)}
 						style={{ marginInlineStart: i === 0 ? 0 : offset }}
 					>
 						<mask id={mask}>
