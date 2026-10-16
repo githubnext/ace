@@ -27,8 +27,11 @@ export function url(): string | undefined {
 	if (existsSync(config)) return JSON.parse(readFileSync(config, "utf8")).url;
 }
 
-/** `app` is the team's web app, set where the directory is deployed. */
-let known: { hosts: Host[]; channels: Listing[]; app?: string } = { hosts: [], channels: [] };
+/** `app` and `hosted` are the team's web app and hosting service, set where the directory is deployed. */
+let known: { hosts: Host[]; channels: Listing[]; app?: string; hosted?: string } = {
+	hosts: [],
+	channels: [],
+};
 let synced: number | undefined;
 /** The last sync's failure, kept until a sync succeeds so Settings can say what is wrong and since when. */
 let error: string | undefined;

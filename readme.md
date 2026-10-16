@@ -130,6 +130,10 @@ the Keychain. Change or leave the directory, or remove the saved secret, in the 
 row shows the directory's URL, the last successful sync, and the last sync's error until a sync
 succeeds; Troubleshooting → Refresh status syncs at once.
 
+Name the hosting service in the directory so every host offers it in a channel's Move to menu:
+`printf %s https://ace-channel.<your-subdomain>.workers.dev | bunx wrangler secret put HOSTED` in
+`services/directory`.
+
 From a checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>`
 does the same. While Ace Helper or `ace serve` runs, both go through it: macOS asks before a signed
 Ace Helper reads a Keychain item another program, such as `bun` or `security`, saved.

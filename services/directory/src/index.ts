@@ -15,6 +15,8 @@ type Env = {
 	TAILNET?: string;
 	/** The team's deployed web app, which every host in the directory lets open its sockets. */
 	APP?: string;
+	/** The team's channel hosting service, which every host in the directory offers as a move destination. */
+	HOSTED?: string;
 };
 
 /** What a host publishes. Channel listings are opaque here: hosts define and read them. */
@@ -111,7 +113,7 @@ export default {
 		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") {
 			const { hosts, channels } = await directory.read();
-			return Response.json({ hosts, channels, app: env.APP });
+			return Response.json({ hosts, channels, app: env.APP, hosted: env.HOSTED });
 		}
 		const host = HOST.exec(pathname);
 		if (host && request.method === "PUT") {
