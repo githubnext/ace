@@ -1768,10 +1768,6 @@
 
     "@ace/compute-pilot/@sandbox-sdk/core": ["@sandbox-sdk/core@file:services/compute/vendor/sandbox-sdk/core", {}],
 
-    "@ace/desktop/@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#c3e08eb", { "bin": { "desktop-tools-build": "dist/build.js", "desktop-tools-app": "dist/app.js", "desktop-tools-mcp": "dist/mcp.js" } }, "githubnext-desktop-tools-c3e08eb", "sha512-GK0to7CODjRm46xgfxjjFsAVQ+yRSfoPNWv4XAQIhP7KCov80+R7iZt6vFhd37ULjtsUVExAmierbMG58ODXHQ=="],
-
-    "@ace/host/@githubnext/desktop-tools": ["@githubnext/desktop-tools@github:githubnext/desktop-tools#c3e08eb", { "bin": { "desktop-tools-build": "dist/build.js", "desktop-tools-app": "dist/app.js", "desktop-tools-mcp": "dist/mcp.js" } }, "githubnext-desktop-tools-c3e08eb", "sha512-GK0to7CODjRm46xgfxjjFsAVQ+yRSfoPNWv4XAQIhP7KCov80+R7iZt6vFhd37ULjtsUVExAmierbMG58ODXHQ=="],
-
     "@aws-sdk/credential-provider-sso/@aws-sdk/token-providers": ["@aws-sdk/token-providers@3.1138.0", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/nested-clients": "^3.997.46", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-GpyAr0DD63YOEmYFM6Df+gJuIgC92MMTiBK4FTKfxii5MJ9ge20epR7LyroulscYlG89J+ZB2ivFDPjvfQhzdw=="],
 
     "@babel/helper-compilation-targets/lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],

@@ -59,8 +59,15 @@ export class Compute extends DurableObject<Env> {
 	#queue: Promise<unknown> = Promise.resolve();
 	#sandbox: Promise<Sandbox> | undefined;
 
-	get #running(): boolean {
-		return !!this.ctx.storage.kv.get("running");
+	/** A container that restarted has lost its runner, so only a live runner counts as running. */
+	async #running(): Promise<boolean> {
+		if (await (await this.#box()).status() !== "running") return false;
+		try {
+			await this.#call("/health");
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** The workspace is a Sandbox SDK sandbox; only this adapter choice names a provider. */
@@ -78,13 +85,7 @@ export class Compute extends DurableObject<Env> {
 	async #destroy() {
 		const box = await this.#box();
 		this.#sandbox = undefined;
-		this.ctx.storage.kv.put("running", false);
-		try {
-			await box.stop();
-		} catch (error) {
-			// Destroying the container resets the Sandbox object while this call waits on it.
-			if (!String((error as Error).cause || error).includes("Durable Object reset")) throw error;
-		}
+		await box.stop();
 	}
 
 	#settings(): Settings {
@@ -119,7 +120,6 @@ export class Compute extends DurableObject<Env> {
 	 * exposed port on any provider.
 	 */
 	async #call(path: string, body?: unknown): Promise<Response> {
-		if (!this.#running) throw new Error("The sandbox is stopped");
 		const box = await this.#box();
 		let post = "";
 		if (body !== undefined) {
@@ -144,7 +144,6 @@ export class Compute extends DurableObject<Env> {
 	/** The container's instance type is fixed in wrangler.jsonc; the SDK has no portable size. */
 	async #boot(_selected: Size) {
 		const box = await this.#box();
-		this.ctx.storage.kv.put("running", true);
 		await box.process.spawnShell("bun --no-env-file runner.js", { cwd: "/app" });
 		for (let attempt = 0; attempt < 120; attempt++) {
 			try {
@@ -227,13 +226,12 @@ export class Compute extends DurableObject<Env> {
 
 	async #start(selected: Size) {
 		const settings = this.#settings();
-		if (this.#running) {
-			if (this.ctx.storage.kv.get("frozen") && !this.ctx.storage.kv.get("ready")) {
-				await this.#destroy();
-			} else {
-				throw new Error("Sandbox is already running; use resize to change its size");
-			}
+		const incomplete = this.ctx.storage.kv.get("frozen") && !this.ctx.storage.kv.get("ready");
+		if (!incomplete && await this.#running()) {
+			throw new Error("Sandbox is already running; use resize to change its size");
 		}
+		// Clears an incomplete start or a container that restarted without its runner.
+		await this.#destroy();
 		const manifest = this.ctx.storage.kv.get<Manifest>("checkpoint");
 		if (settings.started && !manifest) {
 			throw new Error(
@@ -261,7 +259,7 @@ export class Compute extends DurableObject<Env> {
 	 * previous attempt having done it, so a retry after a partial failure finishes the job.
 	 */
 	async #delete(id: string) {
-		if (this.#running) await this.#destroy();
+		await this.#destroy();
 		const channel = this.env.CHANNEL.getByName(id);
 		// A frozen channel refuses deletion; a thaw refused because it is active or gone is harmless.
 		await channel.fetch(`https://channel/channels/${id}/transfer`, {
@@ -282,12 +280,13 @@ export class Compute extends DurableObject<Env> {
 		}
 		const action = named || "status";
 		if (action === "status" && request.method === "GET") {
+			const running = await this.#running();
 			return Response.json({
-				running: this.#running,
+				running,
 				settings: this.ctx.storage.kv.get("settings"),
 				checkpoint: this.ctx.storage.kv.get("checkpoint"),
 				frozen: !!this.ctx.storage.kv.get("frozen"),
-				runner: this.#running ? await (await this.#call("/status")).json() : null,
+				runner: running ? await (await this.#call("/status")).json() : null,
 			});
 		}
 		if (request.method !== "POST") return new Response("Use POST", { status: 405 });
@@ -342,7 +341,7 @@ export class Compute extends DurableObject<Env> {
 		}
 		if (
 			["exec", "checkpoint", "stop", "resize", "resume"].includes(action)
-			&& !this.#running
+			&& !(await this.#running())
 		) {
 			throw new Error("The sandbox is stopped; use start to restore it");
 		}

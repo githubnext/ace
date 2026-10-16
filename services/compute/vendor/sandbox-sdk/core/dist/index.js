@@ -403,6 +403,12 @@ export const fromSandboxRuntime = (input) => ({
         delete: (id) => guarded(input, "snapshotDelete", "snapshots.delete", () => input.snapshots.delete(id)),
         restore: (id) => guarded(input, "snapshotRestore", "snapshots.restore", () => input.snapshots.restore(id)),
     },
+    status: () => guarded(input, "status", "status", () => {
+        if (input.status === undefined) {
+            return missingRuntime(input.provider, "status");
+        }
+        return input.status();
+    }),
     stop: input.stop,
 });
 /** build a normalized command result */

@@ -23,6 +23,7 @@ const capabilities = (backups) => ({
     snapshotCreate: backups ? "filesystem" : false,
     snapshotDelete: false,
     snapshotRestore: backups ? "filesystem" : false,
+    status: true,
     streaming: "separate",
 });
 const backupRoots = [
@@ -110,6 +111,10 @@ const wrap = async (action, feature) => {
         throw sandboxError(provider, `${feature} failed`, "provider", error);
     }
 };
+const isReset = (error) => typeof error === "object" &&
+    error !== null &&
+    "durableObjectReset" in error &&
+    error.durableObjectReset === true;
 const providerCode = (error) => {
     if (typeof error !== "object" || error === null || !("code" in error)) {
         return;
@@ -474,8 +479,25 @@ const createSandbox = (raw, cwd, options, support) => {
                 }
             },
         },
+        status: () => wrap(async () => {
+            const { status } = await raw.getState();
+            if (status === "running" || status === "healthy") {
+                return "running";
+            }
+            return status === "stopping" ? "stopping" : "stopped";
+        }, "status"),
         stop: async () => {
-            await wrap(() => raw.destroy(), "stop");
+            try {
+                await raw.destroy();
+            }
+            catch (error) {
+                // destroy() ends by destroying the container, which resets this Durable Object
+                // while the call is still waiting on it, so the reset means the stop completed
+                if (isReset(error)) {
+                    return;
+                }
+                throw sandboxError(provider, "stop failed", "provider", error);
+            }
         },
     };
 };
@@ -506,7 +528,11 @@ export const cloudflare = (options) => {
             if (Object.keys(env).length > 0) {
                 await raw.setEnvVars(env);
             }
-            await raw.mkdir(cwd, { recursive: true });
+            // The image ships /workspace, so connecting with the default cwd leaves the container
+            // untouched and status() can read it without starting it.
+            if (cwd !== "/workspace") {
+                await raw.mkdir(cwd, { recursive: true });
+            }
             return createSandbox(raw, cwd, { ...options, id }, support);
         },
         provider,

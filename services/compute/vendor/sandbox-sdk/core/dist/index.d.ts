@@ -1,5 +1,5 @@
 import type { Adapter, Capabilities, Capability, CapabilityModes, Cause, Code, Input, Options, Port, Preview, PreviewOptions, RawCapability, Result, Sandbox, SandboxRuntime } from "./types.js";
-export type { Adapter, Capabilities, Capability, CapabilityModes, Cause, Code, Entry, Exec, Files, Input, Mode, Options, Port, Ports, Preview, PreviewOptions, Process, RawCapability, Result, Running, Sandbox, SandboxRuntimeFiles, SandboxRuntimeProcess, SandboxRuntimePorts, SandboxRuntimePreview, SandboxRuntime, Snapshot, Snapshots, Spawn, Timer, Url, } from "./types.js";
+export type { Adapter, Capabilities, Capability, CapabilityModes, Cause, Code, Entry, Exec, Files, Input, Mode, Options, Port, Ports, Preview, PreviewOptions, Process, RawCapability, Result, Running, Sandbox, SandboxRuntimeFiles, SandboxRuntimeProcess, SandboxRuntimePorts, Status, SandboxRuntimePreview, SandboxRuntime, Snapshot, Snapshots, Spawn, Timer, Url, } from "./types.js";
 export { rawCapabilities } from "./types.js";
 /**
  * normalized error emitted by public sandbox sdk operations

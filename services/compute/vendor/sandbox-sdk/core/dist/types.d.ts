@@ -1,5 +1,5 @@
 /** normalized feature flags adapters expose for runtime branching */
-export type Capability = "environment" | "files" | "fileStreaming" | "ports" | "processExec" | "processSpawn" | "snapshotCreate" | "snapshotDelete" | "snapshotRestore" | "snapshotSource" | "streaming";
+export type Capability = "environment" | "files" | "fileStreaming" | "ports" | "processExec" | "processSpawn" | "snapshotCreate" | "snapshotDelete" | "snapshotRestore" | "snapshotSource" | "status" | "streaming";
 /** provider-specific capability keys available through `sandbox.raw` */
 export declare const rawCapabilities: readonly ["backup", "buckets", "codegen", "desktop", "drives", "git", "gpu", "interpreter", "lifecycle", "lsp", "mcp", "metrics", "network", "previews", "pty", "resources", "secrets", "sessions", "ssh", "system", "tunnels", "volumes", "watching", "websocket"];
 /** provider-specific capabilities available through `sandbox.raw` */
@@ -28,6 +28,8 @@ export type CapabilityModes = Readonly<{
     snapshotRestore: boolean | "disk" | "filesystem" | "memory" | "volume";
     /** fresh sandbox creation from a snapshot behavior */
     snapshotSource: boolean | "create-time";
+    /** lifecycle state reads that do not start or wake the sandbox */
+    status: boolean;
     /** background process output stream behavior */
     streaming: boolean | "combined" | "separate";
 }>;
@@ -210,6 +212,8 @@ export type Port = Readonly<{
     /** provider-issued preview URL token when the adapter supports it; treat it as a bearer credential */
     token?: string;
 }>;
+/** provider lifecycle state normalized across adapters */
+export type Status = "running" | "stopping" | "stopped";
 /**
  * normalized sandbox instance returned by every adapter
  *
@@ -235,6 +239,8 @@ export type Sandbox<Raw = unknown> = Readonly<{
     raw: Raw;
     /** snapshot operations gated by capabilities */
     snapshots: Snapshots;
+    /** current lifecycle state, read without starting or waking the sandbox */
+    status(): Promise<Status>;
     /** stop, destroy, or release the sandbox according to adapter semantics */
     stop(): Promise<void>;
 }>;
@@ -298,6 +304,8 @@ export type SandboxRuntime<Raw = unknown> = Readonly<{
     raw: Raw;
     /** snapshot operations gated by capabilities */
     snapshots: Snapshots;
+    /** current lifecycle state when `status` is advertised */
+    status?(): Promise<Status>;
     /** stop, destroy, or release the sandbox according to adapter semantics */
     stop(): Promise<void>;
 }>;
