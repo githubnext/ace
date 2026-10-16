@@ -24,10 +24,10 @@ export function QuestionInput({
 	...props
 }: Props) {
 	return (
-		<div className="relative mt-2">
+		<div className="relative mt-1.5">
 			<label
 				onPointerDown={event => event.currentTarget.querySelector("input")?.focus()}
-				className="flex items-start gap-2 text-sm"
+				className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-muted/60 has-disabled:cursor-not-allowed"
 			>
 				<input
 					type="radio"
