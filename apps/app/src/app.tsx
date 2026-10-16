@@ -463,8 +463,10 @@ export function App() {
 		chooseProject(projectId(hello.host, value.path, value.repo));
 	}
 
-	const isLocal = (checkout: Project, value: AppProject) =>
-		projectId(hello.host, checkout.path, checkout.repo) === value.id;
+	// Declared, not a const: the All Projects groups above call it during render.
+	function isLocal(checkout: Project, value: AppProject) {
+		return projectId(hello.host, checkout.path, checkout.repo) === value.id;
+	}
 
 	async function remove(value: AppProject) {
 		try {
