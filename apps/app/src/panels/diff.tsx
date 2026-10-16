@@ -207,6 +207,7 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 			creatingPr={git.creatingPr}
 			onCreatePr={git.createPr}
 			onCreateDraftPr={git.createDraftPr}
+			actions={git.actions}
 			onFileOpen={open}
 			className="rounded-none border-0"
 		/>

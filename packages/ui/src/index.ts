@@ -36,6 +36,7 @@ export {
 } from "./components/diff/diff-view";
 export { Facepile, type FacepileAvatar, type FacepileProps } from "./components/facepile/facepile";
 export { FileView, type FileViewProps } from "./components/file/file-view";
+export { type GitAction } from "./components/git-action";
 export {
 	Layout,
 	Main,
@@ -90,7 +91,6 @@ export {
 	type ScrollViewRange,
 } from "./components/scroll-view/scroll-view";
 export {
-	type DetailsAction,
 	type DetailsChanges,
 	type DetailsFact,
 	type DetailsLink,
