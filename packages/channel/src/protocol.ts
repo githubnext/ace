@@ -167,6 +167,12 @@ export type QueuedMessage = {
 
 export type Answer = { choices: number[] } | { custom: string };
 
+/** `from` is the author who reacted. */
+export type Reaction = { from: string; emoji: string };
+
+/** Each message's reactions by entry, in the order people added them. */
+export type Reactions = Record<EntryId, Reaction[]>;
+
 export type Request =
 	| { op: "info" }
 	| { op: "models" }
@@ -193,6 +199,10 @@ export type Request =
 	| { op: "chat"; author: string; model?: ModelRef }
 	/** Answer a pending `question` tool call: each question's chosen option indices or written answer. */
 	| { op: "answer"; chat?: ChatId; call: string; author: string; answers: Answer[] }
+	/** Add, or `remove`, the author's reaction to a human message or agent reply. */
+	| { op: "react"; chat?: ChatId; author: string; entry: EntryId; emoji: string; remove?: boolean }
+	/** Replace the author's own human message with a tombstone, for people and later model context. */
+	| { op: "delete"; chat?: ChatId; author: string; entry: EntryId }
 	| { op: "stop"; chat?: ChatId }
 	| { op: "kill" }
 	| { op: "share"; author: string; shared: boolean }
@@ -213,6 +223,8 @@ export type Request =
 		captions?: boolean;
 		/** Include progress events; older clients do not understand them. */
 		progress?: boolean;
+		/** Include deleted and reactions events; older clients do not understand them. */
+		actions?: boolean;
 	};
 
 export type Event =
@@ -222,7 +234,10 @@ export type Event =
 	 * does; pi keeps no copy, so they are sent once, live, for their authors to get back.
 	 */
 	| { kind: "queue"; chat: ChatId; messages: QueuedMessage[]; withdrawn?: QueuedMessage[] }
-	/** A human message; `invoked` when it asked the chat's agent to run. */
+	/**
+	 * A human message; `invoked` when it asked the chat's agent to run. A message its author deleted
+	 * replays `deleted`, without its text or images.
+	 */
 	| {
 		kind: "message";
 		chat: ChatId;
@@ -232,7 +247,12 @@ export type Event =
 		text: string;
 		images?: Image[];
 		invoked: boolean;
+		deleted?: boolean;
 	}
+	/** The message `entry` was deleted by its author since it was sent. */
+	| { kind: "deleted"; chat: ChatId; entry: EntryId }
+	/** The chat's complete reactions, sent on attachment when there are any and on every change. */
+	| { kind: "reactions"; chat: ChatId; reactions: Reactions }
 	/** `error` when the provider failed the response; `stopped` when someone stopped it. */
 	| {
 		kind: "reply";

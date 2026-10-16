@@ -1,4 +1,4 @@
-import type { QueuedMessage } from "@ace/channel/protocol";
+import type { QueuedMessage, Reactions } from "@ace/channel/protocol";
 import type { Listing, People } from "@ace/host/protocol";
 import type { Event } from "@ace/ui";
 
@@ -126,14 +126,25 @@ export function toEvents(
 	channels: Map<string, Listing>,
 	captions: Record<string, string>,
 	recaps: Record<string, string>,
+	reactions: Reactions,
 ): Event[] {
 	const events = items.map((item) => {
+		const reacted = item.entry === undefined ? undefined : reactions[item.entry];
 		const base = {
 			id: `${topic}::${item.key}`,
 			uid: item.key,
 			type: "message",
 			topic,
 			created_at: Math.floor(item.at / 1000),
+			...(reacted
+				? {
+					reactions: reacted.map(({ from, emoji }) => ({
+						from,
+						display: authorName(from, people, channels),
+						emoji,
+					})),
+				}
+				: {}),
 		} as const;
 		if (item.kind === "message") {
 			return {
@@ -143,7 +154,7 @@ export function toEvents(
 					value: item.author,
 					display: authorName(item.author, people, channels),
 				},
-				content: [
+				content: item.deleted ? [text("Message deleted")] : [
 					text(item.invoked && !/(^|\s)@ace\b/i.test(item.text) ? `@ace ${item.text}` : item.text),
 					...(item.images || []).map((image) => ({
 						type: "image" as const,

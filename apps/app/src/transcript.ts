@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { Image, QueuedMessage } from "@ace/channel/protocol";
+import type { Image, QueuedMessage, Reactions } from "@ace/channel/protocol";
 import { DISCONNECTED } from "@ace/host/gateway-client";
 import { CHANNEL_CLOSED, type ChannelInfo, type Event } from "@ace/host/protocol";
 
@@ -25,15 +25,19 @@ export type Item =
 	| {
 		kind: "message";
 		key: string;
+		entry: number;
 		at: number;
 		author: string;
 		text: string;
 		images?: Image[];
 		invoked: boolean;
+		deleted?: boolean;
 	}
 	| {
 		kind: "reply";
 		key: string;
+		/** Absent for a reply that only called tools, which takes no reactions. */
+		entry?: number;
 		at: number;
 		model: string;
 		text: string;
@@ -55,6 +59,7 @@ export type Transcript = {
 	captions: Record<string, string>;
 	/** Each tool call's recap of the work it was part of, by call ID. */
 	recaps: Record<string, string>;
+	reactions: Reactions;
 	/** Text streamed for the reply being generated. */
 	draft: string;
 	busy: boolean;
@@ -71,6 +76,7 @@ const EMPTY: Transcript = {
 	withdrawn: [],
 	captions: {},
 	recaps: {},
+	reactions: {},
 	draft: "",
 	busy: false,
 	live: false,
@@ -94,10 +100,22 @@ export function apply(state: Transcript, event: Event): Transcript {
 				...state,
 				items: [...state.items, { kind: "message", key: `e${event.entry}`, ...pick(event) }],
 			};
+		case "deleted":
+			return {
+				...state,
+				items: state.items.map((item) =>
+					item.kind === "message" && item.entry === event.entry
+						? { ...item, text: "", images: undefined, deleted: true }
+						: item
+				),
+			};
+		case "reactions":
+			return { ...state, reactions: event.reactions };
 		case "reply": {
 			const item: Item = {
 				kind: "reply",
 				key: `e${event.entry}`,
+				entry: event.entry,
 				at: event.at,
 				model: event.model,
 				text: event.text,
@@ -226,8 +244,16 @@ function withdraw(items: Item[], messages: QueuedMessage[]): Item[] {
 }
 
 function pick(event: Extract<Event, { kind: "message" }>) {
-	const { at, author, text, images, invoked } = event;
-	return { at, author, text, ...(images ? { images } : {}), invoked };
+	const { entry, at, author, text, images, invoked, deleted } = event;
+	return {
+		entry,
+		at,
+		author,
+		text,
+		...(images ? { images } : {}),
+		invoked,
+		...(deleted ? { deleted } : {}),
+	};
 }
 
 /** Automatic re-watches allowed before a watch stays open for `STABLE` ms. */
@@ -298,6 +324,7 @@ export function useTranscript(
 				queue: true,
 				captions: true,
 				progress: true,
+				actions: true,
 				...(chat === undefined ? {} : { chat }),
 			}, {
 				event(event) {

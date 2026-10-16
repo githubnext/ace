@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { Button, Timeline } from "@ace/ui";
+import { Button, Timeline, toast } from "@ace/ui";
 import type { Listing } from "@ace/host/protocol";
 
 import { Composer } from "./composer";
+import { DeleteMessage } from "./delete-message";
 import { desktop } from "./desktop";
 import { publish } from "./details";
 import { host } from "./host";
@@ -86,6 +87,7 @@ export function Conversation(
 				senders,
 				transcript.captions,
 				transcript.recaps,
+				transcript.reactions,
 			),
 		[
 			transcript.items,
@@ -97,8 +99,34 @@ export function Conversation(
 			senders,
 			transcript.captions,
 			transcript.recaps,
+			transcript.reactions,
 		],
 	);
+	const byKey = useMemo(
+		() => new Map(transcript.items.map((item) => [item.key, item])),
+		[transcript.items],
+	);
+	// Reactions and deletions target stored entries; the streamed draft and tool-only replies have none.
+	const actions = (uid: string) => {
+		const item = byKey.get(uid);
+		const stored = item?.entry !== undefined && !(item.kind === "message" && item.deleted);
+		// An archived channel refuses changes to its history.
+		const open = stored && channel.state !== "archived";
+		return { react: open, copy: stored && !!item.text, delete: open, permalink: false };
+	};
+	const [deleting, setDeleting] = useState<string>();
+	const act = (
+		request: { op: "react"; emoji: string; remove: boolean } | { op: "delete" },
+		uid: string,
+	) => {
+		const entry = byKey.get(uid)!.entry!;
+		host.channel(channel.id, { ...request, chat: id, author: user, entry }).catch((error: Error) =>
+			toast.error(
+				request.op === "react" ? "Could not react" : "Could not delete the message",
+				{ description: error.message },
+			)
+		);
+	};
 	// Keyed by Tailscale login for message authors and by GitHub login for mentions.
 	const avatars = useMemo(
 		() =>
@@ -146,9 +174,18 @@ export function Conversation(
 						<Timeline
 							className="h-full min-h-0 contain-paint scroll-fade [--fade:3rem]"
 							events={events}
-							toolbar={false}
 							working={transcript.busy || undefined}
-							currentUser={{ login: user }}
+							currentUser={{ login: user, own: [user] }}
+							actions={actions}
+							onReact={(uid, emoji) => {
+								const entry = byKey.get(uid)!.entry!;
+								const remove = !!transcript.reactions[entry]?.some((value) =>
+									value.from === user && value.emoji === emoji
+								);
+								act({ op: "react", emoji, remove }, uid);
+							}}
+							onCopy={(uid) => void navigator.clipboard.writeText(byKey.get(uid)!.text)}
+							onDelete={setDeleting}
 							avatars={avatars}
 							openSender={(sender) => {
 								const source = senders.get(sender);
@@ -178,6 +215,15 @@ export function Conversation(
 						</div>
 					)}
 			</div>
+			{deleting && (
+				<DeleteMessage
+					onDelete={() => {
+						act({ op: "delete" }, deleting);
+						setDeleting(undefined);
+					}}
+					onCancel={() => setDeleting(undefined)}
+				/>
+			)}
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
 				{transcript.live && (notice || transition || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">

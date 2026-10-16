@@ -11,6 +11,7 @@ import {
 	type Cursor,
 	defineDoc,
 	defineExtension,
+	type EntryId,
 	type EntryRecord,
 	Harness,
 	InboxDoc,
@@ -49,6 +50,7 @@ import { HANDOFF, Handoffs } from "./handoffs";
 import { type Images, images } from "./images";
 import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
+import { DeletionEntry, type Messages, MessagesDoc, react, remove } from "./messages";
 import { metadata, MetadataDoc, validateName } from "./metadata";
 import { available, choose, usable } from "./models";
 import { progress } from "./progress";
@@ -118,6 +120,14 @@ export type Options = {
 };
 
 type Send = (event: Event) => void;
+/** `reacted` once a reactions event, which carries the chat's whole state, has been sent. */
+type Listener = {
+	chat: ChatId;
+	send: Send;
+	captions: boolean;
+	actions: boolean;
+	reacted?: boolean;
+};
 
 export class Channel {
 	#options: Options;
@@ -132,7 +142,7 @@ export class Channel {
 	#publishedBusy?: boolean;
 	#unsubscribe?: () => void;
 	#admissions = new Map<ChatId, Promise<unknown>>();
-	#listeners = new Set<{ chat: ChatId; send: Send; captions: boolean }>();
+	#listeners = new Set<Listener>();
 	/** Chats with a captioning pass in progress; `true` when another pass must follow it. */
 	#captioning = new Map<ConversationId, boolean>();
 	#closing = new AbortController();
@@ -231,6 +241,15 @@ export class Channel {
 					channel.#broadcast();
 					continue;
 				}
+				if (change.record.kind === MessagesDoc.definition.kind) {
+					const { scope } = change.record;
+					const value = change.value as Messages | null;
+					if (scope.kind === "conversation" && value) {
+						const chat = scope.conversationId;
+						channel.#sendActions(chat, { kind: "reactions", chat, reactions: value.reactions });
+					}
+					continue;
+				}
 				if (change.record.kind === InboxDoc.definition.kind) {
 					const { scope } = change.record;
 					if (scope.kind === "conversation") {
@@ -307,6 +326,18 @@ export class Channel {
 				await this.#mayInvoke(request.author);
 				const { id } = await this.#conversation(request.chat);
 				return answer(this.#harness, id, request.call, request.author, request.answers, context);
+			}
+			case "react": {
+				this.#author(request.author);
+				const { id } = await this.#conversation(request.chat);
+				const entry = request.entry as EntryId;
+				const reaction = { from: request.author, emoji: request.emoji };
+				return react(this.#harness, id, entry, reaction, !!request.remove, context);
+			}
+			case "delete": {
+				this.#author(request.author);
+				const { id } = await this.#conversation(request.chat);
+				return remove(this.#harness, id, request.entry as EntryId, request.author, context);
 			}
 			case "stop":
 				return (await this.#conversation(request.chat)).abort(context);
@@ -785,6 +816,18 @@ export class Channel {
 		}
 	}
 
+	#sendActions(chat: ConversationId, event: Event): void {
+		for (const listener of this.#listeners) {
+			if (listener.chat !== chat || !listener.actions) continue;
+			try {
+				listener.reacted = true;
+				listener.send(event);
+			} catch {
+				this.#listeners.delete(listener);
+			}
+		}
+	}
+
 	/** Replays the chat's active transcript, then streams. Resolves when the stream ends. */
 	async #watch(request: Extract<Request, { op: "watch" }>, send: Send) {
 		const conversation = await this.#conversation(request.chat);
@@ -798,8 +841,24 @@ export class Channel {
 				throw error;
 			})
 			: undefined;
-		const listener = { chat: conversation.id, send, captions: !!request.captions };
+		const actions = !!request.actions;
+		const listener: Listener = {
+			chat: conversation.id,
+			send,
+			captions: !!request.captions,
+			actions,
+		};
 		this.#listeners.add(listener);
+		// Read after the stream's snapshot, so every deletion it holds is here; later ones arrive live.
+		const messages = await this.#harness.snapshot(MessagesDoc, conversation.id, context);
+		const deleted = messages?.deleted || {};
+		// Clients that did not opt in never see deletions as events, but replay still drops the text.
+		const forward = (event: Event) => {
+			if (event.kind === "deleted" && !actions) return;
+			if (event.kind !== "message" || !deleted[event.entry]) return send(event);
+			const { images: _, ...rest } = event;
+			send({ ...rest, text: "", deleted: true });
+		};
 		void stream.closed.then(() => {
 			this.#listeners.delete(listener);
 			tools?.stop();
@@ -807,7 +866,11 @@ export class Channel {
 		});
 		void view?.closed.then(() => stream.stop());
 		send(this.#event(conversation.id));
-		for (const entry of stream.snapshot.entries) for (const event of events(entry)) send(event);
+		for (const entry of stream.snapshot.entries) for (const event of events(entry)) forward(event);
+		// A commit while the document was read has already sent its newer state.
+		if (actions && !listener.reacted && Object.keys(messages?.reactions || {}).length) {
+			send({ kind: "reactions", chat: conversation.id, reactions: messages!.reactions });
+		}
 		if (request.captions) {
 			const captions = await this.#harness.snapshot(CaptionsDoc, conversation.id, context);
 			for (const { calls, text } of Object.values(captions?.groups || {})) {
@@ -843,7 +906,7 @@ export class Channel {
 			for (const event of batch) {
 				if (event.type === "snapshot") tools?.snapshot(event.tools);
 				else tools?.update(event);
-				for (const mapped of live(conversation.id, event)) send(mapped);
+				for (const mapped of live(conversation.id, event)) forward(mapped);
 			}
 		});
 		return {
@@ -906,7 +969,7 @@ function readable(error: string | undefined): string {
 }
 
 function live(chat: ChatId, event: AgentEvent): Event[] {
-	if (event.type === "message_end") return events(event.entry);
+	if (event.type === "message_end" || event.type === "entry_appended") return events(event.entry);
 	if (event.type === "message_update") {
 		const text = event.changes.flatMap((change) =>
 			change.type === "text_delta" ? [change.delta] : []
@@ -920,6 +983,7 @@ function live(chat: ChatId, event: AgentEvent): Event[] {
 
 function events(entry: EntryRecord): Event[] {
 	const chat = entry.conversationId;
+	if (DeletionEntry.is(entry)) return [{ kind: "deleted", chat, entry: entry.data.target }];
 	const human = room.human(entry);
 	if (human) return [{ kind: "message", chat, entry: entry.id, ...human }];
 	const message = entry.model?.[0];

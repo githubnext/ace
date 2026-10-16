@@ -134,6 +134,13 @@ Put a channel away. An archived channel keeps its history and can be resumed.
 **Delete**:
 Remove a channel permanently.
 
+**Delete a message**:
+Replace your own message with "Message deleted" for everyone and for agents' later runs. Runs that
+already read it keep what they learned, and the channel's data keeps the original.
+
+**Reaction**:
+An emoji anyone in the channel adds to a person's message or an agent's reply.
+
 **Dormant**:
 A channel whose worker is not running while its host is reachable. Opening it wakes it.
 _Avoid_: idle, asleep, offline

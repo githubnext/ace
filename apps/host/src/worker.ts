@@ -20,6 +20,8 @@ import type { WorkerInfo, WorkerRequest } from "./protocol";
 import { tabs } from "./tabs";
 
 const RETIRE_AFTER = 10 * 60_000;
+/** An archived channel keeps its history as it was archived. */
+const ARCHIVED = new Set(["say", "ask", "chat", "react", "delete"]);
 
 seal();
 
@@ -154,9 +156,7 @@ function serve(socket: Socket) {
 				send({ id: frame, ok: true, value: null });
 				return exit(false, "move");
 			}
-			if (
-				catalog.read(id).archived && (body.op === "say" || body.op === "ask" || body.op === "chat")
-			) {
+			if (catalog.read(id).archived && ARCHIVED.has(body.op)) {
 				throw new Error("The channel is archived");
 			}
 			// `wait` lasts as long as a run, which the move's busy check already refuses.

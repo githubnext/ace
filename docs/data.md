@@ -150,6 +150,12 @@ for compatibility. The version 2 form is written on the next settings change. Ne
 nor changing a setting rewrites chats, entries, or name/summary revisions; these gates are not a
 shell security sandbox.
 
+Message reactions and deletions live in pi's version 1 `ace.messages` conversation document:
+each entry's reactions as `{ from, emoji }` in the order added, and the deleted entries. A deletion
+also appends an `ace.deletion` entry whose context edit replaces the message for later model
+requests; the original entry stays in the database and in backups. Both kinds are new, so existing
+channels need no migration and read as having no reactions or deletions.
+
 The October 3, 2026 credential-deferral check opened a backed-up version 0 channel with no keys:
 its pi entries and selected model were unchanged. Fresh channels accepted human messages before
 provider setup and retained their history through a worker restart. Adding a real Anthropic key
@@ -194,3 +200,10 @@ pi tables hashed to the backup digests. The restored copies replayed the same hi
 from it with a real model, and the mid-run copy reported the interrupted tool and reran it. The live
 channels kept answering afterwards, and a thaw request found both active, not frozen. With the
 previous service build, `ace backup` reported that the service needs a redeploy and left no output.
+
+The October 16, 2026 message-actions check backed up a channel created by the previous build in
+an isolated `ACE_HOME` and restored it with the new build. Reacting, removing reactions, and
+deleting a message through the gateway, the app, and a worker socket added only new entries and
+documents: the original pi entries stayed byte-for-byte equivalent, the database passed an
+integrity check, and the source backup's checksums remained unchanged. A pi harness over a copy
+derived the deleted message as its author's "[deleted this message]" placeholder.
