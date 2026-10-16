@@ -644,7 +644,9 @@ Cloudflare WAF rule on a custom domain, or have hosts present tailnet-issued tok
 and verify them in the Workers.
 
 Each host's gateway serves its owner's app over loopback. Its tailnet listeners name each caller
-with `tailscale whois` and accept peer hosts or the owner's browser from an allowed origin.
+with `tailscale whois` and accept peer hosts or the owner's browser from an allowed origin: the
+host's own pages and the team's web app. The web app is the host's `ace web` setting, or else the
+`APP` the team's directory names when it is deployed, so joining the directory is the only setup.
 Teammates use their own host to reach shared channels. Local-only settings remain on loopback.
 `ace serve --loopback`, which `bun desktop dev` uses, has no tailnet listeners, peers, or directory
 entry, since another host on the same machine would publish under its tailnet name.
