@@ -616,6 +616,20 @@ export function App() {
 		}
 	}
 
+	async function fork(source: Listing) {
+		const id = toast.loading(`Forking ${source.name}…`);
+		try {
+			const value = await host.request<Pick<Listing, "id" | "name" | "project">>({
+				op: "fork",
+				channel: source.id,
+			});
+			toast.success(`Forked ${source.name} into ${value.name}`, { id });
+			select({ ...value, host: source.host, root: source.root, repo: source.repo });
+		} catch (error) {
+			toast.error(`Could not fork ${source.name}`, { id, description: (error as Error).message });
+		}
+	}
+
 	async function change(request: HostRequest) {
 		try {
 			await host.request(request);
@@ -744,6 +758,12 @@ export function App() {
 										onMoveTargets={connected && !deployed ? moveTargets : undefined}
 										onMove={connected && !deployed
 											? async (item, target) => setMoving({ item, target })
+											: undefined}
+										onFork={connected
+											? (item) => {
+												const value = listings.get(item.uid);
+												if (value) void fork(value);
+											}
 											: undefined}
 										onPin={(item) => setPins((value) => [...value, item.uid])}
 										onUnpin={(item) => setPins((value) => value.filter((id) => id !== item.uid))}

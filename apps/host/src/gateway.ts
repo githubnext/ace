@@ -22,6 +22,7 @@ import { move, targets } from "./move";
 import {
 	archive,
 	archiveInactive,
+	fork,
 	isRunning,
 	isWorkerAlive,
 	models,
@@ -343,7 +344,7 @@ async function lifecycle(
 	}
 }
 
-const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete"]);
+const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete", "fork"]);
 const windowOps = new Set<HostRequest["op"]>(["window", "windows", "tab-rename", "tab-result"]);
 const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
 const keychainOps = new Set<HostRequest["op"]>(["key-store", "key-forget", "directory-set"]);
@@ -403,7 +404,7 @@ async function handle(
 		throw new Error("Ace is pausing this machine's channels to install an update");
 	}
 	// A channel runs where it was created, so even its owner creates from that machine.
-	if (client.peer && request.op === "create") {
+	if (client.peer && (request.op === "create" || request.op === "fork")) {
 		throw new Error("Create channels from the host that will run them");
 	}
 	if (owned.has(request.op) && client.user !== catalog.user) {
@@ -541,6 +542,14 @@ async function handle(
 			const record = request.cloud
 				? await compute.create(request.project, request.model, request.name || undefined)
 				: catalog.create(await project(request.project), request.model, request.name || undefined);
+			await broadcast();
+			return record;
+		}
+		case "fork": {
+			if (!catalog.owns(request.channel)) {
+				throw new Error("Fork channels from the host that runs them");
+			}
+			const record = await fork(request.channel, client.user);
 			await broadcast();
 			return record;
 		}
