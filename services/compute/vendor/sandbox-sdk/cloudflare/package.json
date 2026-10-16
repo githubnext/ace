@@ -1,0 +1,12 @@
+{
+	"name": "@sandbox-sdk/cloudflare",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"license": "MIT",
+	"exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+	"dependencies": {
+		"@cloudflare/sandbox": "0.12.9",
+		"@sandbox-sdk/core": "file:../core"
+	}
+}

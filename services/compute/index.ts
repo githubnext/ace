@@ -1,3 +1,6 @@
+import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
+import { cloudflare } from "@sandbox-sdk/cloudflare";
+import { create, type Sandbox } from "@sandbox-sdk/core";
 import { DurableObject } from "cloudflare:workers";
 
 import { validateName } from "@ace/channel";
@@ -8,10 +11,12 @@ import { authorized, refused } from "@ace/directory/scope";
 import channels from "../channel/src/index";
 import type { Env as ChannelEnv } from "../channel/src/object";
 
+export { Sandbox } from "@cloudflare/sandbox";
 export { HostedChannel } from "../channel/src/object";
 
 type Env = ChannelEnv & {
 	COMPUTE: DurableObjectNamespace<Compute>;
+	Sandbox: DurableObjectNamespace<CloudflareSandbox>;
 	GITHUB_TOKEN?: string;
 };
 const SIZES = ["standard-1", "standard-2", "standard-3", "standard-4"] as const;
@@ -35,7 +40,7 @@ type Manifest = {
 };
 const CHUNK = 64 * 1024;
 const MAX = 16 * 1024 * 1024;
-const INACTIVITY = 6 * 60 * 60 * 1000;
+const INACTIVITY = "6h";
 
 function size(value: unknown): Size {
 	if (!SIZES.includes(value as Size)) throw new Error(`Size must be ${SIZES.join(", ")}`);
@@ -52,11 +57,33 @@ async function digest(bytes: Uint8Array): Promise<string> {
 /** Pilot checkpoints contain filesystem state only. Channel history remains in pi. */
 export class Compute extends DurableObject<Env> {
 	#queue: Promise<unknown> = Promise.resolve();
+	#sandbox: Promise<Sandbox> | undefined;
 
-	constructor(ctx: DurableObjectState, env: Env) {
-		super(ctx, env);
-		if (ctx.container?.running) {
-			void ctx.blockConcurrencyWhile(() => ctx.container!.setInactivityTimeout(INACTIVITY));
+	get #running(): boolean {
+		return !!this.ctx.storage.kv.get("running");
+	}
+
+	/** The workspace is a Sandbox SDK sandbox; only this adapter choice names a provider. */
+	#box(): Promise<Sandbox> {
+		this.#sandbox ||= create({
+			adapter: cloudflare({
+				binding: this.env.Sandbox,
+				id: this.#settings().id,
+				options: { sleepAfter: INACTIVITY },
+			}),
+		});
+		return this.#sandbox;
+	}
+
+	async #destroy() {
+		const box = await this.#box();
+		this.#sandbox = undefined;
+		this.ctx.storage.kv.put("running", false);
+		try {
+			await box.stop();
+		} catch (error) {
+			// Destroying the container resets the Sandbox object while this call waits on it.
+			if (!String((error as Error).cause || error).includes("Durable Object reset")) throw error;
 		}
 	}
 
@@ -87,24 +114,38 @@ export class Compute extends DurableObject<Env> {
 		this.ctx.storage.kv.put("frozen", action === "freeze");
 	}
 
+	/**
+	 * Bodies travel as files and the request runs inside the sandbox, so the runner needs no
+	 * exposed port on any provider.
+	 */
 	async #call(path: string, body?: unknown): Promise<Response> {
-		if (!this.ctx.container?.running) throw new Error("The sandbox is stopped");
-		const response = await this.ctx.container.getTcpPort(8080).fetch(`http://container${path}`, {
-			method: body === undefined ? "GET" : "POST",
-			body: body === undefined
-				? undefined
-				: body instanceof Uint8Array
-				? body
-				: JSON.stringify(body),
-		});
+		if (!this.#running) throw new Error("The sandbox is stopped");
+		const box = await this.#box();
+		let post = "";
+		if (body !== undefined) {
+			await box.files.write(
+				"/tmp/ace-request",
+				body instanceof Uint8Array ? body : JSON.stringify(body),
+			);
+			post = "-X POST --data-binary @/tmp/ace-request";
+		}
+		const result = await box.process.shell(
+			`curl -sS -o /tmp/ace-reply -w '%{http_code}' ${post} http://localhost:8080${path}; rm -f /tmp/ace-request`,
+			// Marked so the runner's quiescence check ignores this request's own processes.
+			{ timeout: 300_000, env: { ACE_CONTROL: "1" } },
+		);
+		const status = Number(result.stdout);
+		if (!status) throw new Error(`${path}: ${result.stderr}`);
+		const response = new Response(await box.files.read("/tmp/ace-reply"), { status });
 		if (!response.ok) throw new Error(`${path}: ${await response.text()}`);
 		return response;
 	}
 
-	async #boot(selected: Size) {
-		const container = this.ctx.container!;
-		container.start({ image: container.images.base, instance: selected, enableInternet: true });
-		await container.setInactivityTimeout(INACTIVITY);
+	/** The container's instance type is fixed in wrangler.jsonc; the SDK has no portable size. */
+	async #boot(_selected: Size) {
+		const box = await this.#box();
+		this.ctx.storage.kv.put("running", true);
+		await box.process.spawnShell("bun --no-env-file runner.js", { cwd: "/app" });
 		for (let attempt = 0; attempt < 120; attempt++) {
 			try {
 				await this.#call("/health");
@@ -186,9 +227,9 @@ export class Compute extends DurableObject<Env> {
 
 	async #start(selected: Size) {
 		const settings = this.#settings();
-		if (this.ctx.container!.running) {
+		if (this.#running) {
 			if (this.ctx.storage.kv.get("frozen") && !this.ctx.storage.kv.get("ready")) {
-				await this.ctx.container!.destroy();
+				await this.#destroy();
 			} else {
 				throw new Error("Sandbox is already running; use resize to change its size");
 			}
@@ -207,7 +248,7 @@ export class Compute extends DurableObject<Env> {
 			await this.#connect(false);
 		} catch (error) {
 			// No channel input can reach this incomplete replacement while it is frozen.
-			await this.ctx.container!.destroy();
+			await this.#destroy();
 			throw error;
 		}
 		this.ctx.storage.kv.put("settings", { ...settings, size: selected, started: true });
@@ -220,7 +261,7 @@ export class Compute extends DurableObject<Env> {
 	 * previous attempt having done it, so a retry after a partial failure finishes the job.
 	 */
 	async #delete(id: string) {
-		if (this.ctx.container!.running) await this.ctx.container!.destroy();
+		if (this.#running) await this.#destroy();
 		const channel = this.env.CHANNEL.getByName(id);
 		// A frozen channel refuses deletion; a thaw refused because it is active or gone is harmless.
 		await channel.fetch(`https://channel/channels/${id}/transfer`, {
@@ -242,11 +283,11 @@ export class Compute extends DurableObject<Env> {
 		const action = named || "status";
 		if (action === "status" && request.method === "GET") {
 			return Response.json({
-				running: this.ctx.container!.running,
+				running: this.#running,
 				settings: this.ctx.storage.kv.get("settings"),
 				checkpoint: this.ctx.storage.kv.get("checkpoint"),
 				frozen: !!this.ctx.storage.kv.get("frozen"),
-				runner: this.ctx.container!.running ? await (await this.#call("/status")).json() : null,
+				runner: this.#running ? await (await this.#call("/status")).json() : null,
 			});
 		}
 		if (request.method !== "POST") return new Response("Use POST", { status: 405 });
@@ -301,7 +342,7 @@ export class Compute extends DurableObject<Env> {
 		}
 		if (
 			["exec", "checkpoint", "stop", "resize", "resume"].includes(action)
-			&& !this.ctx.container!.running
+			&& !this.#running
 		) {
 			throw new Error("The sandbox is stopped; use start to restore it");
 		}
@@ -331,14 +372,14 @@ export class Compute extends DurableObject<Env> {
 			}
 			case "stop": {
 				const checkpoint = await this.#save();
-				await this.ctx.container!.destroy();
+				await this.#destroy();
 				await this.#channel("thaw");
 				return Response.json({ stopped: true, checkpoint });
 			}
 			case "resize": {
 				const selected = size(body.size);
 				const checkpoint = await this.#save();
-				await this.ctx.container!.destroy();
+				await this.#destroy();
 				await this.#start(selected);
 				return Response.json({ size: selected, checkpoint });
 			}

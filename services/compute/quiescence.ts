@@ -1,5 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 
+/** Set by the controller on the commands it runs to reach the runner. */
+export const CONTROL = "ACE_CONTROL=1";
+
 let baseline: Map<number, string> | undefined;
 
 // A dedicated container records its platform processes before accepting work. Start times
@@ -44,7 +47,11 @@ async function processes(): Promise<Map<number, string>> {
 			if (fields.length < 20 || !/^\d+$/.test(fields[19])) {
 				throw new Error(`Cannot inspect process ${pid} before checkpointing`);
 			}
-			if (fields[0] !== "Z") found.set(pid, fields[19]);
+			if (fields[0] === "Z") return;
+			// The controller reaches the runner through processes it marks, which are not workspace work.
+			const environ = await readFile(`/proc/${pid}/environ`, "utf8").catch(() => "");
+			if (environ.split("\0").includes(CONTROL)) return;
+			found.set(pid, fields[19]);
 		}),
 	);
 	return found;
