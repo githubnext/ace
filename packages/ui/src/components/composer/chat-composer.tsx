@@ -18,6 +18,7 @@ import type { MarkType, Node as ProseMirrorNode, NodeType } from "prosemirror-mo
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
+import { canDictate, useDictation } from "../../hooks/use-dictation";
 import { useDraft } from "../../hooks/use-draft";
 import { useHistory } from "../../hooks/use-history";
 import { useMic } from "../../hooks/use-mic";
@@ -177,7 +178,7 @@ type Props = {
 	agents?: Agent[];
 	/** Overrides the active mode's placeholder. */
 	placeholder?: string;
-	/** Enables the microphone + recording UI. Defaults to false. */
+	/** Enables dictation where the runtime can transcribe speech. Defaults to false. */
 	mic?: boolean;
 	mode?: string;
 	onModeChange?: (mode: string) => void;
@@ -598,7 +599,7 @@ function useComposer({
 	models,
 	agents,
 	placeholder,
-	mic = false,
+	mic: dictation = false,
 	mode,
 	onModeChange,
 	model,
@@ -673,7 +674,15 @@ function useComposer({
 	let draft = useDraft(scope);
 	let restoredMode = useRef(draft.defaultValue ? curMode : undefined);
 	let history = useHistory(scope);
+	let mic = dictation && canDictate;
 	let analyser = useMic(mic && recording);
+	let dictated = useRef({ from: 0, size: 0 });
+	useDictation(mic && recording, (text) => {
+		let v = view.current!;
+		let { from, size } = dictated.current;
+		v.dispatch(v.state.tr.insertText(text, from, from + size));
+		dictated.current.size = text.length;
+	}, () => setRecording(false));
 
 	let view = useRef<EditorView | null>(null);
 	let file = useRef<HTMLInputElement | null>(null);
@@ -957,9 +966,15 @@ function useComposer({
 		v.focus();
 	}
 
+	function record() {
+		dictated.current = { from: view.current!.state.selection.from, size: 0 };
+		setRecording(true);
+	}
+
 	function send() {
 		let v = view.current;
 		if (!v) return;
+		setRecording(false);
 		let text = v.state.doc.textContent;
 		let sentMode = modeRef.current;
 		let mode = latest.current.modes.find(item => item.id === sentMode);
@@ -1183,6 +1198,7 @@ function useComposer({
 		empty,
 		filled,
 		planning,
+		record,
 		setRecording,
 		cancel,
 		link,
@@ -1635,6 +1651,7 @@ function ComposerSend({ state }: { state: ComposerState }) {
 		submitBusy,
 		submitLabel,
 		planning,
+		record,
 		setRecording,
 		send,
 		sendable,
@@ -1650,9 +1667,7 @@ function ComposerSend({ state }: { state: ComposerState }) {
 			busyLabel={submitLabel}
 			plan={planning}
 			className="relative z-10"
-			onRecord={mic
-				? () => setRecording(true)
-				: undefined}
+			onRecord={mic ? record : undefined}
 			onStop={mic ? () => setRecording(false) : undefined}
 			onSend={send}
 			disabled={!sendable && (!mic || busy || !canSend)}

@@ -293,6 +293,7 @@ export function Composer(
 				accessory={accessory}
 				scope={scope}
 				tools={!phone}
+				mic
 				modes={blocked ? BLOCKED_MODES : MODES}
 				mode={mode}
 				onModeChange={changeMode}

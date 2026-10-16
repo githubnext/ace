@@ -26,6 +26,14 @@ export default {
 			codesign: false,
 			notarize: false,
 			createDmg: false,
+			// Electrobun writes these usage strings into Info.plist; macOS ends the app when the composer's
+			// dictation asks for the microphone or speech recognition without them. Signing uses
+			// native/entitlements.plist, which carries the hardened-runtime audio-input entitlement.
+			entitlements: {
+				"com.apple.security.device.audio-input": "Ace listens while you dictate a message.",
+				"com.apple.security.personal-information.speech-recognition":
+					"Ace turns your dictation into message text.",
+			},
 		},
 	},
 	release: { generatePatch: false },
