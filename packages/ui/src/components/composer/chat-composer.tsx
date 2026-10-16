@@ -83,6 +83,7 @@ import {
 	IconConsoleMicro,
 	IconListTodoMicro,
 	IconMessageMicro,
+	IconMicMicro,
 	IconSparkleMicro,
 	IconStopFilledMicro,
 	IconTextMicro,
@@ -555,13 +556,16 @@ function presentation({
 	let AgentIcon = selectedAgent?.icon
 		?? (selectedAgent?.id === "plan" ? IconListTodoMicro : IconSparkleMicro);
 	let filtering = query.trim().length > 0;
+	// The submit button doubles as the mic only while there is nothing to send; otherwise the
+	// options toolbar carries the mic so dictation can still extend a draft.
+	let voice = mic && !busy && empty && !curAttach.length;
 	let tip = terminal
 		? "Run"
 		: edit
 		? editingRerun ? "Save & rerun" : "Save edit"
 		: recording
 		? "Stop recording"
-		: mic && !busy && empty && !curAttach.length
+		: voice
 		? "Record"
 		: "Send";
 
@@ -583,6 +587,7 @@ function presentation({
 		selectedAgent,
 		AgentIcon,
 		filtering,
+		voice,
 		tip,
 	};
 }
@@ -676,12 +681,13 @@ function useComposer({
 	let history = useHistory(scope);
 	let mic = dictation && canDictate;
 	let analyser = useMic(mic && recording);
-	let dictated = useRef({ from: 0, size: 0 });
+	let dictated = useRef({ from: 0, size: 0, before: "", after: "" });
 	useDictation(mic && recording, (text) => {
 		let v = view.current!;
-		let { from, size } = dictated.current;
-		v.dispatch(v.state.tr.insertText(text, from, from + size));
-		dictated.current.size = text.length;
+		let { from, size, before, after } = dictated.current;
+		let words = before + text + after;
+		v.dispatch(v.state.tr.insertText(words, from, from + size));
+		dictated.current.size = words.length;
 	}, () => setRecording(false));
 
 	let view = useRef<EditorView | null>(null);
@@ -967,7 +973,12 @@ function useComposer({
 	}
 
 	function record() {
-		dictated.current = { from: view.current!.state.selection.from, size: 0 };
+		let { doc, selection: { from, to } } = view.current!.state;
+		// Like system dictation: replace the selection, and keep spaces between the words already
+		// there and the dictated ones.
+		let before = /\S/.test(doc.textBetween(Math.max(0, from - 1), from)) ? " " : "";
+		let after = /\w/.test(doc.textBetween(to, Math.min(doc.content.size, to + 1))) ? " " : "";
+		dictated.current = { from, size: to - from, before, after };
 		setRecording(true);
 	}
 
@@ -1103,6 +1114,7 @@ function useComposer({
 		selectedAgent,
 		AgentIcon,
 		filtering,
+		voice,
 		tip,
 	} = presentation({
 		modes,
@@ -1182,6 +1194,7 @@ function useComposer({
 		query,
 		modelMenu,
 		filtering,
+		voice,
 		openModelMenu,
 		completeModelMenu,
 		setQuery,
@@ -1563,6 +1576,9 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 		analyser,
 		toolbar,
 		setToolbar,
+		mic,
+		voice,
+		record,
 	} = state;
 	return (
 		<Composer.Start className="min-w-0">
@@ -1611,6 +1627,28 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 					)
 					: (
 						<TooltipProvider>
+							{mic && !voice && (
+								<Tooltip>
+									<TooltipTrigger
+										render={
+											<Toolbar.Button
+												aria-label="Record"
+												onClick={record}
+												render={
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														className="text-muted-foreground"
+													/>
+												}
+											/>
+										}
+									>
+										<IconMicMicro />
+									</TooltipTrigger>
+									<TooltipContent>Record</TooltipContent>
+								</Tooltip>
+							)}
 							<Tooltip>
 								<TooltipTrigger
 									render={
@@ -1641,9 +1679,8 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 function ComposerSend({ state }: { state: ComposerState }) {
 	let {
 		mic,
+		voice,
 		busy,
-		empty,
-		curAttach,
 		edit,
 		filled,
 		ace,
@@ -1659,7 +1696,7 @@ function ComposerSend({ state }: { state: ComposerState }) {
 	} = state;
 	return (
 		<Composer.Submit
-			empty={mic && !busy && empty && !curAttach.length}
+			empty={voice}
 			ready={edit ? filled : filled && !ace}
 			recording={mic && recording}
 			editing={edit}

@@ -405,7 +405,7 @@ export function Dashboard(
 						agents={cloud ? PLACES : undefined}
 						agent={place}
 						onAgentChange={setPlace}
-						mic={false}
+						mic
 						tools={false}
 						canAttach={false}
 						canStop={false}
