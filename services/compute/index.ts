@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 
 import { validateName } from "@ace/channel";
 import type { ModelRef } from "@ace/channel/protocol";
+import { credential } from "@ace/directory/credential";
+import { authorized, refused } from "@ace/directory/scope";
 
 import channels from "../channel/src/index";
 import type { Env as ChannelEnv } from "../channel/src/object";
@@ -120,7 +122,7 @@ export class Compute extends DurableObject<Env> {
 			repository: settings.repository,
 			channel: settings.id,
 			hosted: settings.hosted,
-			secret: this.env.ACE_SECRET,
+			secret: await credential(this.env.ACE_SECRET!, this.env.TAILNET!),
 			gitToken: this.env.GITHUB_TOKEN,
 			owner: settings.owner,
 		});
@@ -358,13 +360,7 @@ export default {
 		if (path.startsWith("/channels/")) return channels.fetch(request, env);
 		const match = /^\/workspaces\/([a-z0-9-]{1,64})(?:\/[a-z-]+)?$/.exec(path);
 		if (!match) return new Response("Not found", { status: 404 });
-		const encoder = new TextEncoder();
-		const given = encoder.encode(request.headers.get("authorization") || "");
-		const expected = encoder.encode(`Bearer ${env.ACE_SECRET}`);
-		if (
-			!env.ACE_SECRET || given.length !== expected.length
-			|| !crypto.subtle.timingSafeEqual(given, expected)
-		) return new Response("Unauthorized", { status: 401 });
+		if (!(await authorized(request, env))) return refused(env);
 		return env.COMPUTE.getByName(match[1]).fetch(request);
 	},
 } satisfies ExportedHandler<Env>;

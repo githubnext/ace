@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import type { Lobby } from "./lobby";
+import { authorized, refused } from "./scope";
 
 export { Lobby } from "./lobby";
 
@@ -8,8 +9,10 @@ type Env = {
 	DIRECTORY: DurableObjectNamespace<Directory>;
 	/** One lobby per project, named by the project ID that hosts and apps share. */
 	LOBBY: DurableObjectNamespace<Lobby>;
-	/** Bearer secret shared by the team's hosts. */
+	/** The team's secret; hosts present it combined with `TAILNET` (see credential.ts). */
 	ACE_SECRET?: string;
+	/** The one tailnet this deployment serves, as its MagicDNS suffix. */
+	TAILNET?: string;
 };
 
 /** What a host publishes. Channel listings are opaque here: hosts define and read them. */
@@ -82,15 +85,6 @@ export class Directory extends DurableObject<Env> {
 	}
 }
 
-/** A deployment without `ACE_SECRET` refuses everything. */
-function authorized(request: Request, env: Env): boolean {
-	const encoder = new TextEncoder();
-	const given = encoder.encode(request.headers.get("authorization") ?? "");
-	const expected = encoder.encode(`Bearer ${env.ACE_SECRET}`);
-	return !!env.ACE_SECRET && given.byteLength === expected.byteLength
-		&& crypto.subtle.timingSafeEqual(given, expected);
-}
-
 function decoded(component: string): string | undefined {
 	try {
 		return decodeURIComponent(component);
@@ -104,7 +98,7 @@ const LOBBY = /^\/lobbies\/([^/]{1,1024})$/;
 
 export default {
 	async fetch(request, env) {
-		if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 });
+		if (!(await authorized(request, env))) return refused(env);
 		const { pathname } = new URL(request.url);
 		const lobby = LOBBY.exec(pathname);
 		if (lobby && request.headers.get("upgrade") === "websocket") {

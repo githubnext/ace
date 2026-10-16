@@ -24,8 +24,10 @@ import { DurableSqlite } from "./storage";
 
 export type Env = {
 	CHANNEL: DurableObjectNamespace<HostedChannel>;
-	/** Bearer secret shared by the team's hosts. */
+	/** The team's secret; hosts present it combined with `TAILNET` (see @ace/directory/credential). */
 	ACE_SECRET?: string;
+	/** The one tailnet this deployment serves, as its MagicDNS suffix. */
+	TAILNET?: string;
 };
 
 /** Paths are on the workspace host, whose file namespace is `workspace`. */
