@@ -25,6 +25,8 @@ type Item = {
 	createdAt: string;
 	updatedAt: string;
 	labels: { name: string; color: string }[];
+	headRefName?: string;
+	isCrossRepository?: boolean;
 };
 type Comment = {
 	id: string;
@@ -42,7 +44,6 @@ type Detail = Item & {
 	comments: Comment[];
 	reviews?: Review[];
 	baseRefName?: string;
-	headRefName?: string;
 	additions?: number;
 	deletions?: number;
 	changedFiles?: number;
@@ -244,6 +245,8 @@ function item(value: Item, kind: GithubKind): GithubItem {
 		created: value.createdAt,
 		updated: value.updatedAt,
 		labels: value.labels.map(({ name, color }) => ({ name, color })),
+		head: value.headRefName,
+		fork: value.isCrossRepository,
 	};
 }
 
@@ -267,7 +270,7 @@ export async function list(
 		"--search",
 		`${search} sort:updated-desc`.trim(),
 		"--json",
-		FIELDS + (kind === "prs" ? ",isDraft" : ""),
+		FIELDS + (kind === "prs" ? ",isDraft,headRefName,isCrossRepository" : ""),
 	]);
 	return {
 		items: values.slice(0, limit).map((value) => item(value, kind)),

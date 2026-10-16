@@ -114,6 +114,10 @@ export type GithubItem = {
 	created: string;
 	updated: string;
 	labels: { name: string; color: string }[];
+	/** A pull request's head branch, which names the channel whose lane pushed it. */
+	head?: string;
+	/** A listed pull request comes from another repository. */
+	fork?: boolean;
 };
 export type GithubList = { items: GithubItem[]; more: boolean };
 export type GithubCheck = {
