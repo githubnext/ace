@@ -13,6 +13,8 @@ type Env = {
 	ACE_SECRET?: string;
 	/** The one tailnet this deployment serves, as its MagicDNS suffix. */
 	TAILNET?: string;
+	/** The team's deployed web app, which every host in the directory lets open its sockets. */
+	APP?: string;
 };
 
 /** What a host publishes. Channel listings are opaque here: hosts define and read them. */
@@ -107,7 +109,10 @@ export default {
 			return env.LOBBY.get(env.LOBBY.idFromName(project)).fetch(request);
 		}
 		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
-		if (pathname === "/" && request.method === "GET") return Response.json(await directory.read());
+		if (pathname === "/" && request.method === "GET") {
+			const { hosts, channels } = await directory.read();
+			return Response.json({ hosts, channels, app: env.APP });
+		}
 		const host = HOST.exec(pathname);
 		if (host && request.method === "PUT") {
 			const publication = await request.json<Publication>();

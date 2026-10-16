@@ -1,13 +1,15 @@
 /**
  * The owner's other devices (a phone, a laptop away from this one) open Ace in a browser over the
  * tailnet. Tailscale names the person behind each connection; only this host's owner is served,
- * and only pages this host or the configured web app served may open a socket, so another site
- * in the owner's browser cannot drive the host.
+ * and only pages this host or the web app served may open a socket, so another site in the
+ * owner's browser cannot drive the host. The web app is this host's own setting, or else the one
+ * the team's directory names, so teammates who joined the directory need no setup of their own.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as catalog from "./catalog";
+import * as directory from "./directory";
 import { failure, log } from "./log";
 import { certificate, type Machine } from "./tailnet";
 
@@ -17,6 +19,8 @@ const file = join(catalog.home, "web.json");
 export function app(): string | undefined {
 	if (process.env.ACE_WEB_APP) return new URL(process.env.ACE_WEB_APP).origin;
 	if (existsSync(file)) return JSON.parse(readFileSync(file, "utf8")).app;
+	const team = directory.read().app;
+	if (team?.startsWith("https://")) return new URL(team).origin;
 }
 
 export function configure(value: string | undefined): void {
