@@ -470,7 +470,8 @@ offline, and a call in flight when it drops is reported to the model as failed.
 
 ### Cloud compute (beta)
 
-With Settings → Beta → Cloud compute on and a service URL saved, a new channel in a GitHub project
+With Settings → Beta → Cloud compute on and a service URL saved, or no saved choice and a team
+directory that names the service as `COMPUTE` when it is deployed, a new channel in a GitHub project
 can **Run in cloud** on the team's [compute service](../services/compute/README.md). The host calls
 `init` with the project's GitHub repository, its owner as the channel owner, and the project's Git
 `user.name` and `user.email` as the author; it then saves the record with `hosted` set to the

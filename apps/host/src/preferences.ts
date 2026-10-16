@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ModelRef } from "@ace/channel/protocol";
 
 import { config } from "./config";
+import * as directory from "./directory";
 import type { Compute } from "./protocol";
 
 export function isModel(value: unknown): value is ModelRef {
@@ -37,8 +38,12 @@ export function preference(): ModelRef | null {
 	return model;
 }
 
+/** A host's saved setting wins; otherwise the team's directory may name the service, which turns it on. */
 export function compute(): Compute {
-	return saved().compute || { enabled: false, url: null };
+	const own = saved().compute;
+	if (own) return own;
+	const team = directory.read().compute;
+	return team ? { enabled: true, url: team } : { enabled: false, url: null };
 }
 
 function save(patch: Saved): void {

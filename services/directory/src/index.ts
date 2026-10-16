@@ -17,6 +17,8 @@ type Env = {
 	APP?: string;
 	/** The team's channel hosting service, which every host in the directory offers as a move destination. */
 	HOSTED?: string;
+	/** The team's cloud compute service, which hosts that have saved none of their own use. */
+	COMPUTE?: string;
 };
 
 /** What a host publishes. Channel listings are opaque here: hosts define and read them. */
@@ -113,7 +115,13 @@ export default {
 		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") {
 			const { hosts, channels } = await directory.read();
-			return Response.json({ hosts, channels, app: env.APP, hosted: env.HOSTED });
+			return Response.json({
+				hosts,
+				channels,
+				app: env.APP,
+				hosted: env.HOSTED,
+				compute: env.COMPUTE,
+			});
 		}
 		const host = HOST.exec(pathname);
 		if (host && request.method === "PUT") {
