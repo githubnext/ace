@@ -27,6 +27,11 @@ started before Ace used it. SQLite may have
 committed data in `channel.sqlite-wal`, so copying only a live `channel.sqlite` is not a backup.
 The socket, worker PID, and logs are process state, not durable channel content.
 
+A host lists only channels whose `channel.json` names the tailnet it is on. Hidden channels stay on
+disk, intact, and Ace does not back them up or delete them. A channel from another tailnet
+reappears when the host starts on that tailnet; one from before Ace recorded tailnets has none and
+never reappears. `ace restore` adds a backup to the current tailnet.
+
 ## Back up a channel
 
 Run `bun ace backup <channel> <new-directory>` from the checkout, or `ace backup` (`ace-canary backup`
@@ -38,7 +43,7 @@ same care as the original chats and tool output.
 
 Every backup writes:
 
-- `channel.json`: the channel's catalog record: identity, owner, project, optional initial model,
+- `channel.json`: the channel's catalog record: identity, owner, tailnet, project, optional initial model,
   when its transcript last grew, and for a hosted channel its service URL.
 - The channel's pi state at the snapshot point, if it has any (below).
 - `backup.json`: format version, source paths, creation time, and SHA-256 checksums. This file is
