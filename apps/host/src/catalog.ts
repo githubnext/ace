@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { type Metadata, type ModelRef, type RunEnd, validateName } from "@ace/channel";
 
 import { config } from "./config";
-import { login } from "./tailnet";
+import { identity } from "./tailnet";
 
 export type Listing = {
 	version: 2;
@@ -29,6 +29,11 @@ export type Listing = {
 	summary?: string;
 	revision?: number;
 	owner: string;
+	/**
+	 * The tailnet the channel was created on, by MagicDNS suffix. Records from before tailnets were
+	 * recorded have none; they stay on disk but no host lists them.
+	 */
+	tailnet?: string;
 	project: string;
 	model?: ModelRef;
 	created: number;
@@ -62,7 +67,14 @@ const root = join(home, "channels");
  * The local human, named by their Tailscale login so they are the same participant on every
  * host. Without Tailscale the host is single-user and the OS account name stands in.
  */
-export const user = config.user || login() || userInfo().username;
+const current = identity();
+export const user = config.user || current.login || userInfo().username;
+
+/**
+ * Channels belong to the tailnet they were created on, and a host shows only its own tailnet's.
+ * Like `user`, it is fixed when the process starts; without Tailscale the host has no channels.
+ */
+export const tailnet = current.tailnet;
 
 export function dir(id: string): string {
 	return join(root, id);
@@ -119,7 +131,9 @@ function pick(words: string[]): string {
 
 /** A new channel's record, not yet saved: a hosted channel saves it once the service has it. */
 export function draft(project: string, model?: ModelRef, name?: string, hosted?: string): Listing {
-	const names = new Set(list().flatMap((record) => [record.name, record.prefix]));
+	if (!tailnet) throw new Error("Start Tailscale first: every channel belongs to a tailnet.");
+	// Hidden channels keep their lane branches in the same projects, so names stay unique across all.
+	const names = new Set(records().flatMap((record) => [record.name, record.prefix]));
 	const random = () => `${pick(WORDS[0])}-${pick(WORDS[1])}`;
 	let chosen = name ? validateName(name) : random();
 	if (name && names.has(chosen)) throw new Error(`A channel named ${chosen} already exists`);
@@ -131,6 +145,7 @@ export function draft(project: string, model?: ModelRef, name?: string, hosted?:
 		prefix: chosen,
 		named: !!name,
 		owner: user,
+		tailnet,
 		project,
 		model,
 		created: Date.now(),
@@ -152,7 +167,7 @@ export function save(record: Listing): Listing {
 
 /** Whether this host runs the channel. Ids arrive from peers, so only well-formed ones reach the disk. */
 export function owns(id: string): boolean {
-	return /^[0-9a-f]{16}$/.test(id) && existsSync(paths(id).record);
+	return /^[0-9a-f]{16}$/.test(id) && existsSync(paths(id).record) && isListed(read(id));
 }
 
 export function read(id: string): Listing {
@@ -198,12 +213,20 @@ export function ran(id: string, ran: RunEnd): void {
 	write({ ...read(id), ran });
 }
 
-export function list(): Listing[] {
+function isListed(record: Listing): boolean {
+	return !!tailnet && record.tailnet === tailnet;
+}
+
+function records(): Listing[] {
 	if (!existsSync(root)) return [];
 	return readdirSync(root)
 		.filter((id) => existsSync(paths(id).record))
-		.map(read)
-		.sort((a, b) => a.created - b.created);
+		.map(read);
+}
+
+/** This tailnet's channels; the others stay on disk untouched. */
+export function list(): Listing[] {
+	return records().filter(isListed).sort((a, b) => a.created - b.created);
 }
 
 /** Resolve a channel by ID or name. */

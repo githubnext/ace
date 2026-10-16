@@ -41,16 +41,17 @@ function options() {
 	return { env: { ...process.env, TAILSCALE_BE_CLI: "1" }, timeout: 5000 };
 }
 
-export function login(): string | undefined {
-	if (!binary) return;
+/** Who runs this host and on which tailnet, by MagicDNS suffix; nothing without Tailscale. */
+export function identity(): { login?: string; tailnet?: string } {
+	if (!binary) return {};
 	const result = Bun.spawnSync([binary, "status", "--json"], {
 		...options(),
 		stderr: "ignore",
 	});
-	if (!result.success) return;
+	if (!result.success) return {};
 	const status = JSON.parse(result.stdout.toString()) as Status;
-	if (status.BackendState !== "Running") return;
-	return status.User?.[status.Self.UserID]?.LoginName;
+	if (status.BackendState !== "Running") return {};
+	return { login: status.User?.[status.Self.UserID]?.LoginName, tailnet: status.MagicDNSSuffix };
 }
 
 async function run(args: string[]): Promise<unknown> {
