@@ -77,6 +77,12 @@ export async function create(
 	return catalog.save(record);
 }
 
+/** A failed start leaves the channel frozen: it runs nothing and refuses connections. */
+export async function frozen(id: string): Promise<boolean> {
+	const { hosted } = catalog.read(id);
+	return (await call<{ frozen: boolean }>(`${hosted}/workspaces/${id}/status`)).frozen;
+}
+
 /** Checkpoints the workspace and stops its container; the chat stays readable while stopped. */
 export async function stop(id: string): Promise<void> {
 	const { hosted, compute } = catalog.read(id);

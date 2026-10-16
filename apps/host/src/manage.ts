@@ -7,6 +7,7 @@ import { available, choose, usable } from "@ace/channel/models";
 
 import * as catalog from "./catalog";
 import { Connection, hostedAuth, request } from "./client";
+import { frozen } from "./compute";
 import { config } from "./config";
 import { refusal } from "./http";
 import { models as providers } from "./keys";
@@ -113,7 +114,11 @@ export async function host(
 }
 
 export async function kill(id: string): Promise<void> {
-	if (catalog.read(id).hosted) return request<void>(id, { op: "kill" });
+	const { hosted, compute } = catalog.read(id);
+	if (hosted) {
+		if (compute && await frozen(id)) return;
+		return request<void>(id, { op: "kill" });
+	}
 	const connection = await Connection.running(id);
 	if (!connection) return;
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -146,7 +151,8 @@ export async function archive(id: string, archived: boolean): Promise<catalog.Li
 
 /** Dormant workers retire only once idle, so only a live worker can have work in progress. */
 async function busy(id: string): Promise<boolean> {
-	const { hosted } = catalog.read(id);
+	const { hosted, compute } = catalog.read(id);
+	if (compute && await frozen(id)) return false;
 	const connection = hosted ? await Connection.hosted(hosted, id) : await Connection.running(id);
 	if (!connection) return false;
 	try {
