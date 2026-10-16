@@ -1,4 +1,10 @@
-import { getSupportedThinkingLevels, type Model, type Models } from "@earendil-works/pi-ai";
+import {
+	type AssistantMessage,
+	getSupportedThinkingLevels,
+	isContextOverflow,
+	type Model,
+	type Models,
+} from "@earendil-works/pi-ai";
 import { BACKGROUND_CONTEXT as context } from "@earendil-works/chord/context";
 import {
 	AgentDoc,
@@ -589,6 +595,10 @@ export class Channel {
 		this.#author(request.author);
 		const conversation = await this.#conversation(request.chat);
 		room.checkAttachments(request);
+		// The chat's next run reads this message, so it must fit the model the chat has now.
+		const { model } = await conversation.agent(context);
+		const selected = model && this.#options.models.getModel(model.provider, model.modelId);
+		if (selected) room.checkContext(selected, request);
 		const entry = room.draft(request.author, request.text, Date.now(), request);
 		const submission = await conversation.submit({
 			type: "write",
@@ -616,7 +626,7 @@ export class Channel {
 		room.checkAttachments(request);
 		await this.#mayInvoke(request.author);
 		const conversation = await this.#conversation(request.chat);
-		await this.#select(conversation, request.model, request.effort);
+		await this.#select(conversation, request, request.model, request.effort);
 		const submission = await conversation.submit({
 			type: "input",
 			content: room.content(request.author, request.text, request),
@@ -637,7 +647,12 @@ export class Channel {
 	}
 
 	/** Model and effort apply to a whole run, never just its later turns. */
-	async #select(conversation: Conversation, requested: ModelRef | undefined, effort?: Effort) {
+	async #select(
+		conversation: Conversation,
+		attached: room.Attached,
+		requested: ModelRef | undefined,
+		effort?: Effort,
+	) {
 		const agent = await conversation.agent(context);
 		const current = agent.model;
 		// A chat's inherited model can lose its provider key; only an explicit request must keep it.
@@ -651,6 +666,8 @@ export class Channel {
 		if (!selected) {
 			throw new Error(`Unknown model ${model.provider}/${model.modelId}`);
 		}
+		// Before configuring, so a refused message leaves the chat's model as it was.
+		room.checkContext(selected, attached);
 		const levels = getSupportedThinkingLevels(selected);
 		if (effort !== undefined && effort !== "off" && !levels.includes(effort)) {
 			throw new Error(
@@ -1009,6 +1026,18 @@ function readable(error: string | undefined): string {
 	}
 }
 
+/**
+ * The transcript keeps whatever overflowed, so every later run in the chat fails the same way until
+ * a person removes it; channels from before attachments were checked against the model can hold one.
+ */
+function failed(message: AssistantMessage): string {
+	const error = readable(message.errorMessage);
+	if (!isContextOverflow(message)) return error;
+	const hint = "This chat no longer fits the model's context, so every run fails this way until "
+		+ "you delete the message with the large attachment or pick a model with a larger context.";
+	return `${error.replace(/\.?$/, ".")} ${hint}`;
+}
+
 function live(chat: ChatId, event: AgentEvent): Event[] {
 	if (event.type === "message_end" || event.type === "entry_appended") return events(event.entry);
 	if (event.type === "message_update") {
@@ -1047,7 +1076,7 @@ function events(entry: EntryRecord): Event[] {
 				at,
 				model,
 				text,
-				...(error ? { error: readable(message.errorMessage) } : {}),
+				...(error ? { error: failed(message) } : {}),
 				...(stopped ? { stopped } : {}),
 			});
 		}

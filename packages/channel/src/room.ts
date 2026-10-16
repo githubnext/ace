@@ -1,4 +1,11 @@
-import type { ImageContent, Message, TextContent, UserMessage } from "@earendil-works/pi-ai";
+import type {
+	Api,
+	ImageContent,
+	Message,
+	Model,
+	TextContent,
+	UserMessage,
+} from "@earendil-works/pi-ai";
 import {
 	defineEntry,
 	type EntryRecord,
@@ -79,6 +86,36 @@ export function checkAttachments({ images = [], files = [] }: Attached) {
 	}
 	if (size > MAX_BYTES) throw new Error("Attachments are too large; send smaller or fewer files");
 }
+
+/**
+ * Bytes, not characters: non-Latin text costs more tokens per character, and Keynote's
+ * multilingual license PDF measured about 2.8 bytes per token on Claude.
+ */
+const BYTES_PER_TOKEN = 3;
+
+/**
+ * A message whose files can't fit the model's context fails its run and every later one, since
+ * the transcript keeps it. The rest of the window holds the prompt, tools, history, and answer.
+ */
+export function checkContext(model: Model<Api>, { files = [] }: Attached) {
+	if (!files.length) return;
+	const encoder = new TextEncoder();
+	const tokens = files.reduce(
+		(sum, file) => sum + Math.ceil(encoder.encode(file.text).length / BYTES_PER_TOKEN),
+		0,
+	);
+	const limit = Math.floor(model.contextWindow * 0.75);
+	if (tokens <= limit) return;
+	const names = files.map((file) => file.name).join(", ");
+	const verb = files.length === 1 ? "is" : "are";
+	throw new Error(
+		`${names} ${verb} about ${thousands(tokens)} tokens; ${model.name} reads at most about `
+			+ `${thousands(limit)} tokens of attachments in one message. Attach a smaller file or an `
+			+ "excerpt, or pick a model with a larger context.",
+	);
+}
+
+const thousands = (tokens: number) => `${Math.round(tokens / 1000)}K`;
 
 export function draft(author: string, text: string, timestamp: number, attached?: Attached) {
 	return {
