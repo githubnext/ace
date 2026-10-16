@@ -45,14 +45,14 @@ async function base(
 	context: Context,
 ) {
 	const head = (await read(env, cwd, "rev-parse HEAD", context)).trim();
-	if (cwd === project) return { base: head, head };
+	if (cwd === project) return { base: head, head, against: undefined };
 	const against = target || await legacy(env, cwd, project, context);
 	const fork = await read(env, cwd, `merge-base HEAD ${quote(against)}`, context).catch(() => {
 		throw new Error(
 			`Could not find where the lane forked from ${against}. Switch to the lane with another base.`,
 		);
 	});
-	return { base: fork.trim(), head };
+	return { base: fork.trim(), head, against };
 }
 
 /** `adds\tdels\tpath\0`, or `adds\tdels\t\0from\0to\0` for a rename; binary files count `-`. */
@@ -127,12 +127,13 @@ export async function changes(
 	lane: { name: string; base?: string } | undefined,
 	context: Context,
 ): Promise<Changes> {
-	const range = await base(env, cwd, project, lane?.base, context);
+	const { against, ...range } = await base(env, cwd, project, lane?.base, context);
 	const stat = async (args: string, state: Stat["state"]) =>
 		numstat(await read(env, cwd, `diff -M --numstat -z ${args}`, context))
 			.map((change) => Object.assign(change, { state }));
-	const [branch, committed, uncommitted, loose] = await Promise.all([
+	const [branch, behind, committed, uncommitted, loose] = await Promise.all([
 		read(env, cwd, "rev-parse --abbrev-ref HEAD", context),
+		against && read(env, cwd, `rev-list --count ${quote(`HEAD..${against}`)}`, context),
 		stat(`${range.base} ${range.head}`, "committed"),
 		stat(range.head, "uncommitted"),
 		untracked(env, cwd, context),
@@ -153,6 +154,7 @@ export async function changes(
 		...(name && name !== "HEAD" ? { branch: name } : {}),
 		cwd,
 		...range,
+		...(Number(behind) ? { behind: Number(behind) } : {}),
 		files,
 		...(loose.dirs.length ? { dirs: loose.dirs } : {}),
 	};

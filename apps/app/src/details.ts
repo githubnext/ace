@@ -5,14 +5,25 @@ import type { ChannelInfo } from "@ace/host/protocol";
 
 import type { Item } from "./transcript";
 
+/** A git or pull request action the chat's agent was asked to take. */
+export type Ask =
+	| "create"
+	| "commit"
+	| "update"
+	| "rebase"
+	| "review"
+	| "ready"
+	| "merge"
+	| "close";
+
 /** What an open channel's views know, shared with its details sidebar outside their tree. */
 export type Details = {
 	info?: ChannelInfo;
 	changes?: Changes;
 	/** The chat branch's newest pull request; `null` once read and none exists. */
 	pull?: GithubPull | null;
-	/** Whether the chat's agent was asked to open a pull request and hasn't finished. */
-	creating?: boolean;
+	/** What the chat's agent was asked to do and hasn't finished; `null` once it has. */
+	asked?: Ask | null;
 	items?: Item[];
 	/** Whether teammates may invoke agents, as the chat's watch reports it. */
 	shared?: boolean;

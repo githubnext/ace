@@ -350,10 +350,23 @@ function check(value: Check): GithubCheck {
 	return { name: value.name, ...(value.detailsUrl ? { url: value.detailsUrl } : {}), state };
 }
 
+const REVIEWS: Record<string, GithubPull["review"]> = {
+	APPROVED: "approved",
+	CHANGES_REQUESTED: "changes",
+	REVIEW_REQUIRED: "required",
+};
+
 /** The newest pull request whose head is `branch`, or null when there is none. */
 export async function pull(repo: string, branch: string): Promise<GithubPull | null> {
 	if (!branch || branch.startsWith("-")) throw new Error("Invalid branch name");
-	const [value] = await gh<(Item & { isDraft: boolean; statusCheckRollup: Check[] })[]>([
+	const [value] = await gh<
+		(Item & {
+			isDraft: boolean;
+			statusCheckRollup: Check[];
+			headRefOid: string;
+			reviewDecision: string;
+		})[]
+	>([
 		"pr",
 		"list",
 		"--repo",
@@ -364,10 +377,16 @@ export async function pull(repo: string, branch: string): Promise<GithubPull | n
 		"--limit",
 		"1",
 		"--json",
-		`${FIELDS},isDraft,statusCheckRollup`,
+		`${FIELDS},isDraft,statusCheckRollup,headRefOid,reviewDecision`,
 	]);
 	if (!value) return null;
-	return { ...item(value, "prs"), checks: value.statusCheckRollup.map(check) };
+	const review = REVIEWS[value.reviewDecision];
+	return {
+		...item(value, "prs"),
+		checks: value.statusCheckRollup.map(check),
+		sha: value.headRefOid,
+		...(review ? { review } : {}),
+	};
 }
 
 export async function files(repo: string, id: number): Promise<GithubFile[]> {

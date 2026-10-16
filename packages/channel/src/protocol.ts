@@ -96,6 +96,11 @@ export type Changes = {
 	cwd: string;
 	base: string;
 	head: string;
+	/**
+	 * Commits on the lane's base, as last fetched, that the lane doesn't have yet; absent when
+	 * none or without a lane.
+	 */
+	behind?: number;
 	files: Change[];
 	/** Untracked directories too large to list file by file. */
 	dirs?: { dir: string; files: number }[];
@@ -126,7 +131,13 @@ export type GithubCheck = {
 	state: "pending" | "passed" | "failed" | "skipped";
 };
 /** The newest pull request from a branch, with its latest check results. */
-export type GithubPull = GithubItem & { checks: GithubCheck[] };
+export type GithubPull = GithubItem & {
+	checks: GithubCheck[];
+	/** The head commit GitHub has; older hosts omit it. */
+	sha?: string;
+	/** What reviewers decided, when the base branch requires a review or someone gave one. */
+	review?: "approved" | "changes" | "required";
+};
 export type GithubComment = {
 	id: string;
 	url: string;
