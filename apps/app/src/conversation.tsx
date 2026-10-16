@@ -7,6 +7,7 @@ import { Checks } from "./checks";
 import { Composer } from "./composer";
 import { DeleteMessage } from "./delete-message";
 import { desktop } from "./desktop";
+import { EditMessage } from "./edit-message";
 import { publish } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
@@ -116,6 +117,20 @@ export function Conversation(
 		return { react: open, copy: stored && !!item.text, delete: open, permalink: false };
 	};
 	const [deleting, setDeleting] = useState<string>();
+	// Only a person's own stored messages are edited, and an archived channel refuses edits.
+	const editable = useMemo(
+		() =>
+			new Set(
+				channel.state === "archived"
+					? []
+					: transcript.items.flatMap((item) =>
+						item.kind === "message" && item.author === user && !item.deleted ? [item.key] : []
+					),
+			),
+		[transcript.items, user, channel.state],
+	);
+	const [editing, setEditing] = useState<string>();
+	const edited = editing === undefined || !editable.has(editing) ? undefined : byKey.get(editing);
 	const act = (
 		request: { op: "react"; emoji: string; remove: boolean } | { op: "delete" },
 		uid: string,
@@ -187,6 +202,9 @@ export function Conversation(
 							}}
 							onCopy={(uid) => void navigator.clipboard.writeText(byKey.get(uid)!.text)}
 							onDelete={setDeleting}
+							editable={editable}
+							editing={edited?.key}
+							onEdit={setEditing}
 							avatars={avatars}
 							openSender={(sender) => {
 								const source = senders.get(sender);
@@ -245,22 +263,36 @@ export function Conversation(
 				{transcript.live && (
 					<MessageQueue messages={transcript.queue} people={people} channels={senders} />
 				)}
-				<Composer
-					channel={channel}
-					chat={id}
-					user={user}
-					current={model}
-					currentEffort={chat?.effort}
-					busy={transcript.busy}
-					waiting={waiting}
-					shared={transcript.shared}
-					ready={transcript.live && !transition && channel.state !== "archived"}
-					draft={draft}
-					onDraftLoaded={onDraftLoaded}
-					returned={transcript.returned}
-					onSettings={onSettings}
-					accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
-				/>
+				{edited && (
+					<EditMessage
+						key={edited.key}
+						channel={channel.id}
+						chat={id}
+						user={user}
+						entry={edited.entry!}
+						text={edited.text}
+						onDone={() => setEditing(undefined)}
+					/>
+				)}
+				{/* Hidden rather than unmounted, so its draft and attachments wait out the edit. */}
+				<div className={edited ? "hidden" : "contents"}>
+					<Composer
+						channel={channel}
+						chat={id}
+						user={user}
+						current={model}
+						currentEffort={chat?.effort}
+						busy={transcript.busy}
+						waiting={waiting}
+						shared={transcript.shared}
+						ready={transcript.live && !transition && channel.state !== "archived"}
+						draft={draft}
+						onDraftLoaded={onDraftLoaded}
+						returned={transcript.returned}
+						onSettings={onSettings}
+						accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
+					/>
+				</div>
 			</div>
 		</>
 	);

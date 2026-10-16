@@ -37,6 +37,15 @@ export const MessagesDoc = defineDoc<Messages>({
  */
 export const DeletionEntry = defineEntry<{ author: string; target: number }>("ace.deletion");
 
+/**
+ * An edit in the transcript: the author's message now reads `text`, as of `at`. Its context edit
+ * replaces the message for later model requests; the newest edit of an entry wins there and in
+ * replay. Replies that answered the earlier text stay, since their runs already read it.
+ */
+export const EditEntry = defineEntry<{ author: string; target: number; text: string; at: number }>(
+	"ace.edit",
+);
+
 const EMOJI = /^\S{1,64}$/u;
 
 async function target(
@@ -107,6 +116,38 @@ export async function remove(
 		await tx.appendEntry(DeletionEntry, chat, {
 			data: { author, target: entry },
 			edits: [{ target: entry, action: "replace", messages: [placeholder] }],
+		});
+	}, context);
+}
+
+/** Only a message's own author edits it; images and files it carried stay with it. */
+export async function edit(
+	harness: Harness,
+	chat: ConversationId,
+	entry: EntryId,
+	author: string,
+	text: string,
+	context: Context,
+): Promise<void> {
+	const record = await target(harness, chat, entry, context);
+	const human = room.human(record);
+	if (!human) throw new Error("Only people's messages can be edited");
+	if (human.author !== author) throw new Error("Only a message's author can edit it");
+	if (typeof text !== "string") throw new Error("Invalid text");
+	const { images, files } = human;
+	if (!text.trim() && !images && !files) throw new Error("A message needs text; delete it instead");
+	const message = record.model![0] as UserMessage;
+	await harness.commit(async (tx) => {
+		const doc = await tx.doc(MessagesDoc, chat);
+		if (doc.deleted[entry]) throw new Error("The message was deleted");
+		const replacement: UserMessage = {
+			role: "user",
+			content: room.content(author, text, { images, files }),
+			timestamp: message.timestamp,
+		};
+		await tx.appendEntry(EditEntry, chat, {
+			data: { author, target: entry, text, at: Date.now() },
+			edits: [{ target: entry, action: "replace", messages: [replacement] }],
 		});
 	}, context);
 }

@@ -125,6 +125,12 @@ is one pi conversation in that Session.
   requests omit the text (unless a compaction summary already holds it) while runs that read it
   keep what they learned. Watches that opt in receive `deleted` and complete `reactions`
   snapshots; every watch replays a deleted message without its text.
+- **Edits keep entries too.** Only a message's author edits it, and an archived channel or a
+  deleted message refuses it. Editing appends an `ace.edit` entry with the new text, whose pi
+  context edit replaces the message under its author, keeping its images and files; the newest
+  edit or deletion of an entry wins. Agent replies to the earlier text stay in the transcript
+  and in later context, and an edit never reruns the agent. Watches that opt in receive `edited`
+  live; every watch replays a message with its newest text and when it was edited.
 - **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
   of each running call's output from pi's live tool slots, at most every half second per watch,
   each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable

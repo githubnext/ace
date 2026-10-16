@@ -50,7 +50,15 @@ import { HANDOFF, Handoffs } from "./handoffs";
 import { type Images, images } from "./images";
 import { lanes, LanesDoc } from "./lanes";
 import { failure, type Log, logging, scoped } from "./log";
-import { DeletionEntry, type Messages, MessagesDoc, react, remove } from "./messages";
+import {
+	DeletionEntry,
+	edit,
+	EditEntry,
+	type Messages,
+	MessagesDoc,
+	react,
+	remove,
+} from "./messages";
 import { metadata, MetadataDoc, validateName } from "./metadata";
 import { available, choose, usable } from "./models";
 import { progress } from "./progress";
@@ -353,6 +361,12 @@ export class Channel {
 				this.#author(request.author);
 				const { id } = await this.#conversation(request.chat);
 				return remove(this.#harness, id, request.entry as EntryId, request.author, context);
+			}
+			case "edit": {
+				this.#author(request.author);
+				const { id } = await this.#conversation(request.chat);
+				const entry = request.entry as EntryId;
+				return edit(this.#harness, id, entry, request.author, request.text, context);
 			}
 			case "stop":
 				return (await this.#conversation(request.chat)).abort(context);
@@ -867,12 +881,24 @@ export class Channel {
 		// Read after the stream's snapshot, so every deletion it holds is here; later ones arrive live.
 		const messages = await this.#harness.snapshot(MessagesDoc, conversation.id, context);
 		const deleted = messages?.deleted || {};
-		// Clients that did not opt in never see deletions as events, but replay still drops the text.
+		// Clients that did not opt in never see deletions or edits as events, but replay still drops
+		// a deleted message's content and shows an edited one's newest text.
 		const forward = (event: Event) => {
-			if (event.kind === "deleted" && !actions) return;
+			if ((event.kind === "deleted" || event.kind === "edited") && !actions) return;
 			if (event.kind !== "message" || !deleted[event.entry]) return send(event);
-			const { images: _, ...rest } = event;
+			const { images: _, files: __, edited: ___, ...rest } = event;
 			send({ ...rest, text: "", deleted: true });
+		};
+		// An edit follows its message, so replay folds the newest one in and sends no earlier text.
+		const edits = new Map<number, { text: string; at: number }>();
+		for (const entry of stream.snapshot.entries) {
+			if (EditEntry.is(entry)) edits.set(entry.data.target, entry.data);
+		}
+		const replay = (event: Event) => {
+			if (event.kind === "edited") return;
+			if (event.kind !== "message") return forward(event);
+			const edited = edits.get(event.entry);
+			forward(edited ? { ...event, text: edited.text, edited: edited.at } : event);
 		};
 		void stream.closed.then(() => {
 			this.#listeners.delete(listener);
@@ -881,7 +907,7 @@ export class Channel {
 		});
 		void view?.closed.then(() => stream.stop());
 		send(this.#event(conversation.id));
-		for (const entry of stream.snapshot.entries) for (const event of events(entry)) forward(event);
+		for (const entry of stream.snapshot.entries) for (const event of events(entry)) replay(event);
 		// A commit while the document was read has already sent its newer state.
 		if (actions && !listener.reacted && Object.keys(messages?.reactions || {}).length) {
 			send({ kind: "reactions", chat: conversation.id, reactions: messages!.reactions });
@@ -999,6 +1025,10 @@ function live(chat: ChatId, event: AgentEvent): Event[] {
 function events(entry: EntryRecord): Event[] {
 	const chat = entry.conversationId;
 	if (DeletionEntry.is(entry)) return [{ kind: "deleted", chat, entry: entry.data.target }];
+	if (EditEntry.is(entry)) {
+		const { target, text, at } = entry.data;
+		return [{ kind: "edited", chat, entry: target, text, at }];
+	}
 	const human = room.human(entry);
 	if (human) return [{ kind: "message", chat, entry: entry.id, ...human }];
 	const message = entry.model?.[0];

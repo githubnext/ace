@@ -154,6 +154,7 @@ export function toEvents(
 					value: item.author,
 					display: authorName(item.author, people, channels),
 				},
+				...(item.edited && !item.deleted ? { last_updated: Math.floor(item.edited / 1000) } : {}),
 				content: item.deleted ? [text("Message deleted")] : [
 					text(item.invoked && !/(^|\s)@ace\b/i.test(item.text) ? `@ace ${item.text}` : item.text),
 					...(item.images || []).map((image) => ({

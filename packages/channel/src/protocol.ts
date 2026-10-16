@@ -213,6 +213,8 @@ export type Request =
 	| { op: "react"; chat?: ChatId; author: string; entry: EntryId; emoji: string; remove?: boolean }
 	/** Replace the author's own human message with a tombstone, for people and later model context. */
 	| { op: "delete"; chat?: ChatId; author: string; entry: EntryId }
+	/** Replace the text of the author's own human message, for people and later model context. */
+	| { op: "edit"; chat?: ChatId; author: string; entry: EntryId; text: string }
 	| { op: "stop"; chat?: ChatId }
 	| { op: "kill" }
 	| { op: "share"; author: string; shared: boolean }
@@ -233,7 +235,7 @@ export type Request =
 		captions?: boolean;
 		/** Include progress events; older clients do not understand them. */
 		progress?: boolean;
-		/** Include deleted and reactions events; older clients do not understand them. */
+		/** Include deleted, edited, and reactions events; older clients do not understand them. */
 		actions?: boolean;
 	};
 
@@ -246,7 +248,8 @@ export type Event =
 	| { kind: "queue"; chat: ChatId; messages: QueuedMessage[]; withdrawn?: QueuedMessage[] }
 	/**
 	 * A human message; `invoked` when it asked the chat's agent to run. A message its author deleted
-	 * replays `deleted`, without its text or images.
+	 * replays `deleted`, without its text or images. An edited one replays its latest text, and
+	 * `edited` is when it was last edited.
 	 */
 	| {
 		kind: "message";
@@ -259,9 +262,12 @@ export type Event =
 		files?: TextFile[];
 		invoked: boolean;
 		deleted?: boolean;
+		edited?: number;
 	}
 	/** The message `entry` was deleted by its author since it was sent. */
 	| { kind: "deleted"; chat: ChatId; entry: EntryId }
+	/** The message `entry` was edited by its author at `at`, and now reads `text`. */
+	| { kind: "edited"; chat: ChatId; entry: EntryId; text: string; at: number }
 	/** The chat's complete reactions, sent on attachment when there are any and on every change. */
 	| { kind: "reactions"; chat: ChatId; reactions: Reactions }
 	/** `error` when the provider failed the response; `stopped` when someone stopped it. */
