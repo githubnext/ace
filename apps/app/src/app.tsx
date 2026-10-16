@@ -133,7 +133,7 @@ function row(
 		createdAt: Math.floor(channel.created / 1000),
 		lifecycle: channel.state === "archived" ? "archived" : "live",
 		private: false,
-		hosted: !!channel.hosted,
+		cloud: place.kind === "cloud",
 		mine: channel.owner === user,
 		member: true,
 		capabilities: {

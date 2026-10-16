@@ -104,7 +104,7 @@ function resolveIcon(data: SidebarRow) {
 		);
 	}
 	if (data.private) return <IconLock aria-label="Private channel" />;
-	if (data.hosted) return <IconCloud aria-label="Hosted channel" />;
+	if (data.cloud) return <IconCloud aria-label="Cloud channel" />;
 	return <IconHash aria-label="Channel" />;
 }
 
