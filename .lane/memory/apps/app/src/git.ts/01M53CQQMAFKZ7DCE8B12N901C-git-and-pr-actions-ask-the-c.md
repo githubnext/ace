@@ -4,8 +4,9 @@ anchor: function useGit
 created: 2026-10-16T22:18:47Z
 norm: '1'
 sig: 6c6d8173da981fc6
-body_hash: 3036eee7abd71d4a
-raw_hash: 3933f615a4c15744
+body_hash: a96a97fd9a2a567f
+raw_hash: 7b665c098e0225cc
+vouched: 2026-10-16T22:31:01Z
 lines: 28-57
 ---
 
