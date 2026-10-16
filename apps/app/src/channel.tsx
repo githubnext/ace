@@ -27,7 +27,7 @@ import { ChannelAccess } from "./channel-access";
 import { EFFORTS } from "./composer";
 import { Conversation } from "./conversation";
 import { forget, publish, useDetails } from "./details";
-import { useCreating, useGit } from "./git";
+import { useAsked, useGit } from "./git";
 import { host } from "./host";
 import { CHAT, Layout } from "./layout/layout";
 import { Diff, GROUPS } from "./panels/diff";
@@ -226,7 +226,7 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
 	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy);
 	useEffect(() => publish(channel.id, { pull }), [channel.id, pull]);
-	useCreating(channel.id, busy, pull);
+	useAsked(channel.id, busy, pull);
 	const git = useGit(channel, chat, user);
 	const totals = useMemo(() => {
 		if (!changes) return;
@@ -270,6 +270,7 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 				onDiff={details.diff}
 				onCreatePr={git.createPr}
 				onCreateDraftPr={git.createDraftPr}
+				actions={git.actions}
 				onClose={() => right.setOpen(false)}
 			/>
 		</Sidebar>

@@ -90,6 +90,7 @@ export {
 	type ScrollViewRange,
 } from "./components/scroll-view/scroll-view";
 export {
+	type DetailsAction,
 	type DetailsChanges,
 	type DetailsFact,
 	type DetailsLink,

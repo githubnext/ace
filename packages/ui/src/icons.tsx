@@ -3,6 +3,7 @@ import {
 	ArchiveRestore,
 	ArrowDownToLine,
 	ArrowUp,
+	ArrowUpFromLine,
 	ArrowUpRight,
 	Baseline,
 	Bold,
@@ -65,6 +66,7 @@ import {
 	type LucideProps,
 	Maximize2,
 	MessageCircle,
+	MessageSquareDiff,
 	MessageSquareShare,
 	Mic,
 	Monitor,
@@ -190,8 +192,10 @@ export const IconPlus = outline(Plus);
 export const IconPointer = outline(MousePointer2);
 export const IconPullRequest = outline(GitPullRequest);
 export const IconPullRequestClosed = outline(GitPullRequestClosed);
+export const IconPush = outline(ArrowUpFromLine);
 export const IconReact = outline(FaceSlightlySmilingPlus);
 export const IconRecord = outline(CircleDot);
+export const IconReview = outline(MessageSquareDiff);
 export const IconRotate = outline(RotateCw);
 export const IconRows = outline(Rows2);
 export const IconSearch = outline(Search);
