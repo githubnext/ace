@@ -281,6 +281,8 @@ export type HostRequest =
 	 * `compute-stop` checkpoints and stops it.
 	 */
 	| { op: "create"; project: string; name?: string; model?: ModelRef; cloud?: true }
+	/** A new sibling channel seeded from one this host runs, which resolves to its listing. */
+	| { op: "fork"; channel: string }
 	| { op: "compute-start"; channel: string }
 	| { op: "compute-stop"; channel: string }
 	| { op: "archive"; channel: string; archived: boolean }

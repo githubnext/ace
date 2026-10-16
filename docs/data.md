@@ -44,6 +44,7 @@ same care as the original chats and tool output.
 Every backup writes:
 
 - `channel.json`: the channel's catalog record: identity, owner, tailnet, project, optional initial model,
+  a fork's starting lane,
   when its transcript last grew, and for a hosted channel its service URL.
 - The channel's pi state at the snapshot point, if it has any (below).
 - `backup.json`: format version, source paths, creation time, and SHA-256 checksums. This file is

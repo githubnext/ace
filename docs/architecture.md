@@ -156,6 +156,14 @@ is one pi conversation in that Session.
   `agent@<prefix>` author of messages its agent sends other channels. The app, the agents that
   receive them, and handoff results name that sender by its current name, `#name`, when they read
   it; stored authors never change.
+- **Forks are sibling channels.** Fork channel creates a new channel in the source's project on its
+  host, named `fork-of-<name>` until its agent names it. It does not copy history: a message from
+  the person who forked it names the source as `#name` with its ID and carries the source's summary.
+  The source's root chat lane continues as a lane of the same name from its current commit, created
+  by the host before the fork's first open and recorded in pi when the fork's root chat is created;
+  uncommitted work stays in the source. The source is only read. Cloud compute channels can't be
+  forked yet, since their lanes are in the container. Forking from a message into a chat of the
+  same channel waits for multiple chats in the UI.
 - **Busy is a live listing projection.** A channel is busy while any chat, including a child chat,
   has a run in pi's `LiveDoc`. Opening takes an initial snapshot before scheduling resumes;
   committed live-document changes maintain the aggregate and `onBusy` publishes only transitions.

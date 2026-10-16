@@ -21,7 +21,17 @@ import * as loopback from "./loopback";
 import { preference } from "./preferences";
 import type { HostRequest, Listing, WindowInfo } from "./protocol";
 import { setModel } from "./settings";
-import { archive, host, isRunning, kill, models, parseModel, project, remove } from "./manage";
+import {
+	archive,
+	fork,
+	host,
+	isRunning,
+	kill,
+	models,
+	parseModel,
+	project,
+	remove,
+} from "./manage";
 import { move } from "./move";
 
 const HELP = `ace — channels on this host
@@ -30,6 +40,7 @@ const HELP = `ace — channels on this host
   ace ls [--all] [--team]                        --team adds reachable teammates' channels
   ace info <channel>
   ace rename <channel> <name>                   rename without changing its lanes
+  ace fork <channel>                             start a sibling channel from its summary and lane
   ace tabs [--port <port>] [--json]              list open windows and their current channel's tabs
   ace tab rename <window> <channel> <tab> <name>  rename one tab; an empty name restores its default
   ace backup <channel> <directory>              snapshot a local or hosted channel's data into a new directory
@@ -177,6 +188,7 @@ const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
 const owned: Record<string, string> = {
 	backup: "back it up",
 	rename: "rename it",
+	fork: "fork it",
 	kill: "kill it",
 	move: "move it",
 	share: "change its sharing",
@@ -462,6 +474,8 @@ async function main() {
 			if (rest.length !== 1) throw new Error("ace rename <channel> <name>");
 			await request(record.id, { op: "rename", author: catalog.user, name: rest[0]! });
 			return;
+		case "fork":
+			return console.log((await fork(record.id, catalog.user)).name);
 		case "kill":
 			return kill(record.id);
 		case "move": {

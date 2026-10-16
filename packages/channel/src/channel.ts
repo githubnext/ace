@@ -98,6 +98,11 @@ export type Options = {
 	/** Paths inside the execution environment's file system. */
 	project: string;
 	model?: ModelRef;
+	/**
+	 * The lane a forked channel's root chat starts in, recorded only in the commit that creates the
+	 * root chat, so reopening never moves a chat that has since switched lanes.
+	 */
+	lane?: { name: string; path: string; base: string };
 	/** The host's current preference, consulted only for a chat's first agent invocation. */
 	defaultModel?(): Promise<ModelRef>;
 	storage: Storage;
@@ -206,7 +211,17 @@ export class Channel {
 		if (!await harness.conversation(ROOT_CONVERSATION_ID, context)) {
 			await harness.commit(async (tx) => void await tx.doc(SettingsDoc), context);
 		}
-		await harness.root(context, { agent: { model: options.model, cwd: options.project } });
+		const { lane } = options;
+		await harness.root(context, {
+			agent: { model: options.model, cwd: lane?.path || options.project },
+			...(lane
+				? {
+					init: async (tx, chat) => {
+						(await tx.doc(LanesDoc)).lanes[lane.name] = { chat, path: lane.path, base: lane.base };
+					},
+				}
+				: {}),
+		});
 		const value = await harness.commit(async (tx) => {
 			const doc = await tx.doc(MetadataDoc);
 			// A missing document is the version 0 upgrade; existing pi metadata always wins.

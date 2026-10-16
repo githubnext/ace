@@ -36,6 +36,8 @@ export type Listing = {
 	tailnet?: string;
 	project: string;
 	model?: ModelRef;
+	/** A fork's starting lane, which its root chat records only when its pi state is created. */
+	lane?: { name: string; path: string; base: string };
 	created: number;
 	/** When the transcript last grew; channels from older builds have none until they next do. */
 	active?: number;
@@ -129,11 +131,30 @@ function pick(words: string[]): string {
 	return words[randomBytes(1)[0] % words.length];
 }
 
+/** Hidden channels keep their lane branches in the same projects, so names stay unique across all. */
+function taken(): Set<string> {
+	return new Set(records().flatMap((record) => [record.name, record.prefix]));
+}
+
+/**
+ * A fork's record, not yet saved, named for its source and numbered past names in use. `branches`
+ * holds lane prefixes left in the project by deleted channels. The name is not deliberate, so the
+ * fork's agent names it once its work takes shape, as it would a random one.
+ */
+export function fork(source: Listing, model: ModelRef | undefined, branches: Set<string>): Listing {
+	const names = taken();
+	const base = `fork-of-${source.name}`.slice(0, 63).replace(/-+$/, "");
+	let name = base;
+	for (let count = 2; names.has(name) || branches.has(name); count++) {
+		name = `${base.slice(0, 62 - String(count).length).replace(/-+$/, "")}-${count}`;
+	}
+	return { ...draft(source.project, model), name, prefix: name };
+}
+
 /** A new channel's record, not yet saved: a hosted channel saves it once the service has it. */
 export function draft(project: string, model?: ModelRef, name?: string, hosted?: string): Listing {
 	if (!tailnet) throw new Error("Start Tailscale first: every channel belongs to a tailnet.");
-	// Hidden channels keep their lane branches in the same projects, so names stay unique across all.
-	const names = new Set(records().flatMap((record) => [record.name, record.prefix]));
+	const names = taken();
 	const random = () => `${pick(WORDS[0])}-${pick(WORDS[1])}`;
 	let chosen = name ? validateName(name) : random();
 	if (name && names.has(chosen)) throw new Error(`A channel named ${chosen} already exists`);

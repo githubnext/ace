@@ -2,7 +2,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { resolve } from "node:path";
 
-import type { ChannelInfo, ModelRef } from "@ace/channel/protocol";
+import { ROOT_CONVERSATION_ID } from "@earendil-works/pi-durable";
+
+import type { Changes, ChannelInfo, ModelRef } from "@ace/channel/protocol";
 import { available, choose, usable } from "@ace/channel/models";
 
 import * as catalog from "./catalog";
@@ -111,6 +113,86 @@ export async function host(
 		);
 	}
 	return catalog.save(record);
+}
+
+/**
+ * Forks a channel into a new sibling channel in its project, seeded with the source's summary and
+ * a link back to it. The root chat's lane continues in a new lane from its current commit, where
+ * uncommitted work stays behind. The source is only read, never written.
+ */
+export async function fork(id: string, author: string): Promise<catalog.Listing> {
+	const source = catalog.read(id);
+	if (source.compute) {
+		throw new Error(
+			"Cloud compute channels can't be forked yet: their lanes are in the container.",
+		);
+	}
+	const connection = await Connection.open(id);
+	let info: ChannelInfo;
+	let changes: Changes;
+	try {
+		[info, changes] = await Promise.all([
+			connection.request<ChannelInfo>({ op: "info" }),
+			connection.request<Changes>({ op: "changes" }),
+		]);
+	} finally {
+		connection.close();
+	}
+	const root = info.chats.find((chat) => chat.id === ROOT_CONVERSATION_ID);
+	const refs = await git(source.project, [
+		"for-each-ref",
+		"--format=%(refname:lstrip=2)",
+		"refs/heads/",
+	]);
+	const branches = new Set(refs.stdout.split("\n").map((ref) => ref.split("/")[0]!));
+	const record = catalog.fork(source, root?.model || source.model, branches);
+	const lane = changes.lane
+		? {
+			name: changes.lane,
+			path: `${source.project}/.lane/trees/${record.prefix}/${changes.lane}`,
+			// The source's fork point, so the Diff shows its commits as well as the fork's own.
+			base: changes.base,
+		}
+		: undefined;
+	if (lane) await newLane(source.project, `${record.prefix}/${lane.name}`, changes.head);
+	const saved = catalog.save(lane ? { ...record, lane } : record);
+	await request(record.id, { op: "say", author, text: seed(info, changes, lane) });
+	return saved;
+}
+
+async function newLane(project: string, branch: string, base: string): Promise<void> {
+	// Ace's lane is in the helpers directory on the adopted PATH, which `env` makes Bun search.
+	const child = Bun.spawn(["lane", "new", branch, "--base", base], {
+		cwd: project,
+		env: process.env,
+		stdin: "ignore",
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const [stdout, stderr, status] = await Promise.all([
+		new Response(child.stdout).text(),
+		new Response(child.stderr).text(),
+		child.exited,
+	]);
+	if (status !== 0) {
+		throw new Error(`Could not start lane ${branch}: ${(stderr || stdout).trim()}`);
+	}
+}
+
+function seed(info: ChannelInfo, changes: Changes, lane: { name: string } | undefined): string {
+	const lines = [`Forked from #${info.name} (channel ${info.id}).`];
+	if (info.summary) lines.push("", info.summary);
+	if (lane) {
+		const dirty = changes.dirs?.length
+			|| changes.files.some((file) => file.state === "uncommitted" || file.state === "untracked");
+		lines.push(
+			"",
+			`Lane ${lane.name} continues from ${changes.branch || "its lane"} at ${
+				changes.head.slice(0, 12)
+			}.${dirty ? " Its uncommitted changes stayed in the source." : ""}`,
+		);
+	}
+	return lines.join("\n");
 }
 
 export async function kill(id: string): Promise<void> {
