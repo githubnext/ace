@@ -559,8 +559,8 @@ export class Channel {
 	async #say(request: Extract<Request, { op: "say" }>) {
 		this.#author(request.author);
 		const conversation = await this.#conversation(request.chat);
-		room.checkImages(request.images);
-		const entry = room.draft(request.author, request.text, Date.now(), request.images);
+		room.checkAttachments(request);
+		const entry = room.draft(request.author, request.text, Date.now(), request);
 		const submission = await conversation.submit({
 			type: "write",
 			entry,
@@ -584,13 +584,13 @@ export class Channel {
 
 	async #admit(request: Extract<Request, { op: "ask" }>) {
 		this.#author(request.author);
-		room.checkImages(request.images);
+		room.checkAttachments(request);
 		await this.#mayInvoke(request.author);
 		const conversation = await this.#conversation(request.chat);
 		await this.#select(conversation, request.model, request.effort);
 		const submission = await conversation.submit({
 			type: "input",
-			content: room.content(request.author, request.text, request.images),
+			content: room.content(request.author, request.text, request),
 			whenBusy: "steer",
 			...(request.requestId ? { requestId: request.requestId } : {}),
 		}, context);

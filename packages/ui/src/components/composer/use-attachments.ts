@@ -56,6 +56,7 @@ export function useAttachments(
 				type: file.type,
 				size: file.size,
 				preview,
+				file,
 			};
 		});
 		update([...ref.current, ...items]);

@@ -156,12 +156,16 @@ export type GithubFile = {
 /** An image as base64. Clients downscale before sending; see `MAX_IMAGES` in room.ts. */
 export type Image = { mimeType: string; data: string };
 
+/** A text file attached to a message; models read its contents beside the message's text. */
+export type TextFile = { name: string; text: string };
+
 /** A message admitted by pi but not yet placed in the chat's transcript. */
 export type QueuedMessage = {
 	submission: number;
 	author: string;
 	text: string;
 	images?: Image[];
+	files?: TextFile[];
 	invoked: boolean;
 };
 
@@ -183,6 +187,7 @@ export type Request =
 		author: string;
 		text: string;
 		images?: Image[];
+		files?: TextFile[];
 		requestId?: string;
 	}
 	/** Post to the chat and invoke its agent; a busy chat takes the message as steering. */
@@ -192,6 +197,7 @@ export type Request =
 		author: string;
 		text: string;
 		images?: Image[];
+		files?: TextFile[];
 		model?: ModelRef;
 		effort?: Effort;
 		requestId?: string;
@@ -246,6 +252,7 @@ export type Event =
 		author: string;
 		text: string;
 		images?: Image[];
+		files?: TextFile[];
 		invoked: boolean;
 		deleted?: boolean;
 	}

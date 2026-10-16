@@ -1,4 +1,4 @@
-import type { ImageContent, Message, UserMessage } from "@earendil-works/pi-ai";
+import type { ImageContent, Message, TextContent, UserMessage } from "@earendil-works/pi-ai";
 import {
 	defineEntry,
 	type EntryRecord,
@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-durable";
 
 import { MetadataDoc } from "./metadata";
-import type { Image } from "./protocol";
+import type { Image, TextFile } from "./protocol";
 
 /** A human message that did not invoke an agent. */
 export const MessageEntry = defineEntry<{ author: string; text: string }>("ace.message");
@@ -24,48 +24,68 @@ export function isAgent(author: string): boolean {
 	return author.startsWith("agent@");
 }
 
+/** What a human message carries beside its text. */
+export type Attached = { images?: Image[]; files?: TextFile[] };
+
 /**
  * Agents see every participant's messages as `author: text`. Invocations are pi inputs, which carry
- * only content, so the author prefix is also how an input's author is recovered.
+ * only content, so the author prefix is also how an input's author is recovered. Files follow as
+ * their own text blocks, so the first block is always the message.
  */
 export function content(
 	author: string,
 	text: string,
-	images: Image[] = [],
+	{ images = [], files = [] }: Attached = {},
 ): UserMessage["content"] {
 	const body = `${author}: ${text}`;
-	if (!images.length) return body;
+	if (!images.length && !files.length) return body;
 	return [
 		{ type: "text", text: body },
+		...files.map((file): TextContent => ({ type: "text", text: wrap(file) })),
 		...images.map(({ mimeType, data }): ImageContent => ({ type: "image", mimeType, data })),
 	];
 }
 
+const FILE = /^<attachment name="([^"]*)">\n([\s\S]*)\n<\/attachment>$/;
+const escape = (name: string) => name.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+const unescape = (name: string) => name.replaceAll("&quot;", '"').replaceAll("&amp;", "&");
+
+function wrap(file: TextFile) {
+	return `<attachment name="${escape(file.name)}">\n${file.text}\n</attachment>`;
+}
+
 /**
- * Images live in the transcript so every model sees them. A hosted channel stores an entry in one
- * SQLite row, which Durable Objects cap at 2 MB, so a message's images must fit under that.
+ * Attachments live in the transcript so every model sees them. A hosted channel stores an entry in
+ * one SQLite row, which Durable Objects cap at 2 MB, so a message's attachments must fit under that.
  */
 export const MAX_IMAGES = 4;
+const MAX_FILES = 10;
 const MAX_BYTES = 1_500_000;
 const TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
-export function checkImages(images: Image[] = []) {
+export function checkAttachments({ images = [], files = [] }: Attached) {
 	if (images.length > MAX_IMAGES) throw new Error(`At most ${MAX_IMAGES} images per message`);
+	if (files.length > MAX_FILES) throw new Error(`At most ${MAX_FILES} files per message`);
 	let size = 0;
 	for (const image of images) {
 		if (!TYPES.has(image.mimeType)) throw new Error(`Unsupported image type ${image.mimeType}`);
 		if (!/^[A-Za-z0-9+/]*={0,2}$/.test(image.data)) throw new Error("Images must be base64");
 		size += image.data.length;
 	}
-	if (size > MAX_BYTES) throw new Error("Images are too large; send smaller or fewer images");
+	const encoder = new TextEncoder();
+	for (const file of files) {
+		if (!file.name || /[\n\r]/.test(file.name)) throw new Error("Files need a one-line name");
+		size += encoder.encode(file.text).length;
+	}
+	if (size > MAX_BYTES) throw new Error("Attachments are too large; send smaller or fewer files");
 }
 
-export function draft(author: string, text: string, timestamp: number, images?: Image[]) {
+export function draft(author: string, text: string, timestamp: number, attached?: Attached) {
 	return {
 		kind: MessageEntry.kind,
 		data: { author, text } satisfies JsonObject,
 		model: [
-			{ role: "user", content: content(author, text, images), timestamp } satisfies UserMessage,
+			{ role: "user", content: content(author, text, attached), timestamp } satisfies UserMessage,
 		],
 	};
 }
@@ -83,10 +103,22 @@ export function text(message: Message): string {
 	return message.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
 }
 
+/** A human message's own text and its files, which follow it as separate text blocks. */
+function split(content: UserMessage["content"]): { body: string } & Attached {
+	if (typeof content === "string") return { body: content };
+	const [first, ...rest] = content.flatMap((block) => (block.type === "text" ? [block.text] : []));
+	const files = rest.flatMap((block) => {
+		const match = FILE.exec(block);
+		return match ? [{ name: unescape(match[1]!), text: match[2]! }] : [];
+	});
+	return { body: first || "", ...(files.length ? { files } : {}) };
+}
+
 export type Human = {
 	author: string;
 	text: string;
 	images?: Image[];
+	files?: TextFile[];
 	at: number;
 	invoked: boolean;
 };
@@ -97,9 +129,11 @@ export function human(entry: EntryRecord): Human | undefined {
 	if (user?.role !== "user") return;
 	if (MessageEntry.is(entry)) {
 		const attached = images(user);
+		const { files } = split(user.content);
 		return {
 			...entry.data,
 			...(attached ? { images: attached } : {}),
+			...(files ? { files } : {}),
 			at: user.timestamp,
 			invoked: false,
 		};
@@ -112,14 +146,14 @@ export function human(entry: EntryRecord): Human | undefined {
 export function input(content: UserMessage["content"]): Omit<Human, "at" | "invoked"> {
 	const user: UserMessage = { role: "user", content, timestamp: 0 };
 	const attached = images(user);
-	const extra = attached ? { images: attached } : {};
-	const body = text(user);
-	const split = body.indexOf(": ");
-	const author = body.slice(0, split);
-	if (split < 1 || !isAuthor(author)) {
+	const { body, files } = split(content);
+	const extra = { ...(attached ? { images: attached } : {}), ...(files ? { files } : {}) };
+	const at = body.indexOf(": ");
+	const author = body.slice(0, at);
+	if (at < 1 || !isAuthor(author)) {
 		return { author: "unknown", text: body, ...extra };
 	}
-	return { author, text: body.slice(split + 2), ...extra };
+	return { author, text: body.slice(at + 2), ...extra };
 }
 
 export type Room = { name: string; project: string };
@@ -134,6 +168,8 @@ export function section(room: Room): PromptSection {
 				"Each human message starts with its author's name and a colon. You see every message, but",
 				"you act only when someone invokes you; answer the person who did. Write replies as plain",
 				"text without a name prefix: the channel shows who wrote each message.",
+				'Files people attach follow their message as <attachment name="..."> blocks holding the',
+				"whole file; they are not on disk, so read them there.",
 				"",
 				"To wait for another channel's agent, say in this chat what you are waiting for and end your",
 				"run; its message with invoke set wakes you. Never wait for another channel in a shell sleep or",

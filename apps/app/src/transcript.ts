@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { Image, QueuedMessage, Reactions } from "@ace/channel/protocol";
+import type { Image, QueuedMessage, Reactions, TextFile } from "@ace/channel/protocol";
 import { DISCONNECTED } from "@ace/host/gateway-client";
 import { CHANNEL_CLOSED, type ChannelInfo, type Event } from "@ace/host/protocol";
 
@@ -30,6 +30,7 @@ export type Item =
 		author: string;
 		text: string;
 		images?: Image[];
+		files?: TextFile[];
 		invoked: boolean;
 		deleted?: boolean;
 	}
@@ -244,13 +245,14 @@ function withdraw(items: Item[], messages: QueuedMessage[]): Item[] {
 }
 
 function pick(event: Extract<Event, { kind: "message" }>) {
-	const { entry, at, author, text, images, invoked, deleted } = event;
+	const { entry, at, author, text, images, files, invoked, deleted } = event;
 	return {
 		entry,
 		at,
 		author,
 		text,
 		...(images ? { images } : {}),
+		...(files ? { files } : {}),
 		invoked,
 		...(deleted ? { deleted } : {}),
 	};

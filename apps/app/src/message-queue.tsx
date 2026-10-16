@@ -47,6 +47,11 @@ export function MessageQueue({ messages, people, channels }: {
 								))}
 							</div>
 						)}
+						{message.files && (
+							<p className="mt-1 truncate text-muted-foreground">
+								{message.files.map((file) => file.name).join(", ")}
+							</p>
+						)}
 					</li>
 				))}
 			</ol>

@@ -15,7 +15,7 @@ import type { Effort, ModelOption, ModelRef, QueuedMessage } from "@ace/channel/
 import type { Listing } from "@ace/host/protocol";
 
 import { host } from "./host";
-import { images } from "./images";
+import { attachments } from "./attachments";
 
 const ACE_MODE = { id: "ace", name: "Ace", placeholder: "Ask the agent", mention: "ace" };
 const MODES = [
@@ -149,7 +149,8 @@ export function Composer(
 			.map((part) => part.replace(LEADING, "").trim()).filter(Boolean).join("\n\n");
 		composer.current?.set(`@ace ${text}`);
 		const images = mine.flatMap((message) => message.images || []);
-		if (images.length) {
+		const files = mine.flatMap((message) => message.files || []);
+		if (images.length || files.length) {
 			setAttached((current) => [
 				...current,
 				...images.map((image, index) => ({
@@ -158,6 +159,10 @@ export function Composer(
 					type: image.mimeType,
 					preview: `data:${image.mimeType};base64,${image.data}`,
 				})),
+				...files.map(({ name, text }) => {
+					const file = new File([text], name, { type: "text/plain" });
+					return { id: crypto.randomUUID(), name, type: file.type, size: file.size, file };
+				}),
 			]);
 		}
 		toast(
@@ -243,7 +248,7 @@ export function Composer(
 		sending.current = true;
 		setPending(true);
 		try {
-			const encoded = attached.length ? { images: await images(attached) } : {};
+			const encoded = await attachments(attached);
 			if (invoke) {
 				const [provider, ...rest] = model.split("/");
 				await host.channel(channel.id, {
