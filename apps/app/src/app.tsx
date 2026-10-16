@@ -934,7 +934,7 @@ export function App() {
 								</div>
 							)}
 					</Main>
-					{page === "channels" && channel && <ChannelDetails channel={channel} />}
+					{page === "channels" && channel && <ChannelDetails channel={channel} user={hello.user} />}
 				</Layout>
 				<Palette
 					channels={channels}

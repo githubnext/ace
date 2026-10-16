@@ -11,6 +11,8 @@ export type Details = {
 	changes?: Changes;
 	/** The chat branch's newest pull request; `null` once read and none exists. */
 	pull?: GithubPull | null;
+	/** Whether the chat's agent was asked to open a pull request and hasn't finished. */
+	creating?: boolean;
 	items?: Item[];
 	/** Whether teammates may invoke agents, as the chat's watch reports it. */
 	shared?: boolean;

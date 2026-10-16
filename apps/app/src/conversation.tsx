@@ -241,7 +241,7 @@ export function Conversation(
 						mayAnswer={channel.owner === user || transcript.shared !== false}
 					/>
 				)}
-				{transcript.live && <Checks channel={channel.id} />}
+				{transcript.live && <Checks channel={channel} chat={id} user={user} />}
 				{transcript.live && (
 					<MessageQueue messages={transcript.queue} people={people} channels={senders} />
 				)}
