@@ -17,6 +17,7 @@ import { Button } from "../../ui/button";
 import { TooltipProvider } from "../../ui/tooltip";
 
 import { FileTree } from "../file-tree/file-tree";
+import { GitActionButton } from "../git-action";
 import { PrAction, ToolButton } from "./diff-actions";
 import { FileTreeShell } from "./diff-file-tree";
 import { same, selection } from "./selection";
@@ -355,6 +356,7 @@ function useDiffView({
 	onCreatePr,
 	onCreateDraftPr,
 	onManualCreatePr,
+	actions,
 	onFileOpen,
 	className,
 }: DiffViewProps) {
@@ -524,6 +526,7 @@ function useDiffView({
 		onCreatePr,
 		onCreateDraftPr,
 		onManualCreatePr,
+		actions,
 		className,
 		summary,
 		view,
@@ -556,6 +559,7 @@ function DiffViewContent(props: DiffViewProps) {
 		onCreatePr,
 		onCreateDraftPr,
 		onManualCreatePr,
+		actions,
 		className,
 		summary,
 		view,
@@ -615,6 +619,9 @@ function DiffViewContent(props: DiffViewProps) {
 				</div>
 				<TooltipProvider>
 					<div className="flex shrink-0 items-center gap-1.5">
+						{actions?.map((action) => (
+							<GitActionButton key={action.label} action={action} variant="outline" />
+						))}
 						<PrAction
 							pr={pr}
 							creatingPr={creatingPr}

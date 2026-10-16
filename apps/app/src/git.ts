@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 import type { Changes, GithubCheck, GithubPull } from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
-import { type DetailsAction, toast } from "@ace/ui";
+import { type GitAction, toast } from "@ace/ui";
 import {
 	IconBranch,
 	IconCommit,
@@ -44,7 +44,7 @@ const ASKS: Record<Exclude<Ask, "create">, (pull: number) => string> = {
 	close: (pull) => `Close #${pull} with \`gh pr close\`, keeping its branch.`,
 };
 
-const PENDING: Record<Exclude<Ask, "create">, Pick<DetailsAction, "label" | "icon">> = {
+const PENDING: Record<Exclude<Ask, "create">, Pick<GitAction, "label" | "icon">> = {
 	commit: { label: "Committing", icon: IconCommit },
 	update: { label: "Updating PR", icon: IconPush },
 	rebase: { label: "Rebasing", icon: IconBranch },
@@ -84,7 +84,7 @@ export function useGit(channel: Listing, chat: number, user: string) {
 		ask(text).catch(() => publish(channel.id, { asked: null }));
 	}
 
-	const actions: DetailsAction[] = [];
+	const actions: GitAction[] = [];
 	if (asked && asked !== "create") actions.push({ ...PENDING[asked], pending: true });
 	else if (ready && changes) {
 		const number = pull?.number || 0;
@@ -137,6 +137,9 @@ export function useGit(channel: Listing, chat: number, user: string) {
 				onClick: go("merge"),
 				menu: [close],
 			});
+		} else if (pull?.state === "open") {
+			// Until it can merge, Close has no Merge menu to sit in.
+			actions.push(close);
 		}
 	}
 

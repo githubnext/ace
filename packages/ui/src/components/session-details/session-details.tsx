@@ -18,10 +18,10 @@ import {
 } from "../../icons";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
-import { DropdownMenuItem } from "../../ui/dropdown-menu";
 import { SplitButton } from "../../ui/split-button";
 import { type Check, CHECK_ICONS, checkSummary, sortChecks } from "../checks/checks";
 import { CreatePrMenu } from "../create-pr-menu";
+import { type GitAction, GitActionButton } from "../git-action";
 import { LoadingSpinner } from "../session-item/session-item-loading";
 
 export type DetailsPullState = "open" | "draft" | "closed" | "merged";
@@ -42,21 +42,6 @@ export type DetailsSubagent = {
 export type DetailsLink = { url: string; label: string; kind: "issue" | "pull" | "web" };
 export type DetailsFact = { label: string; value: string; title?: string };
 type Icon = ComponentType<{ className?: string }>;
-/** Something the branch or its pull request could have done next, such as merging. */
-export type DetailsAction = {
-	label: string;
-	icon: Icon;
-	/** The icon's color class. */
-	tone?: string;
-	/** Shown at the row's end, such as how many commits a rebase brings in. */
-	count?: string;
-	title?: string;
-	/** Underway: the row shows a spinner and can't be clicked again. */
-	pending?: boolean;
-	onClick?: () => void;
-	/** Less common actions, in the row's menu. */
-	menu?: { label: string; icon: Icon; onClick: () => void }[];
-};
 /** One group's totals, such as committed or untracked files; ungrouped totals omit `group`. */
 export type DetailsChanges = { group?: string; adds: number; dels: number; files: number };
 
@@ -79,7 +64,7 @@ export type SessionDetailsViewProps = {
 	onCreatePr?: () => void;
 	onCreateDraftPr?: () => void;
 	/** Rows after the pull request, each offered only while it can be taken. */
-	actions?: DetailsAction[];
+	actions?: GitAction[];
 	onClose: () => void;
 };
 
@@ -246,66 +231,6 @@ function CreatePr({ creating, onCreate, onDraft }: {
 	);
 }
 
-function Action({ action }: { action: DetailsAction }) {
-	const { label, icon: Glyph, tone, count, title, pending, onClick, menu } = action;
-	const content = (
-		<>
-			{pending
-				? (
-					<span className="grid size-4 shrink-0 place-items-center text-muted-foreground">
-						<LoadingSpinner size={14} />
-					</span>
-				)
-				: <Glyph className={cn(GLYPH, tone || "text-muted-foreground")} aria-hidden />}
-			<span className="min-w-0 truncate">{label}</span>
-			{count && !pending && (
-				<span className="ml-auto shrink-0 font-medium text-muted-foreground tabular-nums">
-					{count}
-				</span>
-			)}
-		</>
-	);
-	const primary = "min-w-0 flex-1 justify-start gap-2 px-2 font-normal disabled:opacity-100";
-	if (!menu?.length) {
-		return (
-			<Button
-				type="button"
-				variant="ghost"
-				size="sm"
-				title={title}
-				className={cn("-mx-2 w-[calc(100%+1rem)]", primary)}
-				disabled={pending || !onClick}
-				onClick={onClick}
-			>
-				{content}
-			</Button>
-		);
-	}
-	return (
-		<SplitButton
-			type="button"
-			variant="ghost"
-			size="sm"
-			title={title}
-			className="-mx-2 w-[calc(100%+1rem)]"
-			primaryClassName={primary}
-			triggerClassName="text-muted-foreground disabled:opacity-100"
-			contentClassName="inline-[max-content]"
-			disabled={pending || !onClick}
-			onClick={onClick}
-			menu={menu.map((item) => (
-				<DropdownMenuItem key={item.label} onClick={item.onClick}>
-					<item.icon className="size-4 text-muted-foreground" aria-hidden />
-					<span>{item.label}</span>
-				</DropdownMenuItem>
-			))}
-			menuLabel={`${label} options`}
-		>
-			{content}
-		</SplitButton>
-	);
-}
-
 function Pull({ pull }: { pull: DetailsPull }) {
 	const [Icon, color] = PULL_ICONS[pull.state];
 	const failed = pull.checks.some((check) => check.state === "failed");
@@ -402,7 +327,15 @@ export function SessionDetailsView(
 							<span className="min-w-0 truncate">No pull request</span>
 						</div>
 					)}
-					{actions?.map((action) => <Action key={action.label} action={action} />)}
+					{actions?.map((action) => (
+						<GitActionButton
+							key={action.label}
+							action={action}
+							variant="ghost"
+							className="-mx-2 w-[calc(100%+1rem)]"
+							primaryClassName="min-w-0 flex-1 justify-start gap-2 px-2 font-normal"
+						/>
+					))}
 				</section>
 			)}
 
