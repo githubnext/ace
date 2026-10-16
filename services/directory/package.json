@@ -4,7 +4,9 @@
 	"type": "module",
 	"license": "MIT",
 	"exports": {
-		"./protocol": "./src/protocol.ts"
+		"./credential": "./src/credential.ts",
+		"./protocol": "./src/protocol.ts",
+		"./scope": "./src/scope.ts"
 	},
 	"scripts": {
 		"dev": "wrangler dev",

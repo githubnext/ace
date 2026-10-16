@@ -8,6 +8,7 @@ import type { Diagnostics } from "./protocol";
 
 type Status = {
 	BackendState: string;
+	MagicDNSSuffix: string;
 	Self: Node;
 	Peer?: Record<string, Node>;
 	User?: Record<string, { LoginName: string }>;
@@ -82,6 +83,11 @@ async function status(): Promise<Status | undefined> {
 export async function self(): Promise<Machine | undefined> {
 	const value = await status();
 	return value && machine(value.Self, value);
+}
+
+/** This machine's tailnet, by MagicDNS suffix, or nothing when Tailscale is not running. */
+export async function domain(): Promise<string | undefined> {
+	return (await status())?.MagicDNSSuffix;
 }
 
 export async function diagnostics(): Promise<Diagnostics["tailscale"]> {

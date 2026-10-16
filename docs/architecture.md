@@ -450,8 +450,9 @@ offline, and a call in flight when it drops is reported to the model as failed.
 - While any chat is busy, a pending timer keeps the object resident: hibernating would drop
   in-flight workspace calls whose processes keep running on the workspace. Idle objects hibernate.
   An alarm still re-wakes an object the runtime resets during a run, so it resumes the run.
-- Hosts share the team's secret with the service (`ACE_SECRET` on hosts and Workers) and state each message's author. They verify their own users over the tailnet, so the
-  service trusts hosts, not individual people.
+- Hosts authenticate with the team's secret scoped to the service's tailnet (see
+  [The team](#the-team)) and state each message's author. They verify their own users over the
+  tailnet, so the service trusts hosts, not individual people.
 - Model keys are Worker secrets.
 - Busy transitions share the metadata/activity projection path over the workspace socket. Every
   workspace reconnect gets a current busy snapshot, including when the object was already open.
@@ -479,8 +480,8 @@ the host's listing reports `computing` while one runs; the app opens the chat an
 only after it ends, and offers neither compute action until then. Deleting the channel calls the
 service's `DELETE /workspaces/:id`, which removes the container, checkpoint, and hosted channel; if
 the service refuses, the host keeps the record so deleting can be retried.
-The service's settings live in `settings.json` beside the default model; its secret is the team's
-`ACE_SECRET`.
+The service's settings live in `settings.json` beside the default model; its secrets are the team's
+`ACE_SECRET` and `TAILNET`. The runner receives the derived credential, never `ACE_SECRET`.
 
 The container serves the workspace, so the host opens no workspace link for a `compute` record,
 refuses to move it, and opens no terminal for it. Busy and rename projections arrive only over the
@@ -523,7 +524,8 @@ below make that poll slower once they push changes. It answers lookups
 only: channel traffic goes to the channel's host over the tailnet, or to the hosted channel. So a
 channel stays listed while its host is asleep. The app shows a local channel whose host is
 unreachable as offline, and reaches a hosted channel directly. Hosts find the directory through
-Settings or `ace directory <url>` and authenticate with the team's `ACE_SECRET`. A running host
+Settings or `ace directory <url>` and authenticate with the team's `ACE_SECRET`, scoped to the
+directory's tailnet. A running host
 checks a new URL and secret against the directory before saving them, and it saves Keychain items
 for the CLI too: macOS lets the program that saved an item read it without asking, so a secret
 saved by another program would make Ace Helper wait on a Keychain prompt.
@@ -620,9 +622,26 @@ continue their existing desktop behavior; the header shows an unknown, disabled 
 host reports the setting.
 
 Local owner tokens and browser-origin checks authenticate local connections. Team-deployed
-services use `ACE_SECRET` to authenticate hosts and trust the participant identities those hosts
-supply; the services do not check tailnet membership themselves. These mechanisms carry the
-team's existing trust and do not define another way for a participant to join the team.
+services authenticate hosts and trust the participant identities those hosts supply. These
+mechanisms carry the team's existing trust and do not define another way for a participant to
+join the team.
+
+Each deployment of the services serves one tailnet, set as the `TAILNET` Worker secret (its
+MagicDNS suffix, such as `tail1234ab.ts.net`) when the services are deployed. Hosts present
+HMAC-SHA256(`ACE_SECRET`, tailnet) using the suffix `tailscale status` reports
+(`@ace/directory/credential`), so a host on another tailnet is refused even with the right
+secret, and the 401 names the service's tailnet. A deployment missing either secret refuses
+everything. Moving a team to another tailnet means deploying new services; there is no migration
+yet.
+
+**Known limitation: the tailnet scope is not a security boundary.** The services are public
+Worker URLs and never see the tailnet. The MagicDNS suffix is public (certificate transparency
+logs list it), so anyone holding `ACE_SECRET` can derive the credential and call the services
+from anywhere. `ACE_SECRET` remains the only secret; protect and rotate it as a credential with
+that reach. Ace keeps this for easy setup. A fork that needs the services reachable only from its
+tailnet can route them through a Tailscale app connector and allowlist its egress IPs in a
+Cloudflare WAF rule on a custom domain, or have hosts present tailnet-issued tokens from tsidp
+and verify them in the Workers.
 
 Each host's gateway serves its owner's app over loopback. Its tailnet listeners name each caller
 with `tailscale whois` and accept peer hosts or the owner's browser from an allowed origin.

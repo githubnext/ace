@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { Lifecycle } from "@ace/directory/protocol";
 
 import * as catalog from "./catalog";
-import { hostedAuth } from "./client";
+import { hostedAuth, rejection, serviceAuth } from "./client";
 import { refusal } from "./http";
 import { failure, log } from "./log";
 import type { Listing } from "./protocol";
@@ -63,22 +63,18 @@ export function configure(value: string | undefined): Promise<void> | undefined 
 
 /** Read the directory with `secret`, so a wrong URL or secret fails before either is saved. */
 export async function check(base: string, secret: string): Promise<void> {
+	const headers = await serviceAuth(secret);
 	let response: Response;
 	try {
 		response = await fetch(`${base}/`, {
-			headers: { authorization: `Bearer ${secret}` },
+			headers,
 			signal: AbortSignal.timeout(10_000),
 			redirect: "error",
 		});
 	} catch {
 		throw new Error(`Could not reach ${base}. Check the URL and your connection.`);
 	}
-	if (response.status === 401) {
-		await response.body?.cancel();
-		throw new Error(
-			"The directory rejected this secret. Ask whoever set it up for the team's secret.",
-		);
-	}
+	if (response.status === 401) throw new Error(await rejection(response, "The directory"));
 	if (!response.ok) {
 		const reason = await refusal(response, "The directory");
 		throw new Error(response.status < 500 ? `${reason} Check the URL.` : reason);
@@ -136,12 +132,7 @@ async function call(
 		if (signal.aborted) throw cause;
 		throw new Error(`Could not reach ${base}. Check the URL and your connection.`, { cause });
 	}
-	if (response.status === 401) {
-		await response.body?.cancel();
-		throw new Error(
-			"The directory rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret.",
-		);
-	}
+	if (response.status === 401) throw new Error(await rejection(response, "The directory"));
 	if (!response.ok) {
 		const reason = await refusal(response, "The directory");
 		throw new Error(response.status < 500 ? `${reason} Check the URL.` : reason);

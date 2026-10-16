@@ -3,6 +3,7 @@ import { closeSync, existsSync, openSync } from "node:fs";
 import { connect as dial, type Socket } from "node:net";
 
 import type { Frame, Request } from "@ace/channel/protocol";
+import { credential } from "@ace/directory/credential";
 
 import * as catalog from "./catalog";
 import { config } from "./config";
@@ -11,6 +12,7 @@ import { key, workerEnv } from "./keys";
 import { lines } from "./lines";
 import { failure, log } from "./log";
 import { CHANNEL_CLOSED, type WorkerRequest } from "./protocol";
+import * as tailnet from "./tailnet";
 
 function start(id: string): void {
 	// Output the worker didn't log itself, such as a crash before its log opens.
@@ -64,7 +66,25 @@ export async function hostedAuth(): Promise<Record<string, string>> {
 			"The team's services need ACE_SECRET. Add it in Settings → This Mac → Team directory, or with ace key set ACE_SECRET",
 		);
 	}
-	return { authorization: `Bearer ${secret}` };
+	return serviceAuth(secret);
+}
+
+/** The team's services serve one tailnet, so the credential combines the secret with this Mac's. */
+export async function serviceAuth(secret: string): Promise<Record<string, string>> {
+	const domain = await tailnet.domain();
+	if (!domain) throw new Error("The team's services need Tailscale running on this Mac.");
+	return { authorization: `Bearer ${await credential(secret, domain)}` };
+}
+
+/** Why a team service refused this host, naming both tailnets when they differ. */
+export async function rejection(response: Response, service: string): Promise<string> {
+	await response.body?.cancel();
+	const served = response.headers.get("ace-tailnet");
+	const domain = await tailnet.domain();
+	if (served && domain && served !== domain) {
+		return `${service} serves the ${served} tailnet, but this Mac is on ${domain}. Switch tailnets, or use services deployed for this one.`;
+	}
+	return `${service} rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret.`;
 }
 
 export async function hostedSocket(base: string, path: string): Promise<WebSocket> {

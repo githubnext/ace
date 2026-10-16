@@ -27,6 +27,7 @@ cd services/compute
 bunx wrangler login
 bun run deploy
 bunx wrangler secret put ACE_SECRET
+bunx wrangler secret put TAILNET
 bunx wrangler secret put OPENAI_API_KEY
 bunx wrangler secret put GITHUB_TOKEN
 ```
@@ -44,7 +45,8 @@ to the container.
 
 ## Public API
 
-All routes require `Authorization: Bearer` with the deployment's `ACE_SECRET`. Use the HTTPS
+All routes require `Authorization: Bearer` with HMAC-SHA256 of the deployment's `ACE_SECRET` over
+its `TAILNET`, the MagicDNS suffix of the one tailnet it serves (`@ace/directory/credential`). Use the HTTPS
 Worker URL returned by deployment. Choose a **fresh channel ID** matching `[a-z0-9-]{1,64}`;
 this pilot does not move an existing channel or import its workspace.
 

@@ -45,7 +45,8 @@ _Avoid_: lobby channel, lobby session
 
 **Cell**:
 A named Durable Object (isolated code with private SQLite) run by Cloudflare or celld. Cells hold
-shared objects such as the directory and lobbies, and hosted channels.
+shared objects such as the directory and lobbies, and hosted channels. A deployment of cells
+serves one tailnet, fixed when it is deployed; another tailnet needs new cells.
 
 ## Channels
 

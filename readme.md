@@ -24,7 +24,9 @@ Disabling them does not restrict shell access.
 
 Keep the host's gateway on loopback or your private tailnet. **Do not expose it to the public
 internet** through Tailscale Funnel, port forwarding, or a public reverse proxy. Protect local
-owner tokens and the team's `ACE_SECRET` as credentials for the access they grant. Read
+owner tokens and the team's `ACE_SECRET` as credentials for the access they grant: the team's
+services are reachable from the internet, and their tailnet scope is
+[not a security boundary](docs/architecture.md#the-team). Read
 [the trust model](docs/architecture.md#the-team) before running or sharing Ace.
 
 Ace is open source software for teams to clone, fork, and operate themselves. Any shared services
@@ -91,7 +93,8 @@ web app can reach them. Deploy it with `bun --filter @ace/app deploy`, point eac
 
 A hosted channel lives in a Durable Object deployed by your team and runs its tools on the host
 that created it, while that host runs `ace serve` or the desktop app. To try one locally, put
-`ACE_SECRET` and a model key in `services/channel/.dev.vars`, then:
+`ACE_SECRET`, `TAILNET` (your tailnet's MagicDNS suffix), and a model key in
+`services/channel/.dev.vars`, then:
 
 ```sh
 bun --filter @ace/channel-service dev                     # http://localhost:8787
@@ -107,11 +110,14 @@ Whoever sets up the team deploys it once from a checkout; everyone else joins fr
 To try it locally, run `services/directory` the same way
 (`bun --filter @ace/directory dev --port 8788`) and point each host at `http://localhost:8788`.
 
-To deploy both services to your Cloudflare account, give the Workers the same secret:
+To deploy both services to your Cloudflare account, give the Workers the same secret and your
+tailnet's MagicDNS suffix (`tailscale status --json | jq -r .MagicDNSSuffix`). The services
+then serve only that tailnet; another tailnet needs new deployments.
 
 ```sh
 SECRET=$(openssl rand -hex 32)
-for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf %s "$SECRET" | bunx wrangler secret put ACE_SECRET); done
+TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
+for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf %s "$SECRET" | bunx wrangler secret put ACE_SECRET && printf %s "$TAILNET" | bunx wrangler secret put TAILNET); done
 (cd services/channel && bunx wrangler secret put ANTHROPIC_API_KEY)   # and any other model keys
 ```
 
