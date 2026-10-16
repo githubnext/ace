@@ -109,6 +109,14 @@ is one pi conversation in that Session.
   an `answer` request from anyone who may invoke the agent writes the answer once, and the first
   wins. Stop and Kill abort the wait. An invoked message queued in the chat dismisses the
   question, so the run reads it instead of blocking it. Subagents' chats have no question tool.
+- **Reactions and deletions keep entries.** pi entries are immutable, so a conversation document
+  keyed by entry holds each message's reactions and which messages were deleted. Anyone who may
+  write to the chat reacts to a person's message or an agent's reply; only a message's author
+  deletes it, and an archived channel refuses both. Deleting appends an entry whose pi context
+  edit replaces the message with "[deleted this message]" under its author, so later model
+  requests omit the text (unless a compaction summary already holds it) while runs that read it
+  keep what they learned. Watches that opt in receive `deleted` and complete `reactions`
+  snapshots; every watch replays a deleted message without its text.
 - **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
   of each running call's output from pi's live tool slots, at most every half second per watch,
   each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable
