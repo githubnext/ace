@@ -44,12 +44,14 @@ export function checkSummary(checks: Check[]): [Icon, string, string] | undefine
 export type ChecksNoticeProps = {
 	pull: { number: number; url: string };
 	failed: Check[];
+	/** Asks for the failures to be fixed; absent while no one can take that now. */
+	onFix?: () => void;
 	onDismiss: () => void;
 	className?: string;
 };
 
 /** A chat's line for failed checks on its pull request, naming each one. */
-export function ChecksNotice({ pull, failed, onDismiss, className }: ChecksNoticeProps) {
+export function ChecksNotice({ pull, failed, onFix, onDismiss, className }: ChecksNoticeProps) {
 	const label = `${failed.length} ${failed.length === 1 ? "check" : "checks"} failed`;
 	return (
 		<div
@@ -87,6 +89,11 @@ export function ChecksNotice({ pull, failed, onDismiss, className }: ChecksNotic
 					</span>
 				))}
 			</span>
+			{onFix && (
+				<Button type="button" variant="ghost" size="sm" onClick={onFix}>
+					Fix
+				</Button>
+			)}
 			<Button
 				type="button"
 				variant="ghost"

@@ -13,10 +13,12 @@ function CreatePrMenu({ onCreateDraftPr, onManualCreatePr }: CreatePrMenuProps) 
 				<IconPullRequest className="size-4 text-muted-foreground" aria-hidden />
 				<span>Create draft PR</span>
 			</DropdownMenuItem>
-			<DropdownMenuItem disabled={!onManualCreatePr} onClick={onManualCreatePr}>
-				<IconExternal className="size-4.5 text-muted-foreground" aria-hidden />
-				<span>Manually create PR</span>
-			</DropdownMenuItem>
+			{onManualCreatePr && (
+				<DropdownMenuItem onClick={onManualCreatePr}>
+					<IconExternal className="size-4.5 text-muted-foreground" aria-hidden />
+					<span>Manually create PR</span>
+				</DropdownMenuItem>
+			)}
 		</>
 	);
 }

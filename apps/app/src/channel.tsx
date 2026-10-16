@@ -27,6 +27,7 @@ import { ChannelAccess } from "./channel-access";
 import { EFFORTS } from "./composer";
 import { Conversation } from "./conversation";
 import { forget, publish, useDetails } from "./details";
+import { useCreating, useGit } from "./git";
 import { host } from "./host";
 import { CHAT, Layout } from "./layout/layout";
 import { Diff, GROUPS } from "./panels/diff";
@@ -217,7 +218,7 @@ function usePull(
 	return key ? pulls.get(key) : undefined;
 }
 
-export function ChannelDetails({ channel }: { channel: Listing }) {
+export function ChannelDetails({ channel, user }: { channel: Listing; user: string }) {
 	const right = useLayoutRight();
 	const details = useDetails(channel.id);
 	const channels = useSyncExternalStore(host.subscribe, () => host.channels);
@@ -225,6 +226,8 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
 	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy);
 	useEffect(() => publish(channel.id, { pull }), [channel.id, pull]);
+	useCreating(channel.id, busy, pull);
+	const git = useGit(channel, chat, user);
 	const totals = useMemo(() => {
 		if (!changes) return;
 		// Totaled per group as the Diff does, so uncommitted and untracked files never inflate the
@@ -263,7 +266,10 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 				links={mentioned?.filter((link) => link.url !== pull?.url)}
 				facts={facts(channel, info)}
 				note={workspace(channel, channels)}
+				creatingPr={git.creatingPr}
 				onDiff={details.diff}
+				onCreatePr={git.createPr}
+				onCreateDraftPr={git.createDraftPr}
 				onClose={() => right.setOpen(false)}
 			/>
 		</Sidebar>
@@ -342,7 +348,7 @@ export function Channel(
 					);
 				}
 				if (data.type === "diff") {
-					return <Diff channel={channel.id} chat={data.chat} active={active} />;
+					return <Diff channel={channel} chat={data.chat} user={user} active={active} />;
 				}
 				if (data.type !== "terminal") return null;
 				return (

@@ -18,7 +18,10 @@ import {
 } from "../../icons";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
+import { SplitButton } from "../../ui/split-button";
 import { type Check, CHECK_ICONS, checkSummary, sortChecks } from "../checks/checks";
+import { CreatePrMenu } from "../create-pr-menu";
+import { LoadingSpinner } from "../session-item/session-item-loading";
 
 export type DetailsPullState = "open" | "draft" | "closed" | "merged";
 export type DetailsCheck = Check;
@@ -52,7 +55,12 @@ export type SessionDetailsViewProps = {
 	facts?: DetailsFact[];
 	/** A line under the facts, such as what the channel depends on. */
 	note?: string;
+	/** Whether a pull request is being opened for the branch. */
+	creatingPr?: boolean;
 	onDiff?: () => void;
+	/** Offered in place of "No pull request" while one could be opened. */
+	onCreatePr?: () => void;
+	onCreateDraftPr?: () => void;
 	onClose: () => void;
 };
 
@@ -190,6 +198,37 @@ function Checks({ checks, summary: [Icon, color, label] }: {
 	);
 }
 
+function CreatePr({ creating, onCreate, onDraft }: {
+	creating: boolean;
+	onCreate?: () => void;
+	onDraft?: () => void;
+}) {
+	return (
+		<SplitButton
+			type="button"
+			variant="ghost"
+			size="sm"
+			className="-mx-2 w-[calc(100%+1rem)]"
+			primaryClassName="min-w-0 flex-1 justify-start gap-2 px-2 font-normal disabled:opacity-100"
+			triggerClassName="text-muted-foreground disabled:opacity-100"
+			contentClassName="inline-[max-content]"
+			disabled={creating || !onCreate}
+			onClick={onCreate}
+			menu={<CreatePrMenu onCreateDraftPr={onDraft} />}
+			menuLabel="Create PR options"
+		>
+			{creating
+				? (
+					<span className="grid size-4 shrink-0 place-items-center text-muted-foreground">
+						<LoadingSpinner size={14} />
+					</span>
+				)
+				: <IconPullRequest className={cn(GLYPH, "text-success")} aria-hidden />}
+			<span className="min-w-0 truncate">{creating ? "Creating PR" : "Create PR"}</span>
+		</SplitButton>
+	);
+}
+
 function Pull({ pull }: { pull: DetailsPull }) {
 	const [Icon, color] = PULL_ICONS[pull.state];
 	const failed = pull.checks.some((check) => check.state === "failed");
@@ -232,7 +271,10 @@ export function SessionDetailsView(
 		links,
 		facts,
 		note,
+		creatingPr = false,
 		onDiff,
+		onCreatePr,
+		onCreateDraftPr,
 		onClose,
 	}: SessionDetailsViewProps,
 ) {
@@ -273,7 +315,10 @@ export function SessionDetailsView(
 						</div>
 					)}
 					{pull && <Pull pull={pull} />}
-					{pull === null && (
+					{pull === null && (creatingPr || onCreatePr) && (
+						<CreatePr creating={creatingPr} onCreate={onCreatePr} onDraft={onCreateDraftPr} />
+					)}
+					{pull === null && !creatingPr && !onCreatePr && (
 						<div className={cn(ROW, "text-muted-foreground")}>
 							<IconPullRequest className={GLYPH} aria-hidden />
 							<span className="min-w-0 truncate">No pull request</span>

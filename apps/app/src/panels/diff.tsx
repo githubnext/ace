@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 
 import { DiffView, type DiffViewFile } from "@ace/ui";
 import type { Change, Changes } from "@ace/channel/protocol";
+import type { Listing } from "@ace/host/protocol";
 
+import { useDetails } from "../details";
+import { useGit } from "../git";
 import { host } from "../host";
 
-type Props = { channel: string; chat: number; active: boolean };
+type Props = { channel: Listing; chat: number; user: string; active: boolean };
 
 /** A loaded patch or its failure, for the version of the file described by `stamp`. */
 type Loaded = { stamp: string; patch?: string; signature?: string; error?: string };
@@ -77,7 +80,10 @@ function Note({ children }: { children: string }) {
 }
 
 /** The chat's changes, polled while the tab is visible and the window focused. */
-export function Diff({ channel, chat, active }: Props) {
+export function Diff({ channel: listing, chat, user, active }: Props) {
+	const channel = listing.id;
+	const { pull } = useDetails(channel);
+	const git = useGit(listing, chat, user);
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const focused = useSyncExternalStore(subscribe, () => document.hasFocus());
 	const [changes, setChanges] = useState<Changes>();
@@ -195,6 +201,12 @@ export function Diff({ channel, chat, active }: Props) {
 			files={files}
 			base={short(changes.base)}
 			head={changes.lane || short(changes.head)}
+			pr={pull
+				? { state: pull.state, number: String(pull.number), url: pull.url, title: pull.title }
+				: undefined}
+			creatingPr={git.creatingPr}
+			onCreatePr={git.createPr}
+			onCreateDraftPr={git.createDraftPr}
 			onFileOpen={open}
 			className="rounded-none border-0"
 		/>
