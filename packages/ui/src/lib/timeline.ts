@@ -44,7 +44,7 @@ type Chunk =
 	| { kind: "diff"; patch: string }
 	| { kind: "image"; src: string; width: number; height: number; alt?: string }
 	| { kind: "image-grid"; images: ImageNode[] }
-	| { kind: "file"; name: string; url: string }
+	| { kind: "file"; name: string; url: string; text?: string }
 	| { kind: "tool-group"; tools: ToolNode[] }
 	| { kind: "commit"; sha: string; message: string; authors: string[]; url?: string }
 	| { kind: "pr"; pr: string; url: string; title: string; draft: boolean }
@@ -268,6 +268,7 @@ function structure(
 					kind: "file",
 					name: c.name,
 					url: typeof c.file === "string" ? c.file : c.file.url,
+					text: c.text,
 				});
 				break;
 			case "tool":

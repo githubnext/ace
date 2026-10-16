@@ -19,6 +19,7 @@
 		"@xterm/addon-fit": "catalog:ui",
 		"@xterm/xterm": "catalog:ui",
 		"electrobun": "catalog:desktop",
+		"pdfjs-dist": "catalog:ui",
 		"react": "catalog:ui",
 		"react-dom": "catalog:ui"
 	},

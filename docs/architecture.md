@@ -131,6 +131,15 @@ is one pi conversation in that Session.
   edit or deletion of an entry wins. Agent replies to the earlier text stay in the transcript
   and in later context, and an edit never reruns the agent. Watches that opt in receive `edited`
   live; every watch replays a message with its newest text and when it was edited.
+- **Attachments live in the message.** Images and files travel on `say` and `ask` and are stored
+  in the human message's pi entry, so every model, channel placement, and teammate reads them
+  without a second store or a workspace. Files are text: `<attachment name="...">` blocks after
+  the message's own text. The app sends a PDF as its pages' text, extracted with pdf.js before
+  sending, because pi's messages carry no provider document input; scanned PDFs and other binary
+  files are refused. A message's images and file text share a 1.5 MB budget under the Durable
+  Object row cap, and the app opens a sent file's text from its timeline block. The budget is
+  bytes, not tokens: a file that alone exceeds the model's context fails the run, and later runs,
+  until its message is deleted.
 - **Tool progress is live only.** Watches that opt in receive `progress` events: the bounded tail
   of each running call's output from pi's live tool slots, at most every half second per watch,
   each replacing the last. Attachment rebuilds them from pi's snapshot, and the call's durable
