@@ -147,7 +147,13 @@ export namespace Event {
 		export namespace Content {
 			export type Text = { type: "text"; text: string; parts?: Part[] };
 			export type Image = { type: "image"; image: string | { url: string } };
-			export type File = { type: "file"; name: string; file: string | { url: string } };
+			export type File = {
+				type: "file";
+				name: string;
+				file: string | { url: string };
+				/** Contents carried with the message, which the block opens in a file view. */
+				text?: string;
+			};
 			export type Tool = { type: "tool" } & import("./types").Tool;
 		}
 

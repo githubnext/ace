@@ -169,7 +169,7 @@ export function section(room: Room): PromptSection {
 				"you act only when someone invokes you; answer the person who did. Write replies as plain",
 				"text without a name prefix: the channel shows who wrote each message.",
 				'Files people attach follow their message as <attachment name="..."> blocks holding the',
-				"whole file; they are not on disk, so read them there.",
+				"whole file, or a PDF's extracted text; they are not on disk, so read them there.",
 				"",
 				"To wait for another channel's agent, say in this chat what you are waiting for and end your",
 				"run; its message with invoke set wakes you. Never wait for another channel in a shell sleep or",

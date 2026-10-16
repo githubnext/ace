@@ -153,7 +153,7 @@ function key(
 				...chunk.images.flatMap(img => [img.src, img.width, img.height, img.alt]),
 			);
 		case "file":
-			return joinKey("file", mode, chunk.name);
+			return joinKey("file", mode, chunk.name, chunk.text);
 		case "tool-group":
 			return joinKey(
 				"tools",
@@ -263,7 +263,7 @@ function build(
 		case "image-grid":
 			return [gridBlock(chunk.images)];
 		case "file":
-			return [fileBlock(chunk.name, "")];
+			return [fileBlock(chunk.name, chunk.text)];
 		case "tool-group":
 			return tools(chunk.tools, expanded, expandedResults, settling);
 		case "commit":

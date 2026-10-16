@@ -161,11 +161,12 @@ export function toEvents(
 						type: "image" as const,
 						image: `data:${image.mimeType};base64,${image.data}`,
 					})),
-					// The block shows only the name; contents stay in the transcript, not a URL.
+					// Contents travel in the transcript, not at a URL; the block opens them.
 					...(item.files || []).map((file) => ({
 						type: "file" as const,
 						name: file.name,
 						file: "",
+						text: file.text,
 					})),
 				],
 			} as Event;
