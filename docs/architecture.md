@@ -496,7 +496,9 @@ until the channel's own metadata is read.
 ### Moving channels
 
 The owner moves an idle channel between its host and a hosting service with `ace move` or the
-channel's Move to menu, which asks for confirmation first. The channel keeps its ID, lanes, and workspace; only where pi runs changes.
+channel's Move to menu, which asks for confirmation first. The menu offers the hosting service the
+team's directory names as `HOSTED` when it is deployed, plus services this host already uses; a
+busy channel offers none. The channel keeps its ID, lanes, and workspace; only where pi runs changes.
 The pi store travels as one snapshot (`@ace/channel/transfer`): an allowlist of pi's tables at the
 current schema, at most 32 MiB, with a SHA-256 digest that import verifies before it commits.
 Export refuses unfinished tasks or queued submissions, so a move never carries an active run.

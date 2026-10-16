@@ -14,6 +14,7 @@ import type { ChannelInfo } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
 import { Connection, hostedAuth } from "./client";
+import * as directory from "./directory";
 import { refusal } from "./http";
 import { KEYCHAIN_WAITING } from "./keys";
 import { log } from "./log";
@@ -68,7 +69,9 @@ export function targets(id: string): MoveTarget[] {
 		return [];
 	}
 	if (record.hosted) return [{ target: "local", label: `This host (${hostname()})` }];
+	const team = directory.read().hosted;
 	const hosted = new Set([
+		...(team ? [canonical(team)] : []),
 		...catalog.list().flatMap((r) => r.hosted ? [r.hosted] : []),
 		...known(),
 	]);
