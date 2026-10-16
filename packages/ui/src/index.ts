@@ -6,6 +6,7 @@ export { NavListLink } from "./components/app-layout/nav-list-link";
 export { Panel } from "./components/app-layout/panel";
 export { AppearanceProvider, useAppearance } from "./components/appearance";
 export { ChatStatus, type ChatStatusProps } from "./components/chat-status/chat-status";
+export { ChecksNotice, type ChecksNoticeProps } from "./components/checks/checks";
 export {
 	CommandPalette,
 	type CommandPaletteProps,

@@ -1,7 +1,8 @@
-import { type ComponentType, type ReactNode, useState } from "react";
+import { type ComponentType, type ReactNode, useId, useState } from "react";
 
 import {
 	IconBranch,
+	IconChevronDown,
 	IconCircleCheck,
 	IconCircleDashed,
 	IconCircleX,
@@ -17,13 +18,10 @@ import {
 } from "../../icons";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
+import { type Check, CHECK_ICONS, checkSummary, sortChecks } from "../checks/checks";
 
 export type DetailsPullState = "open" | "draft" | "closed" | "merged";
-export type DetailsCheck = {
-	name: string;
-	url?: string;
-	state: "pending" | "passed" | "failed" | "skipped";
-};
+export type DetailsCheck = Check;
 export type DetailsPull = {
 	number: number;
 	title: string;
@@ -141,41 +139,60 @@ function Changes({ changes, onDiff }: { changes: DetailsChanges; onDiff?: () => 
 	);
 }
 
-function checkSummary(checks: DetailsCheck[]): [Icon, string, string] | undefined {
-	const counted = checks.filter((check) => check.state !== "skipped");
-	if (!counted.length) return;
-	const failed = counted.filter((check) => check.state === "failed").length;
-	const pending = counted.filter((check) => check.state === "pending").length;
-	if (failed) {
-		return [
-			IconCircleX,
-			"text-destructive",
-			`${failed} ${failed === 1 ? "check" : "checks"} failed`,
-		];
-	}
-	if (pending) {
-		return [
-			IconLoader,
-			"animate-spin text-muted-foreground",
-			`Checks running ${counted.length - pending}/${counted.length}`,
-		];
-	}
-	return [IconCircleCheck, "text-success", "Checks passed"];
-}
-
-function Checks(
-	{ url, summary: [Icon, color, label] }: { url: string; summary: [Icon, string, string] },
-) {
+/** The checks' summary, opening to each check; it opens on its own once any check fails. */
+function Checks({ checks, summary: [Icon, color, label] }: {
+	checks: DetailsCheck[];
+	summary: [Icon, string, string];
+}) {
+	const id = useId();
+	const [open, setOpen] = useState(checks.some((check) => check.state === "failed"));
 	return (
-		<External href={url}>
-			<Icon className={cn(GLYPH, color)} aria-hidden />
-			<span className="min-w-0 truncate">{label}</span>
-		</External>
+		<>
+			<button
+				type="button"
+				className={cn(ROW, ACTIVE)}
+				aria-expanded={open}
+				aria-controls={id}
+				onClick={() => setOpen(!open)}
+			>
+				<Icon className={cn(GLYPH, color)} aria-hidden />
+				<span className="min-w-0 truncate">{label}</span>
+				<IconChevronDown
+					className={cn(
+						"ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform",
+						open && "rotate-180",
+					)}
+					aria-hidden
+				/>
+			</button>
+			{open && (
+				<div id={id} className="flex min-w-0 flex-col gap-1 pl-6">
+					{sortChecks(checks).map((check) => {
+						const [State, tone] = CHECK_ICONS[check.state];
+						const content = (
+							<>
+								<State className={cn("size-3.5 shrink-0", tone)} aria-hidden />
+								<span className="min-w-0 truncate">{check.name}</span>
+							</>
+						);
+						const name = `${check.name}: ${check.state}`;
+						return check.url
+							? (
+								<External key={check.url} href={check.url} label={name}>
+									{content}
+								</External>
+							)
+							: <div key={check.name} className={ROW} aria-label={name}>{content}</div>;
+					})}
+				</div>
+			)}
+		</>
 	);
 }
 
 function Pull({ pull }: { pull: DetailsPull }) {
 	const [Icon, color] = PULL_ICONS[pull.state];
+	const failed = pull.checks.some((check) => check.state === "failed");
 	// A closed pull request's checks are history; only live ones say anything about the branch.
 	const summary = pull.state === "open" || pull.state === "draft"
 		? checkSummary(pull.checks)
@@ -190,7 +207,13 @@ function Pull({ pull }: { pull: DetailsPull }) {
 				<span className="min-w-0 truncate">{pull.title}</span>
 				<span className="shrink-0 text-muted-foreground tabular-nums">#{pull.number}</span>
 			</External>
-			{summary && <Checks url={`${pull.url}/checks`} summary={summary} />}
+			{summary && (
+				<Checks
+					key={failed ? "failed" : "passing"}
+					checks={pull.checks}
+					summary={summary}
+				/>
+			)}
 		</>
 	);
 }
