@@ -31,7 +31,15 @@ import {
 import { Skeleton } from "../../ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip";
 import { isSidebarRowSelected } from "./selection";
-import { IconArchive, IconCheck, IconChevronDown, IconPlus, IconRows, IconX } from "../../icons";
+import {
+	IconArchive,
+	IconCheck,
+	IconChevronDown,
+	IconPlus,
+	IconRows,
+	IconTrash,
+	IconX,
+} from "../../icons";
 
 export type SessionSidebarGroupId =
 	| "pinned"
@@ -51,6 +59,8 @@ export type SessionSidebarGroup = {
 	sort?: "creation" | "none";
 	collapsed?: boolean;
 	onNewSession?: () => void;
+	/** Forget the project's folder on this host; its files stay. */
+	onRemove?: () => void;
 };
 
 export type SessionSidebarRepo = {
@@ -591,7 +601,7 @@ function Group({
 			)}
 		>
 			{showHeader && (
-				<ContextMenu disabled={!archiveInactive}>
+				<ContextMenu disabled={!archiveInactive && !group.onRemove}>
 					<ContextMenuTrigger
 						render={
 							<div
@@ -647,10 +657,18 @@ function Group({
 						)}
 					</ContextMenuTrigger>
 					<ContextMenuContent className="inline-40">
-						<ContextMenuItem onClick={archiveInactive}>
-							<IconArchive className="size-3.5" />
-							Archive inactive
-						</ContextMenuItem>
+						{archiveInactive && (
+							<ContextMenuItem onClick={archiveInactive}>
+								<IconArchive className="size-3.5" />
+								Archive inactive
+							</ContextMenuItem>
+						)}
+						{group.onRemove && (
+							<ContextMenuItem onClick={group.onRemove}>
+								<IconTrash className="size-3.5" />
+								Remove project
+							</ContextMenuItem>
+						)}
 					</ContextMenuContent>
 				</ContextMenu>
 			)}

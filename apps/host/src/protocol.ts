@@ -210,6 +210,8 @@ export type HostRequest =
 	| { op: "channels" }
 	| { op: "projects" }
 	| { op: "project-open"; path: string }
+	/** Forget an opened folder; refused while this host has channels in it. */
+	| { op: "project-remove"; path: string }
 	/** Initialize Git in an opened folder and commit its current files. */
 	| { op: "project-init"; path: string }
 	/**
