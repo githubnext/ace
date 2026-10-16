@@ -4,8 +4,9 @@ anchor: function Ring
 created: 2026-10-16T22:02:34Z
 norm: '1'
 sig: ceddf3ba74b19d73
-body_hash: 8f6dfa95d85c7540
-raw_hash: 2893138cc146e0e7
+body_hash: 9cfe19a6d90f98fb
+raw_hash: 1f6258b757b2dc04
+vouched: 2026-10-16T22:02:51Z
 lines: 25-48
 ---
 
