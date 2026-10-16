@@ -120,7 +120,7 @@ export function GithubSidebar({ kind, project, repos, connected, onProject, onOp
 	);
 }
 
-function StateIcon({ item }: { item: Pick<GithubItem, "kind" | "state"> }) {
+export function StateIcon({ item }: { item: Pick<GithubItem, "kind" | "state"> }) {
 	const Icon = ICONS[item.kind][item.state];
 	const color = COLORS[item.kind][item.state];
 	return <Icon className={`size-4 shrink-0 ${color}`} aria-hidden />;
@@ -309,7 +309,7 @@ function Results({ kind, repo, data, filter, busy, onFilter, onRetry, onChannel 
 	);
 }
 
-function prompt(item: GithubItem): string {
+export function prompt(item: GithubItem): string {
 	const work = item.kind === "prs"
 		? "Continue this pull request on its existing branch: make the needed changes, validate them, and push them to it instead of opening a new pull request."
 		: "Make the needed changes, validate them, and open or update a pull request.";

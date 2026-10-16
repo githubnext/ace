@@ -845,6 +845,10 @@ export function App() {
 									project={current}
 									repos={repos}
 									channels={visible}
+									user={hello.user}
+									people={people}
+									presence={presence[current.id]}
+									attention={attention}
 									local={local}
 									connected={connected}
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}
