@@ -53,7 +53,8 @@ export async function publishGithub(directory: string): Promise<void> {
 		? `Ace ${release.display}`
 		: `Ace Canary ${release.display} (${release.version})`;
 	const endpoint = `repos/${repo}`;
-	const prerelease = release.channel === "canary";
+	// Canaries are full releases people install; only stable is marked GitHub's latest.
+	const latest = release.channel === "stable";
 	const ref = gh(["api", `${endpoint}/git/ref/tags/${tag}`], true);
 	const commit = ref ? gh(["api", `${endpoint}/commits/${tag}`]) : undefined;
 	if (commit && (JSON.parse(commit) as { sha: string }).sha !== release.revision) {
@@ -72,7 +73,7 @@ export async function publishGithub(directory: string): Promise<void> {
 	if (existing) {
 		published = existing;
 		if (
-			published.prerelease !== prerelease
+			published.prerelease
 			|| (published.draft && published.target_commitish !== release.revision)
 			|| (!published.draft && !commit)
 		) throw new Error(`${tag} does not match the requested release`);
@@ -112,8 +113,6 @@ export async function publishGithub(directory: string): Promise<void> {
 				`body=${notes}`,
 				"-F",
 				"draft=true",
-				"-F",
-				`prerelease=${prerelease}`,
 				"-f",
 				"make_latest=false",
 			])!,
@@ -142,7 +141,7 @@ export async function publishGithub(directory: string): Promise<void> {
 				"-F",
 				"draft=false",
 				"-f",
-				`make_latest=${prerelease ? "false" : "true"}`,
+				`make_latest=${latest}`,
 			])!,
 		) as GithubRelease;
 	}
