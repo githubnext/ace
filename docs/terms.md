@@ -138,6 +138,10 @@ Remove a channel permanently.
 Replace your own message with "Message deleted" for everyone and for agents' later runs. Runs that
 already read it keep what they learned, and the channel's data keeps the original.
 
+**Edit a message**:
+Change your own message's text for everyone and for agents' later runs. It shows as edited, and
+replies that answered the earlier text stay. The channel's data keeps the original.
+
 **Reaction**:
 An emoji anyone in the channel adds to a person's message or an agent's reply.
 

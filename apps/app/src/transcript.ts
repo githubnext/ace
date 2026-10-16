@@ -33,6 +33,8 @@ export type Item =
 		files?: TextFile[];
 		invoked: boolean;
 		deleted?: boolean;
+		/** When its author last edited it, in ms. */
+		edited?: number;
 	}
 	| {
 		kind: "reply";
@@ -106,7 +108,16 @@ export function apply(state: Transcript, event: Event): Transcript {
 				...state,
 				items: state.items.map((item) =>
 					item.kind === "message" && item.entry === event.entry
-						? { ...item, text: "", images: undefined, deleted: true }
+						? { ...item, text: "", images: undefined, files: undefined, deleted: true }
+						: item
+				),
+			};
+		case "edited":
+			return {
+				...state,
+				items: state.items.map((item) =>
+					item.kind === "message" && item.entry === event.entry
+						? { ...item, text: event.text, edited: event.at }
 						: item
 				),
 			};
@@ -245,7 +256,7 @@ function withdraw(items: Item[], messages: QueuedMessage[]): Item[] {
 }
 
 function pick(event: Extract<Event, { kind: "message" }>) {
-	const { entry, at, author, text, images, files, invoked, deleted } = event;
+	const { entry, at, author, text, images, files, invoked, deleted, edited } = event;
 	return {
 		entry,
 		at,
@@ -255,6 +266,7 @@ function pick(event: Extract<Event, { kind: "message" }>) {
 		...(files ? { files } : {}),
 		invoked,
 		...(deleted ? { deleted } : {}),
+		...(edited ? { edited } : {}),
 	};
 }
 

@@ -157,6 +157,11 @@ also appends an `ace.deletion` entry whose context edit replaces the message for
 requests; the original entry stays in the database and in backups. Both kinds are new, so existing
 channels need no migration and read as having no reactions or deletions.
 
+Message edits are `ace.edit` entries holding the author, the edited entry, the new text, and the
+edit time, with a context edit that replaces the message for later model requests. They add no
+document and do not change `ace.messages`, so existing channels need no migration and read as
+having no edits. Replay folds each message's newest edit into it.
+
 The October 3, 2026 credential-deferral check opened a backed-up version 0 channel with no keys:
 its pi entries and selected model were unchanged. Fresh channels accepted human messages before
 provider setup and retained their history through a worker restart. Adding a real Anthropic key
@@ -208,3 +213,11 @@ deleting a message through the gateway, the app, and a worker socket added only 
 documents: the original pi entries stayed byte-for-byte equivalent, the database passed an
 integrity check, and the source backup's checksums remained unchanged. A pi harness over a copy
 derived the deleted message as its author's "[deleted this message]" placeholder.
+
+The October 16, 2026 message-edit check created a channel with the previous build in an isolated
+`ACE_HOME`, gave it a human message and a real `openai/gpt-5-mini` run, backed it up, and restored
+it with the new build. Editing that message twice through a worker socket, and another through the
+gateway, added only `ace.edit` entries: the original entries stayed byte-for-byte equivalent, the
+database passed an integrity check, and the source backup's checksums remained unchanged. Later
+real runs answered from the newest edits while the earlier reply stayed, and deleting the edited
+message replaced it in context with the deletion placeholder.
