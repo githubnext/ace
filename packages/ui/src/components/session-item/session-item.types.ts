@@ -23,8 +23,8 @@ export type SidebarRow = {
 
 	// Permissions / role
 	private: boolean;
-	/** Runs in a team-deployed cell rather than on its host. */
-	hosted?: boolean;
+	/** Runs on the team's cloud compute rather than a teammate's machine. */
+	cloud?: boolean;
 	mine: boolean;
 	member: boolean;
 	/** Omitted by local/legacy callers; explicit peer policy controls administrative actions. */

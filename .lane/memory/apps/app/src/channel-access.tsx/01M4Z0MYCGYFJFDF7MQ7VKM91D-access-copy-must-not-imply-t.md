@@ -4,9 +4,9 @@ anchor: function ChannelAccess
 created: 2026-10-15T05:30:36Z
 norm: '1'
 sig: d9bb90f2534024f3
-body_hash: 1b42b6f9f6d6029c
-raw_hash: fd0160c95f6573ed
-vouched: 2026-10-15T12:39:40Z
+body_hash: d071cf690a8fbaab
+raw_hash: 5df6168beeb7cbb9
+vouched: 2026-10-16T21:22:40Z
 lines: 63-136
 ---
 

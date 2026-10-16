@@ -14,7 +14,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@ace/ui";
-import { IconBot, IconMonitor } from "@ace/ui/icons";
+import { IconBot, IconCloud, IconLaptop, IconMonitor } from "@ace/ui/icons";
 
 import { useDetails } from "./details";
 import { host } from "./host";
@@ -42,6 +42,33 @@ function reach(channel: Listing): { agents: string; confirm: string; desktop: bo
 			"Teammates can run commands as you on this machine, with Ace's macOS permissions such as Screen Recording.",
 		desktop: true,
 	};
+}
+
+/** The machine the channel's tools run on: its host's, or a container on the compute service. */
+function Machine({ channel }: { channel: Listing }) {
+	const place = placement(channel);
+	const [Icon, name, detail] = place.kind === "cloud"
+		? [IconCloud, "Cloud", `Tools run in a container on ${place.service}.`]
+		: place.kind === "hosted"
+		? [
+			IconLaptop,
+			place.workspace,
+			`Hosted on ${place.service}. Tools run on ${place.workspace}.`,
+		]
+		: [IconLaptop, place.host, `Runs on ${place.host}.`];
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<span className="mr-1 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground" />
+				}
+			>
+				<Icon className="size-3.5 shrink-0" aria-hidden />
+				<span className="max-w-40 truncate">{name}</span>
+			</TooltipTrigger>
+			<TooltipContent>{detail}</TooltipContent>
+		</Tooltip>
+	);
 }
 
 function AccessToggle({ label, value, live, owner, pending, description, children, onClick }: {
@@ -117,6 +144,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 			aria-label="Channel access"
 			className="mr-2 flex shrink-0 items-center gap-0.5 electrobun-webkit-app-region-no-drag"
 		>
+			<Machine channel={channel} />
 			<AccessToggle
 				label="Collaborator agent access"
 				value={shared}
