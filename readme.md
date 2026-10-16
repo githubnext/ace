@@ -35,7 +35,12 @@ hosted service.
 
 ## Run
 
-Requires Bun 1.4 or later and a model provider key. Ace reads a key such as `OPENAI_API_KEY` from
+To use Ace without a checkout, install Ace or Ace Canary from
+[releases](https://github.com/githubnext/ace/releases), start Tailscale, add a model key in
+Settings → Providers, and join your team's directory in Settings → This Mac. GitHub Next teammates
+follow the [dogfooding guide](https://github.com/githubnext/ace-dogfooding).
+
+From a checkout, Ace requires Bun 1.4 or later and a model provider key. Ace reads a key such as `OPENAI_API_KEY` from
 `ACE_OPENAI_API_KEY`, then `OPENAI_API_KEY`, then the OS keychain (`bun ace key set OPENAI_API_KEY`).
 
 ```sh
@@ -79,8 +84,10 @@ Electrobun's compatible bundled runtime, and Ace Helper carries its own compiled
 If `bun desktop dev` or `build` exits silently, macOS killed Electrobun's downloaded CLI for an invalid
 signature. Re-sign it once with `codesign --force -s - apps/desktop/node_modules/electrobun/bin/electrobun`.
 
-Start Tailscale to collaborate: the host shares its channels over the tailnet, and the app shows
-teammates' channels. Local work can run without Tailscale; remote collaboration uses the tailnet.
+Start Tailscale before Ace Helper: every channel belongs to the tailnet it was created on, and a
+host shows only its current tailnet's channels, so a host without Tailscale creates none. The host
+shares its channels over the tailnet, and the app shows teammates' channels. Restart Ace Helper
+after switching tailnets.
 
 On your phone or another of your devices, with Tailscale on, open the address the host prints
 (`http://<machine>.<tailnet>.ts.net:4140`). Only the host's owner is served; Tailscale names the
