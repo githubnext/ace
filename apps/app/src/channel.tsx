@@ -55,7 +55,7 @@ const GITHUB = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/(\d+)\/?$
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-// Open checks change on their own, so a visible pull request is read again this often.
+// Open checks change on their own, so the shown channel's pull request is read again this often.
 const PULL = 60_000;
 
 /** Links people and agents wrote in the chat, newest mention first; tool output is left out. */
@@ -184,20 +184,20 @@ function StoppedCloud({ className }: { className?: string }) {
 const pulls = new Map<string, GithubPull | null>();
 
 /**
- * The newest pull request from the chat's branch, read again while it can be seen. Opening a pull
- * request doesn't move the head, so a run ending reads it again too.
+ * The newest pull request from the chat's branch, read again while its channel is shown, since the
+ * chat surfaces failed checks with the details sidebar closed. Opening a pull request doesn't move
+ * the head, so a run ending reads it again too.
  */
 function usePull(
 	repo: string | undefined,
 	branch: string | undefined,
 	head: string | undefined,
 	busy: boolean,
-	open: boolean,
 ) {
 	const [, render] = useReducer((count: number) => count + 1, 0);
 	const key = repo && branch ? `${repo}\0${branch}` : undefined;
 	useEffect(() => {
-		if (!open || !repo || !branch) return;
+		if (!repo || !branch) return;
 		let active = true;
 		const read = () =>
 			host.request<GithubPull | null>({ op: "github-pull", repo, branch }).then(
@@ -213,7 +213,7 @@ function usePull(
 			active = false;
 			clearInterval(timer);
 		};
-	}, [open, repo, branch, head, busy]);
+	}, [repo, branch, head, busy]);
 	return key ? pulls.get(key) : undefined;
 }
 
@@ -223,7 +223,8 @@ export function ChannelDetails({ channel }: { channel: Listing }) {
 	const channels = useSyncExternalStore(host.subscribe, () => host.channels);
 	const { changes, info, items } = details;
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
-	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy, right.open);
+	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy);
+	useEffect(() => publish(channel.id, { pull }), [channel.id, pull]);
 	const totals = useMemo(() => {
 		if (!changes) return;
 		// Totaled per group as the Diff does, so uncommitted and untracked files never inflate the

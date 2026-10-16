@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import type { Changes } from "@ace/channel/protocol";
+import type { Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo } from "@ace/host/protocol";
 
 import type { Item } from "./transcript";
@@ -9,6 +9,8 @@ import type { Item } from "./transcript";
 export type Details = {
 	info?: ChannelInfo;
 	changes?: Changes;
+	/** The chat branch's newest pull request; `null` once read and none exists. */
+	pull?: GithubPull | null;
 	items?: Item[];
 	/** Whether teammates may invoke agents, as the chat's watch reports it. */
 	shared?: boolean;

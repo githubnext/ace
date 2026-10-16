@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Button, Timeline, toast } from "@ace/ui";
 import type { Listing } from "@ace/host/protocol";
 
+import { Checks } from "./checks";
 import { Composer } from "./composer";
 import { DeleteMessage } from "./delete-message";
 import { desktop } from "./desktop";
@@ -240,6 +241,7 @@ export function Conversation(
 						mayAnswer={channel.owner === user || transcript.shared !== false}
 					/>
 				)}
+				{transcript.live && <Checks channel={channel.id} />}
 				{transcript.live && (
 					<MessageQueue messages={transcript.queue} people={people} channels={senders} />
 				)}
