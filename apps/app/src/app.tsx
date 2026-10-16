@@ -423,6 +423,9 @@ export function App() {
 					onNewSession: connected && (value.host === hello.host || value.repo)
 						? () => void create(undefined, undefined, value)
 						: undefined,
+					onRemove: connected && opened.some((checkout) => isLocal(checkout, value))
+						? () => void remove(value)
+						: undefined,
 				},
 				...[...team].map(([owner, rows]) => ({ owner, name: person(people, owner), rows }))
 					.sort((a, b) => a.name.localeCompare(b.name))
@@ -458,6 +461,19 @@ export function App() {
 	async function open(path: string) {
 		const value = await host.request<Project>({ op: "project-open", path });
 		chooseProject(projectId(hello.host, value.path, value.repo));
+	}
+
+	const isLocal = (checkout: Project, value: AppProject) =>
+		projectId(hello.host, checkout.path, checkout.repo) === value.id;
+
+	async function remove(value: AppProject) {
+		try {
+			for (const checkout of opened.filter((checkout) => isLocal(checkout, value))) {
+				await host.request({ op: "project-remove", path: checkout.path });
+			}
+		} catch (error) {
+			toast.error("Could not remove project", { description: (error as Error).message });
+		}
 	}
 
 	async function choose() {

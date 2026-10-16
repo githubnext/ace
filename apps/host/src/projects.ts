@@ -130,19 +130,32 @@ export async function open(value: string): Promise<Project> {
 	if (!statSync(path).isDirectory()) throw new Error("Choose a folder to open as a project");
 	path = realpathSync((await checkout(path)).root);
 	const opened = paths();
-	if (!opened.includes(path)) {
-		mkdirSync(config.home, { recursive: true, mode: 0o700 });
-		const temporary = join(config.home, `.projects-${randomUUID()}.json`);
-		try {
-			writeFileSync(temporary, `${JSON.stringify([...opened, path], null, "\t")}\n`, {
-				mode: 0o600,
-			});
-			renameSync(temporary, join(config.home, "projects.json"));
-		} finally {
-			rmSync(temporary, { force: true });
-		}
-	}
+	if (!opened.includes(path)) save([...opened, path]);
 	return project(path);
+}
+
+/** Removing a project forgets the folder; its files and lanes stay where they are. */
+export function remove(path: string): void {
+	const channels = catalog.list().filter((channel) => channel.project === path).length;
+	if (channels) {
+		throw new Error(
+			`This project still has ${
+				channels === 1 ? "a channel" : `${channels} channels`
+			}, counting archived ones. Delete ${channels === 1 ? "it" : "them"} first.`,
+		);
+	}
+	save(paths().filter((value) => value !== path));
+}
+
+function save(opened: string[]): void {
+	mkdirSync(config.home, { recursive: true, mode: 0o700 });
+	const temporary = join(config.home, `.projects-${randomUUID()}.json`);
+	try {
+		writeFileSync(temporary, `${JSON.stringify(opened, null, "\t")}\n`, { mode: 0o600 });
+		renameSync(temporary, join(config.home, "projects.json"));
+	} finally {
+		rmSync(temporary, { force: true });
+	}
 }
 
 /** Secrets, dependencies, and build output that a first commit of a whole folder must not take. */

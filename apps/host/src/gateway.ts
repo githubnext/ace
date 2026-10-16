@@ -464,6 +464,9 @@ async function handle(
 			await projectsChanged();
 			return project;
 		}
+		case "project-remove":
+			projects.remove(request.path);
+			return projectsChanged();
 		case "project-init": {
 			const project = await projects.init(request.path);
 			await projectsChanged();

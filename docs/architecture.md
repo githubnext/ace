@@ -211,7 +211,9 @@ a Git repository with a commit, since lanes are worktrees of one. Until then the
 initialize the folder in place of starting a channel: the host runs `git init` and commits the
 folder's current files under a `.gitignore` it writes to exclude common secrets, dependencies, and
 build output. A folder that already has a `.gitignore` is refused, so the person commits it. Existing catalog
-channels also contribute their project paths. Only local owner connections can read or change
+channels also contribute their project paths. Remove project, from a project header's context menu, takes the folder
+off the list and leaves its files and lanes; the host refuses while it has channels there, archived
+ones included, since those would list it again. Only local owner connections can read or change
 the opened-project list; teammates see the project information already present in channel listings.
 Setting up a known GitHub project is a local-only operation on that list: the host validates the
 `owner/name`, expands `~`, and runs `git clone` of `https://github.com/<owner>/<name>.git` with
