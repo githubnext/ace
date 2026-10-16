@@ -15,7 +15,7 @@ import { basename, isAbsolute, join, resolve } from "node:path";
 
 import * as catalog from "./catalog";
 import { config } from "./config";
-import { clone, remote, REMOTES, repository } from "./github";
+import { clone, parse, remote, REMOTES } from "./github";
 import type { Project } from "./protocol";
 
 /** `commit` is whether lanes can start: the folder is a Git repository with a commit. */
@@ -219,11 +219,11 @@ export async function init(path: string): Promise<Project> {
 const cloning = new Set<string>();
 
 /**
- * Sets up a known GitHub project on this host: clones it into `value`, or opens the checkout of
- * it already there. Anything else at `value` is left untouched.
+ * Sets up a GitHub repository on this host: clones it into `value`, or opens the checkout of it
+ * already there. Anything else at `value` is left untouched.
  */
-export async function setup(repo: string, value: string): Promise<Project> {
-	repository(repo);
+export async function setup(source: string, value: string): Promise<Project> {
+	const repo = parse(source);
 	const expanded = expand(value.trim());
 	if (!isAbsolute(expanded)) throw new Error("Enter a full folder path, such as ~/code/project");
 	const path = resolve(expanded);

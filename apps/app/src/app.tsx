@@ -276,9 +276,12 @@ export function App() {
 		{},
 	);
 	const [adding, setAdding] = useState(false);
-	/** A project to clone here; `start` continues into channel creation with its initial text. */
+	/**
+	 * A project to clone here, or a repository by URL without one; `start` continues into channel
+	 * creation with its initial text.
+	 */
 	const [setup, setSetup] = useState<{
-		project: AppProject & { repo: string };
+		project?: AppProject & { repo: string };
 		start?: { text?: string; onCreated?: () => void };
 	}>();
 	const [settings, setSettings] = useState<boolean | "updates">(false);
@@ -500,18 +503,18 @@ export function App() {
 		}
 	}
 
+	function cloneUrl() {
+		if (connected) setSetup({});
+	}
+
 	function startSetup(project: AppProject, start?: { text?: string; onCreated?: () => void }) {
 		if (project.repo) setSetup({ project: { ...project, repo: project.repo }, start });
 	}
 
 	/** Channels only start on this host; setup may clone here first, never on the other host. */
-	async function finishSetup(path: string) {
+	async function finishSetup(repo: string, path: string) {
 		if (!setup) return;
-		const value = await host.request<Project>({
-			op: "project-clone",
-			repo: setup.project.repo,
-			path,
-		});
+		const value = await host.request<Project>({ op: "project-clone", repo, path });
 		const id = projectId(hello.host, value.path, value.repo);
 		setSetup(undefined);
 		if (!setup.start) return chooseProject(id);
@@ -700,6 +703,7 @@ export function App() {
 					<Drawers page={page} channel={channel?.id} />
 					<WindowControls
 						onOpen={() => void choose()}
+						onClone={cloneUrl}
 						onSettings={() => setSettings(true)}
 						onPage={setPage}
 						connected={connected}
@@ -726,6 +730,7 @@ export function App() {
 										loading={status === "connecting" && !channels.length}
 										onRepoChange={(repo) => chooseProject(repo.id)}
 										onAddRepo={connected ? () => void choose() : undefined}
+										onCloneRepo={connected ? cloneUrl : undefined}
 										onSelect={(item) => {
 											const value = listings.get(item.uid);
 											if (value) select(value);
@@ -782,6 +787,7 @@ export function App() {
 										connected={connected}
 										onProject={chooseProject}
 										onOpen={() => void choose()}
+										onClone={cloneUrl}
 									/>
 								)}
 						</Sidebar>
@@ -805,7 +811,13 @@ export function App() {
 						{!current && !connected
 							? null
 							: !current
-							? <EmptyProjects onOpen={() => void choose()} disabled={!connected} />
+							? (
+								<EmptyProjects
+									onOpen={() => void choose()}
+									onClone={cloneUrl}
+									disabled={!connected}
+								/>
+							)
 							: page === "dashboard"
 							? (
 								<Dashboard
@@ -819,6 +831,7 @@ export function App() {
 									onInit={() => init(current.path)}
 									onProject={chooseProject}
 									onOpen={() => void choose()}
+									onClone={cloneUrl}
 									onChannel={select}
 									onCreate={(text, onCreated, cloud) => create(text, onCreated, current, cloud)}
 									cloud={local && !!current.repo && !!compute?.enabled}

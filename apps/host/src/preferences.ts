@@ -14,7 +14,7 @@ export function isModel(value: unknown): value is ModelRef {
 		&& typeof value.modelId === "string" && value.modelId.length > 0;
 }
 
-type Saved = { model?: ModelRef | null; compute?: Compute };
+type Saved = { model?: ModelRef | null; compute?: Compute; folder?: string };
 
 function saved(): Saved {
 	let text: string;
@@ -46,6 +46,11 @@ export function compute(): Compute {
 	return team ? { enabled: true, url: team } : { enabled: false, url: null };
 }
 
+/** Kept as entered, with `~` unexpanded, so the app shows and suggests paths the way people type them. */
+export function folder(): string {
+	return saved().folder || "~/code";
+}
+
 function save(patch: Saved): void {
 	const next = { ...saved(), ...patch };
 	mkdirSync(config.settings, { recursive: true, mode: 0o700 });
@@ -65,4 +70,8 @@ export function savePreference(model: ModelRef | null): void {
 
 export function saveCompute(value: Compute): void {
 	save({ compute: value });
+}
+
+export function saveFolder(value: string): void {
+	save({ folder: value });
 }

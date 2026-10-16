@@ -25,6 +25,7 @@ import type { ProviderSettings, Settings as HostSettings } from "@ace/host/proto
 
 import { useCompute } from "./compute";
 import { desktop } from "./desktop";
+import { useFolder } from "./folder";
 import { host } from "./host";
 import { HostStatus } from "./host-settings";
 import { NativeStatus } from "./native-settings";
@@ -39,7 +40,7 @@ const all: (Info & { desktop?: boolean })[] = [
 	{
 		id: "general",
 		label: "General",
-		description: "Appearance and the model new chats start with.",
+		description: "Appearance, where cloned projects go, and the model new chats start with.",
 		icon: IconSettings,
 	},
 	{
@@ -370,6 +371,65 @@ function CloudCompute({ disabled }: { disabled: boolean }) {
 	);
 }
 
+/** A text field: the host expands `~`, and browsers cannot pick a host folder. */
+function ProjectsFolder({ disabled }: { disabled: boolean }) {
+	const { folder: saved, error } = useFolder();
+	const [value, setValue] = useState<string>();
+	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
+	const draft = value ?? saved ?? "";
+	const locked = !saved || disabled || action.busy;
+
+	async function save() {
+		setAction({ busy: true });
+		try {
+			await host.request({ op: "preferences", folder: draft });
+			setValue(undefined);
+			setAction({});
+		} catch (error) {
+			setAction({ error: (error as Error).message });
+		}
+	}
+
+	return (
+		<Row
+			id="projects-folder-label"
+			label="Projects folder"
+			description={`Clone from URL suggests a folder here, named after the repository, on ${
+				desktop ? "this Mac" : "this host"
+			}.`}
+			footer={
+				<>
+					<form
+						className="flex flex-col gap-2 @md:flex-row"
+						onSubmit={(event) => {
+							event.preventDefault();
+							void save();
+						}}
+					>
+						<Input
+							spellCheck={false}
+							aria-labelledby="projects-folder-label"
+							placeholder="~/code"
+							value={draft}
+							disabled={locked}
+							onChange={(event) => setValue(event.target.value)}
+						/>
+						<Button
+							type="submit"
+							variant="outline"
+							disabled={locked || !draft.trim() || draft.trim() === saved}
+						>
+							Save folder
+						</Button>
+					</form>
+					{error && <Problem>{error}</Problem>}
+					{action.error && <Problem>{action.error}</Problem>}
+				</>
+			}
+		/>
+	);
+}
+
 function Appearance() {
 	const { theme, set } = useTheme();
 	return (
@@ -512,6 +572,9 @@ export function Settings(
 							<div hidden={section !== "general"} className="flex flex-col gap-6">
 								<Group title="Appearance">
 									<Appearance />
+								</Group>
+								<Group title="Projects">
+									<ProjectsFolder disabled={offline} />
 								</Group>
 								<Group title="Models">
 									<DefaultModel settings={result.settings} disabled={offline} />

@@ -29,7 +29,7 @@ import {
 	remove,
 } from "./manage";
 import * as peers from "./peers";
-import { compute as computeSettings } from "./preferences";
+import { compute as computeSettings, folder } from "./preferences";
 import * as projects from "./projects";
 import {
 	channelProject,
@@ -50,6 +50,7 @@ import {
 	removeKey,
 	setCompute,
 	setDirectory,
+	setFolder,
 	setKey,
 	setModel,
 	settings,
@@ -362,6 +363,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"key-remove",
 	"preferences",
 	"compute",
+	"folder",
 	"compute-start",
 	"compute-stop",
 	"update-prepare",
@@ -518,6 +520,7 @@ async function handle(
 		case "preferences":
 			if (request.model !== undefined) await setModel(request.model);
 			if (request.compute) setCompute(request.compute);
+			if (request.folder !== undefined) setFolder(request.folder);
 			return settingsChanged();
 		case "key-store":
 			await storeKey(request.name, request.value);
@@ -543,6 +546,8 @@ async function handle(
 		}
 		case "compute":
 			return computeSettings();
+		case "folder":
+			return folder();
 		case "compute-start":
 			return lifecycle(
 				request.channel,

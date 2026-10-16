@@ -42,7 +42,7 @@ label add the fewest trailing parent folders that tell them apart, or a GitHub p
 the project picker shows each checkout's full path on hover. Creating channels and archiving
 inactive ones use this host's checkout. A GitHub project checked out only on teammates' hosts lists
 their channels, and its channel creation entry points first offer to set it up on this machine:
-the person confirms or edits a destination, `~/code/<repo>` by default, before anything is cloned.
+the person confirms or edits a destination, `<projects folder>/<repo>` by default, before anything is cloned.
 A creation that led to setup continues here with its initial text once the project is added;
 standalone setup only adds the project. The dashboard draft belongs to the project, so it
 survives setup until a channel admits it. Channels never start on the other host. Its Channels sidebar shows the person's own channels, then one
@@ -206,7 +206,10 @@ service without freezing it, alongside its catalog record. `ace restore` adds a 
 local channel with a new ID. Project files and lane worktrees have their own repository backup. Stored format changes require migrations; see [data](data.md).
 
 Opening a folder adds a project to the host's `projects.json`, independently of channel creation
-or model credentials. This is a list of local folders, not channel history. Channels start only in
+or model credentials. Clone from URL takes a GitHub URL, SSH remote, or `owner/name`, which
+`githubRepo` in the host protocol reads for both the app's suggested folder and the host's clone,
+and clones into `<projects folder>/<repo>` unless the person edits it. The projects folder is a host
+setting in `settings.json`, `~/code` by default, kept unexpanded since the host expands `~`. This is a list of local folders, not channel history. Channels start only in
 a Git repository with a commit, since lanes are worktrees of one. Until then the app offers to
 initialize the folder in place of starting a channel: the host runs `git init` and commits the
 folder's current files under a `.gitignore` it writes to exclude common secrets, dependencies, and

@@ -87,6 +87,7 @@ export function Navigation({ page, user, github, onPage, onSettings }: {
 const ACTIONS = [
 	"new-window",
 	"project-open",
+	"project-clone",
 	"settings",
 	"dashboard",
 	"channels",
@@ -96,8 +97,9 @@ const ACTIONS = [
 	"channels-toggle",
 ];
 
-export function WindowControls({ onOpen, onSettings, onPage, connected }: {
+export function WindowControls({ onOpen, onClone, onSettings, onPage, connected }: {
 	onOpen: () => void;
+	onClone: () => void;
 	onSettings: () => void;
 	onPage: (page: Page) => void;
 	connected: boolean;
@@ -112,6 +114,8 @@ export function WindowControls({ onOpen, onSettings, onPage, connected }: {
 				return void desktop?.window();
 			case "project-open":
 				return onOpen();
+			case "project-clone":
+				return onClone();
 			case "settings":
 				return onSettings();
 			case "dashboard":

@@ -6,7 +6,7 @@ import * as directory from "./directory";
 import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } from "./keys";
 import { models, parseModel } from "./manage";
 import { canonical } from "./move";
-import { isModel, preference, saveCompute, savePreference } from "./preferences";
+import { isModel, preference, saveCompute, saveFolder, savePreference } from "./preferences";
 import type { Compute, ProviderId, Settings } from "./protocol";
 
 const providers = new Map(
@@ -132,6 +132,14 @@ export function setCompute({ enabled, url }: Compute): void {
 	const service = url?.trim() ? canonical(url.trim()) : null;
 	if (enabled && !service) throw new Error("Add the cloud compute service URL first");
 	saveCompute({ enabled, url: service });
+}
+
+export function setFolder(value: string): void {
+	const path = value.trim().replace(/(.)\/+$/, "$1");
+	if (!isValue(path) || !/^(?:~(?:\/|$)|\/)/.test(path)) {
+		throw new Error("Enter a full folder path, such as ~/code");
+	}
+	saveFolder(path);
 }
 
 function named(name: unknown): void {

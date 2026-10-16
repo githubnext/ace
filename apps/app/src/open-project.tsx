@@ -10,11 +10,15 @@ import {
 	DialogTitle,
 	Input,
 } from "@ace/ui";
-import { IconBranch, IconFolderSearch } from "@ace/ui/icons";
+import { IconArrowDownToLine, IconBranch, IconFolderSearch } from "@ace/ui/icons";
 
 import { desktop } from "./desktop";
 
-export function EmptyProjects({ onOpen, disabled }: { onOpen: () => void; disabled: boolean }) {
+export function EmptyProjects({ onOpen, onClone, disabled }: {
+	onOpen: () => void;
+	onClone: () => void;
+	disabled: boolean;
+}) {
 	return (
 		<div className="mx-auto flex min-h-full w-full max-w-[42rem] flex-col justify-center px-5 py-10">
 			<div className="flex flex-col items-center gap-5 text-center">
@@ -23,13 +27,21 @@ export function EmptyProjects({ onOpen, disabled }: { onOpen: () => void; disabl
 				</div>
 				<div className="flex flex-col gap-2">
 					<h1 className="text-xl font-medium tracking-normal">Open a project</h1>
-					<p className="text-sm leading-6 text-muted-foreground">Choose a folder to get started.</p>
+					<p className="text-sm leading-6 text-muted-foreground">
+						Choose a folder or clone a GitHub repository to get started.
+					</p>
 				</div>
-				<Button onClick={onOpen} disabled={disabled}>
-					<IconFolderSearch aria-hidden data-icon="inline-start" />
-					Open folder…
-					{desktop && <kbd className="ml-2 text-xs opacity-60">⌘O</kbd>}
-				</Button>
+				<div className="flex flex-wrap justify-center gap-2">
+					<Button onClick={onOpen} disabled={disabled}>
+						<IconFolderSearch aria-hidden data-icon="inline-start" />
+						Open folder…
+						{desktop && <kbd className="ml-2 text-xs opacity-60">⌘O</kbd>}
+					</Button>
+					<Button variant="outline" onClick={onClone} disabled={disabled}>
+						<IconArrowDownToLine aria-hidden data-icon="inline-start" />
+						Clone from URL…
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

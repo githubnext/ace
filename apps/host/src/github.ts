@@ -10,7 +10,7 @@ import type {
 } from "@ace/channel/protocol";
 
 import { githubEnv } from "./keys";
-import type { HostRequest } from "./protocol";
+import { githubRepo, type HostRequest } from "./protocol";
 
 const REPO = /^[a-z\d][a-z\d-]*\/[a-z\d_.-]+$/i;
 const FIELDS = "number,title,url,state,author,createdAt,updatedAt,labels";
@@ -71,6 +71,17 @@ export function repository(value: string): string {
 		throw new Error("Choose a GitHub repository in owner/name format");
 	}
 	return value;
+}
+
+/** A GitHub repository URL, SSH remote, or owner/name, as a valid owner/name. */
+export function parse(value: string): string {
+	const repo = githubRepo(value);
+	if (!repo) {
+		throw new Error(
+			"Ace clones GitHub repositories. Enter one such as https://github.com/owner/name or owner/name.",
+		);
+	}
+	return repository(repo);
 }
 
 function command(kind: GithubKind): "issue" | "pr" {
