@@ -72,13 +72,14 @@ function useGithubFilter(kind: GithubKind, project: AppProject) {
 	);
 }
 
-export function GithubSidebar({ kind, project, repos, connected, onProject, onOpen }: {
+export function GithubSidebar({ kind, project, repos, connected, onProject, onOpen, onClone }: {
 	kind: GithubKind;
 	project: AppProject;
 	repos: SessionSidebarRepo[];
 	connected: boolean;
 	onProject: (id: string) => void;
 	onOpen: () => void;
+	onClone: () => void;
 }) {
 	const [filter, setFilter] = useGithubFilter(kind, project);
 	const left = useLayoutLeft();
@@ -91,6 +92,7 @@ export function GithubSidebar({ kind, project, repos, connected, onProject, onOp
 			selectedRepoId={project.id}
 			onRepoChange={(repo) => onProject(repo.id)}
 			onAddRepo={connected ? onOpen : undefined}
+			onCloneRepo={connected ? onClone : undefined}
 		>
 			<h2 className="px-3 pt-2 pb-1.5 text-xs font-medium text-muted-foreground">{NAMES[kind]}</h2>
 			<nav className="flex flex-col gap-0.5 px-1.5" aria-label={`${NAMES[kind]} state`}>

@@ -180,6 +180,7 @@ ApplicationMenu.setApplicationMenu([
 		submenu: [
 			{ label: "New Window", action: "new-window", accelerator: "CmdOrCtrl+n" },
 			{ label: "Open Folder…", action: "project-open", accelerator: "CmdOrCtrl+o" },
+			{ label: "Clone from URL…", action: "project-clone" },
 		],
 	},
 	{
@@ -258,6 +259,7 @@ Electrobun.events.on("application-menu-clicked", ({ data }) => {
 		[
 			"settings",
 			"project-open",
+			"project-clone",
 			"dashboard",
 			"channels",
 			"issues",

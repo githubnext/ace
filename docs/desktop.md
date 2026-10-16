@@ -9,7 +9,8 @@ The app carries its runtimes; opening it from Finder requires neither a source c
 Keep the existing Ace shell and shared UI components. The left navigation has Dashboard and
 Channels; native window controls have their own space above it. Cmd+O opens a native folder
 picker and adds the chosen folder as a project. Opening a project needs no provider key, creates
-no channel, and remains available after a restart. Repository import is a later feature.
+no channel, and remains available after a restart. File → Clone from URL… clones a GitHub
+repository into the projects folder from Settings → General and adds it the same way.
 
 Dashboard and Channels share the project picker. A dashboard request or New channel creates a
 channel in the selected project. Switching projects restores each project's selected channel.

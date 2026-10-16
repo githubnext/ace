@@ -64,8 +64,9 @@ The default model is shared with the CLI's `ace model` command. Provider keys ar
 to the UI, and running workers read changes on their next model request. Environment overrides
 still take priority and are identified in Settings.
 
-Press Cmd+O in the desktop to open a folder as a project. Opening a project needs no provider key
-and creates no channel. Dashboard and Channels share the project picker; start a channel from
+Press Cmd+O in the desktop to open a folder as a project, or choose Clone from URL… (File menu,
+project picker, or Cmd+K) to clone a GitHub repository into the projects folder from Settings →
+General, `~/code` by default. Opening a project needs no provider key and creates no channel. Dashboard and Channels share the project picker; start a channel from
 the project's dashboard or sidebar. Each project remembers its selected channel.
 
 Settings → This Mac shows Git, shell, and Tailscale status, joins the

@@ -33,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../
 import { isSidebarRowSelected } from "./selection";
 import {
 	IconArchive,
+	IconArrowDownToLine,
 	IconCheck,
 	IconChevronDown,
 	IconPlus,
@@ -108,6 +109,8 @@ export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children
 	/** When provided, the "…" menu offers "Start from an issue…". */
 	onStartIssue?: () => void;
 	onAddRepo?: () => void;
+	/** When provided, the project menu offers "Clone from URL…" beside "Open folder…". */
+	onCloneRepo?: () => void;
 	groupHeaderClassName?: string;
 	empty?: ReactNode;
 };
@@ -266,6 +269,7 @@ export function ProjectPicker(
 		onRepoChange,
 		onRepoRemove,
 		onAddRepo,
+		onCloneRepo,
 		trigger,
 		children,
 	}: {
@@ -275,6 +279,7 @@ export function ProjectPicker(
 		onRepoChange?: (repo: SessionSidebarRepo) => void;
 		onRepoRemove?: (repo: SessionSidebarRepo) => void;
 		onAddRepo?: () => void;
+		onCloneRepo?: () => void;
 		trigger?: ReactElement;
 		children?: ReactNode;
 	},
@@ -322,12 +327,20 @@ export function ProjectPicker(
 						<DropdownMenuSeparator className="my-0.5" />
 					</>
 				)}
-				{onAddRepo && (
+				{(onAddRepo || onCloneRepo) && (
 					<>
-						<DropdownMenuItem className="mt-0 mb-1" onClick={onAddRepo}>
-							<IconPlus className="size-3.5 text-muted-foreground" />
-							<span className="min-w-0 flex-1 truncate">Open folder…</span>
-						</DropdownMenuItem>
+						{onAddRepo && (
+							<DropdownMenuItem className={cn("mt-0", !onCloneRepo && "mb-1")} onClick={onAddRepo}>
+								<IconPlus className="size-3.5 text-muted-foreground" />
+								<span className="min-w-0 flex-1 truncate">Open folder…</span>
+							</DropdownMenuItem>
+						)}
+						{onCloneRepo && (
+							<DropdownMenuItem className="mt-0 mb-1" onClick={onCloneRepo}>
+								<IconArrowDownToLine className="size-3.5 text-muted-foreground" />
+								<span className="min-w-0 flex-1 truncate">Clone from URL…</span>
+							</DropdownMenuItem>
+						)}
 						{orgGroups.length > 0 && <DropdownMenuSeparator className="my-0.5" />}
 					</>
 				)}
@@ -793,6 +806,7 @@ export function ProjectSidebar({
 	onRepoChange,
 	onRepoRemove,
 	onAddRepo,
+	onCloneRepo,
 	children,
 	className,
 	...props
@@ -807,6 +821,7 @@ export function ProjectSidebar({
 		| "onRepoChange"
 		| "onRepoRemove"
 		| "onAddRepo"
+		| "onCloneRepo"
 	>)
 {
 	return (
@@ -826,6 +841,7 @@ export function ProjectSidebar({
 						onRepoChange={onRepoChange}
 						onRepoRemove={onRepoRemove}
 						onAddRepo={onAddRepo}
+						onCloneRepo={onCloneRepo}
 					/>
 				</div>
 				{here && <Presence members={here} />}
@@ -922,6 +938,7 @@ export function SessionSidebar(
 		onContinuePr,
 		onStartIssue,
 		onAddRepo,
+		onCloneRepo,
 		groupHeaderClassName,
 		empty,
 		className,
@@ -1011,6 +1028,7 @@ export function SessionSidebar(
 				onRepoChange={onRepoChange}
 				onRepoRemove={onRepoRemove}
 				onAddRepo={onAddRepo}
+				onCloneRepo={onCloneRepo}
 				{...props}
 			>
 				<div className="relative min-h-0 flex-1 overflow-hidden">

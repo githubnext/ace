@@ -33,6 +33,7 @@ const ACTIONS = [
 	action("issues", "Issues", "Go to", "3"),
 	action("prs", "Pull Requests", "Go to", "4"),
 	action("project-open", "Open Folder…", "Project", "o"),
+	action("project-clone", "Clone from URL…", "Project"),
 	action("settings", "Settings", "Ace", ","),
 	...(desktop ? [action("updates", "Check for Updates…", "Ace")] : []),
 	action("nav-toggle", "Toggle Navigation", "View", "b"),

@@ -119,6 +119,19 @@ export const projectId = (host: string, path: string, repo?: string) =>
 export const channelProject = (channel: Pick<Listing, "host" | "project" | "root" | "repo">) =>
 	projectId(channel.host, root(channel), channel.repo);
 
+/**
+ * The owner/name a GitHub URL, SSH remote, or owner/name names, or undefined for anything else.
+ * The app reads it to suggest a clone's folder and the host to clone, so both agree on the name.
+ */
+export function githubRepo(value: string): string | undefined {
+	const text = value.trim();
+	const url =
+		/^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com(?::\d+)?\/)([^/?#]+)\/([^/?#]+)/i
+			.exec(text);
+	if (url) return `${url[1]}/${url[2]!.replace(/\.git$/i, "")}`;
+	if (/^[^/:@\s]+\/[^/:@\s]+$/.test(text)) return text.replace(/\.git$/i, "");
+}
+
 /** Channels idle this long are inactive until their transcript grows again. */
 const INACTIVE_AFTER = 6 * 60 * 60_000;
 
@@ -215,8 +228,9 @@ export type HostRequest =
 	/** Initialize Git in an opened folder and commit its current files. */
 	| { op: "project-init"; path: string }
 	/**
-	 * Clone a known GitHub project into `path` on this host, or open the matching checkout already
-	 * there, then add it like `project-open`. The host expands `~`.
+	 * Clone a GitHub repository into `path` on this host, or open the matching checkout already
+	 * there, then add it like `project-open`. `repo` is anything `githubRepo` reads; the host
+	 * expands `~`.
 	 */
 	| { op: "project-clone"; repo: string; path: string }
 	/** Resolve a known project's GitHub remote on the machine that holds its checkout. */
@@ -243,8 +257,10 @@ export type HostRequest =
 	| { op: "key-remove"; provider: ProviderId }
 	/** The cloud compute beta's settings, which hold no secret and so never wait on Keychain. */
 	| { op: "compute" }
+	/** The projects folder, where a clone by URL goes unless the person picks another folder. */
+	| { op: "folder" }
 	/** Each field present is saved; the others keep their saved values. */
-	| { op: "preferences"; model?: ModelRef | null; compute?: Compute }
+	| { op: "preferences"; model?: ModelRef | null; compute?: Compute; folder?: string }
 	/**
 	 * Only this host's loopback clients save or remove keychain items and join or leave the
 	 * directory: Ace Helper saves them so it can read them back without a macOS prompt.

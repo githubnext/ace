@@ -75,6 +75,7 @@ export function Dashboard(
 		onInit,
 		onProject,
 		onOpen,
+		onClone,
 		onChannel,
 		onCreate,
 		cloud,
@@ -89,6 +90,7 @@ export function Dashboard(
 		onInit: () => Promise<void>;
 		onProject: (id: string) => void;
 		onOpen: () => void;
+		onClone: () => void;
 		onChannel: (channel: Listing) => void;
 		onCreate: (text?: string, onCreated?: () => void, cloud?: boolean) => Promise<void>;
 		/** The cloud compute beta is on and this project has a GitHub repository. */
@@ -128,6 +130,7 @@ export function Dashboard(
 					selectedRepoId={project.id}
 					onRepoChange={(repo) => onProject(repo.id)}
 					onAddRepo={connected ? onOpen : undefined}
+					onCloneRepo={connected ? onClone : undefined}
 					trigger={
 						<button
 							type="button"
