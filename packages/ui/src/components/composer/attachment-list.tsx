@@ -15,6 +15,8 @@ type Attachment = {
 	size?: number;
 	/** Preview URL for images/videos. */
 	preview?: string;
+	/** The added file, for reading contents that have no preview. */
+	file?: File;
 };
 
 const ROTATIONS = [-2, 1.5, -1, 2, -1.5];
