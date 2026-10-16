@@ -27,7 +27,7 @@ function Ring({ fraction }: { fraction: number }) {
 	const length = 2 * Math.PI * radius;
 	return (
 		<svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>
-			<circle cx="8" cy="8" r={radius} fill="none" strokeWidth="2" className="stroke-muted" />
+			<circle cx="8" cy="8" r={radius} fill="none" strokeWidth="2" className="stroke-foreground/20" />
 			<circle
 				cx="8"
 				cy="8"
