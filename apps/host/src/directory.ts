@@ -27,11 +27,16 @@ export function url(): string | undefined {
 	if (existsSync(config)) return JSON.parse(readFileSync(config, "utf8")).url;
 }
 
-/** `app` and `hosted` are the team's web app and hosting service, set where the directory is deployed. */
-let known: { hosts: Host[]; channels: Listing[]; app?: string; hosted?: string } = {
-	hosts: [],
-	channels: [],
+/** `app`, `hosted`, and `compute` are the team's web app and services, set where the directory is deployed. */
+type Known = {
+	hosts: Host[];
+	channels: Listing[];
+	app?: string;
+	hosted?: string;
+	compute?: string;
 };
+
+let known: Known = { hosts: [], channels: [] };
 let synced: number | undefined;
 /** The last sync's failure, kept until a sync succeeds so Settings can say what is wrong and since when. */
 let error: string | undefined;
@@ -174,7 +179,7 @@ export function watch({ self, channels, changed, published, covered }: Options) 
 			published(before, after);
 			before = after;
 			reading = [];
-			const answer: typeof known = await (await call(base, "/", controller.signal)).json();
+			const answer: Known = await (await call(base, "/", controller.signal)).json();
 			// The directory changed while this sync was under way; its answer belongs to the old one.
 			if (url() !== base) return;
 			for (const event of reading) answer.channels = patch(answer.channels, event);

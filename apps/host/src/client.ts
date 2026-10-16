@@ -81,7 +81,10 @@ export async function rejection(response: Response, service: string): Promise<st
 	await response.body?.cancel();
 	const served = response.headers.get("ace-tailnet");
 	const domain = await tailnet.domain();
-	if (served && domain && served !== domain) {
+	if (!served) {
+		return `${service} names no tailnet: it predates tailnet-scoped services or lacks its TAILNET setting. Check its URL against your team's current services.`;
+	}
+	if (domain && served !== domain) {
 		return `${service} serves the ${served} tailnet, but this Mac is on ${domain}. Switch tailnets, or use services deployed for this one.`;
 	}
 	return `${service} rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret.`;

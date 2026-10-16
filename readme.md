@@ -139,7 +139,9 @@ succeeds; Troubleshooting → Refresh status syncs at once.
 
 Name the hosting service in the directory so every host offers it in a channel's Move to menu:
 `printf %s https://ace-channel.<your-subdomain>.workers.dev | bunx wrangler secret put HOSTED` in
-`services/directory`.
+`services/directory`. Name the [compute service](services/compute/README.md) the same way with
+`COMPUTE`, which turns on Run in cloud for every host that hasn't saved its own Settings → Beta
+choice.
 
 From a checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>`
 does the same. While Ace Helper or `ace serve` runs, both go through it: macOS asks before a signed
