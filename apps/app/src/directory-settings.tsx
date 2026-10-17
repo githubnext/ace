@@ -4,16 +4,64 @@ import { Button, Input } from "@ace/ui";
 import type { Diagnostics } from "@ace/host/protocol";
 
 import { host } from "./host";
-import { Problem, Row, Status } from "./settings-layout";
+import { useDiagnostics } from "./host-settings";
+import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
 const SETUP = "https://github.com/githubnext/ace#team-directory";
 
 const secrets = {
-	keychain: "Saved in Keychain.",
-	environment: "Set in Ace Helper's environment.",
-	missing: "Not saved.",
-	unavailable: "Keychain access needed.",
+	keychain: "Saved in Keychain",
+	environment: "From the environment",
+	missing: "Not set",
+	unavailable: "Keychain access needed",
 };
+
+const tailnet = {
+	missing: "Not installed",
+	offline: "Disconnected",
+	running: "Connected",
+	error: "Couldn't check",
+};
+
+export function TeamSettings({ active }: { active: boolean }) {
+	const checks = useDiagnostics(active);
+	const checked = checks.value;
+	return (
+		<Page>
+			<Group
+				action={
+					<Button
+						variant="ghost"
+						size="sm"
+						disabled={!checks.open}
+						onClick={() => checks.refresh(true)}
+					>
+						Refresh
+					</Button>
+				}
+			>
+				{checked && (
+					<>
+						<Row
+							label="Tailscale"
+							description={checked.tailscale.loopback
+								? "Loopback only, so teammates can't reach this host"
+								: checked.tailscale.name}
+							footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
+						>
+							<Value>{tailnet[checked.tailscale.state]}</Value>
+						</Row>
+						<TeamDirectory directory={checked.directory} onChange={() => checks.refresh()} />
+					</>
+				)}
+			</Group>
+			{!checks.open
+				? <Status>Waiting for Ace Helper…</Status>
+				: !checked && !checks.error && <Status>Checking…</Status>}
+			{checks.error && checks.open && <Problem>{checks.error}</Problem>}
+		</Page>
+	);
+}
 
 /** A time today, or a date and time when older, so a stale sync doesn't read as recent. */
 function when(time: number) {
@@ -27,7 +75,7 @@ function when(time: number) {
 type Action = { row?: "directory" | "secret"; busy?: string; error?: string; message?: string };
 
 /** Join, change, or leave the team's directory, and save or remove the team's shared secret. */
-export function TeamDirectory(
+function TeamDirectory(
 	{ directory, onChange }: { directory: Diagnostics["directory"]; onChange: () => void },
 ) {
 	const [editing, setEditing] = useState(false);
@@ -76,30 +124,20 @@ export function TeamDirectory(
 		<>
 			<Row
 				id="directory-label"
-				label="Team directory"
-				description={
+				label="Directory"
+				description={directory.url || (
 					<>
-						{directory.url
-							? `${directory.url} · ${
-								directory.synced
-									? `Last synced ${when(directory.synced)}.`
-									: directory.error
-									? "Not synced yet."
-									: "Waiting for the first sync…"
-							}`
-							: "Not configured. Join the directory your team deployed to see everyone's channels, even while their hosts sleep."}
-						{" "}
-						Deploying a directory is a command-line step for whoever sets up the team;{" "}
+						Not joined.{" "}
 						<a
 							href={SETUP}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
 						>
-							see how
-						</a>.
+							Set up a directory
+						</a>
 					</>
-				}
+				)}
 				footer={
 					<>
 						{editing && (
@@ -143,8 +181,8 @@ export function TeamDirectory(
 									aria-label="Team secret"
 									maxLength={4096}
 									placeholder={saved
-										? "Team secret (leave blank to keep the saved one)"
-										: "Team secret (ACE_SECRET)"}
+										? "Team secret (blank keeps the saved one)"
+										: "Team secret"}
 									value={secret}
 									disabled={!!action.busy}
 									onChange={(event) => setSecret(event.target.value)}
@@ -163,34 +201,20 @@ export function TeamDirectory(
 							</form>
 						)}
 						{confirm === "leave" && (
-							<div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3 @md:flex-row @md:items-center @md:justify-between">
-								<p>
-									Leave the directory? Teammates' channels whose hosts are offline disappear here,
-									and this host's channels stop being listed for them.
-								</p>
-								<div className="flex shrink-0 gap-2">
-									<Button
-										variant="destructive"
-										disabled={!!action.busy}
-										onClick={() =>
-											void run(
-												"directory",
-												"Leaving the directory…",
-												"Left the directory.",
-												() => host.request({ op: "directory-set", url: null }),
-											)}
-									>
-										Leave
-									</Button>
-									<Button
-										variant="ghost"
-										disabled={!!action.busy}
-										onClick={() => setConfirm(undefined)}
-									>
-										Cancel
-									</Button>
-								</div>
-							</div>
+							<Confirm
+								action="Leave"
+								busy={!!action.busy}
+								onConfirm={() =>
+									void run(
+										"directory",
+										"Leaving the directory…",
+										"Left the directory.",
+										() => host.request({ op: "directory-set", url: null }),
+									)}
+								onCancel={() => setConfirm(undefined)}
+							>
+								Leave the directory? Teammates stop seeing this host's channels while it's offline.
+							</Confirm>
 						)}
 						{directory.error && (
 							<Problem>
@@ -202,6 +226,15 @@ export function TeamDirectory(
 					</>
 				}
 			>
+				{directory.url && (
+					<Value>
+						{directory.synced
+							? `Synced ${when(directory.synced)}`
+							: directory.error
+							? "Not synced"
+							: "Syncing…"}
+					</Value>
+				)}
 				{!editing && (
 					<Button
 						variant="outline"
@@ -230,50 +263,26 @@ export function TeamDirectory(
 			</Row>
 			<Row
 				label="Team secret"
-				description={
-					<>
-						{secrets[directory.secret.source]} Hosts use it for the directory and hosted channels.
-						{directory.secret.override && (
-							<>
-								{" "}
-								{directory.secret.override}{" "}
-								takes priority over a saved secret. Remove it and restart Ace Helper to use
-								Keychain.
-							</>
-						)}
-					</>
-				}
+				description={directory.secret.override
+					? `${directory.secret.override} overrides Keychain`
+					: secrets[directory.secret.source]}
 				footer={
 					<>
 						{confirm === "forget" && (
-							<div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3 @md:flex-row @md:items-center @md:justify-between">
-								<p>
-									Remove the saved secret? This host can no longer reach the directory or hosted
-									channels until you enter it again.
-								</p>
-								<div className="flex shrink-0 gap-2">
-									<Button
-										variant="destructive"
-										disabled={!!action.busy}
-										onClick={() =>
-											void run(
-												"secret",
-												"Removing the secret…",
-												"Saved secret removed.",
-												() => host.request({ op: "key-forget", name: "ACE_SECRET" }),
-											)}
-									>
-										Remove secret
-									</Button>
-									<Button
-										variant="ghost"
-										disabled={!!action.busy}
-										onClick={() => setConfirm(undefined)}
-									>
-										Cancel
-									</Button>
-								</div>
-							</div>
+							<Confirm
+								action="Remove secret"
+								busy={!!action.busy}
+								onConfirm={() =>
+									void run(
+										"secret",
+										"Removing the secret…",
+										"Secret removed.",
+										() => host.request({ op: "key-forget", name: "ACE_SECRET" }),
+									)}
+								onCancel={() => setConfirm(undefined)}
+							>
+								Remove the team secret? This host loses access to the directory and hosted channels.
+							</Confirm>
 						)}
 						{directory.secret.waiting && <Status>{directory.secret.waiting}…</Status>}
 						{directory.secret.error && <Problem>{directory.secret.error}</Problem>}

@@ -4,7 +4,7 @@ import { Button } from "@ace/ui";
 import { IconCheck } from "@ace/ui/icons";
 import type { NativeAction, NativeState } from "@ace/desktop/protocol";
 
-import { Disclosure, Group, Problem, Row } from "./settings-layout";
+import { Group, Page, Problem, Row, Value } from "./settings-layout";
 
 type Permission = Extract<NativeAction, { op: "permission" }>["permission"];
 
@@ -12,17 +12,17 @@ const permissions = [
 	{
 		key: "accessibility",
 		label: "Accessibility",
-		description: "Read and operate controls in other apps.",
+		description: "Read and operate controls in other apps",
 	},
 	{
 		key: "screenRecording",
 		label: "Screen Recording",
-		description: "See window contents in screenshots.",
+		description: "See window contents in screenshots",
 	},
 	{
 		key: "eventSynthesizing",
 		label: "Keyboard input",
-		description: "Type and press shortcuts in other apps.",
+		description: "Type and press shortcuts in other apps",
 	},
 ] as const;
 
@@ -99,29 +99,29 @@ export function NativeStatus(
 	const error = action.error || result.error || value?.error;
 
 	return (
-		<div className="flex flex-col gap-6">
+		<Page>
 			<Group>
 				<Row
 					label="Status"
-					description="Keep Ace open on the host running the channel's tools."
+					description="Agents can use this Mac while Ace is open"
 					footer={error && <Problem>{error}</Problem>}
 				>
-					<span role="status" className="text-xs text-muted-foreground">
+					<Value>
 						{needsPermission
 							? "Permissions needed"
 							: value
 							? states[value.state]
 							: result.error
-							? "Could not check computer use"
+							? "Couldn't check"
 							: "Checking…"}
-					</span>
+					</Value>
 				</Row>
 			</Group>
 			<Group title="macOS permissions">
 				{permissions.map(({ key, label, description }) => (
 					<Row key={key} label={label} description={description}>
 						{!value
-							? <span className="text-xs text-muted-foreground">Not checked</span>
+							? <Value>Not checked</Value>
 							: value[key]
 							? (
 								<span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -142,23 +142,14 @@ export function NativeStatus(
 					</Row>
 				))}
 				<Row
-					label="Clipboard reading"
+					label="Clipboard"
 					description={value && !value.clipboardRead.readAdmitted
-						? "Allow Ace to read the clipboard in macOS System Settings to insert text while preserving clipboard contents."
-						: "Lets agents insert text while preserving clipboard contents."}
+						? "Allow in System Settings to insert text without losing the clipboard"
+						: "Insert text without losing the clipboard"}
 				>
-					<span className="text-xs text-muted-foreground">
-						{value ? clipboardPolicies[value.clipboardRead.policy] : "Not checked"}
-					</span>
+					<Value>{value ? clipboardPolicies[value.clipboardRead.policy] : "Not checked"}</Value>
 				</Row>
 			</Group>
-			<Disclosure summary="How computer use works">
-				<p className="text-muted-foreground">
-					Agents use these permissions on the host running the channel's tools. For a hosted
-					channel, that is its workspace. The channel's collaborator agent setting also applies to
-					computer use. Checking clipboard status does not read the clipboard.
-				</p>
-			</Disclosure>
-		</div>
+		</Page>
 	);
 }
