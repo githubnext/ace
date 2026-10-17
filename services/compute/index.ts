@@ -61,7 +61,10 @@ export class Compute extends DurableObject<Env> {
 
 	/** A container that restarted has lost its runner, so only a live runner counts as running. */
 	async #running(): Promise<boolean> {
-		if (await (await this.#box()).status() !== "running") return false;
+		return await (await this.#box()).status() === "running" && await this.#healthy();
+	}
+
+	async #healthy(): Promise<boolean> {
 		try {
 			await this.#call("/health");
 			return true;
@@ -227,8 +230,18 @@ export class Compute extends DurableObject<Env> {
 	async #start(selected: Size) {
 		const settings = this.#settings();
 		const incomplete = this.ctx.storage.kv.get("frozen") && !this.ctx.storage.kv.get("ready");
-		if (!incomplete && await this.#running()) {
-			throw new Error("Sandbox is already running; use resize to change its size");
+		const box = await this.#box();
+		if (!incomplete && await box.status() === "running") {
+			if (await this.#healthy()) {
+				throw new Error("Sandbox is already running; use resize to change its size");
+			}
+			// A restarted container comes back without the project; a runner that merely exited
+			// leaves work newer than the checkpoint, so it restarts in place.
+			if ((await box.process.shell("test -d /workspace/project")).ok) {
+				await this.#channel("freeze");
+				await this.#boot(selected);
+				return this.#connect();
+			}
 		}
 		// Clears an incomplete start or a container that restarted without its runner.
 		await this.#destroy();
