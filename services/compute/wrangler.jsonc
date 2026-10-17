@@ -8,13 +8,17 @@
 		"bindings": [
 			{ "name": "CHANNEL", "class_name": "HostedChannel" },
 			{ "name": "COMPUTE", "class_name": "Compute" },
+			{ "name": "Sandbox", "class_name": "Sandbox" },
 		],
 	},
 	"containers": [{
-		"class_name": "Compute",
-		"scheduling_policy": "durable_object",
-		"images": { "base": { "dockerfile": "./Dockerfile" } },
+		"class_name": "Sandbox",
+		"instance_type": "standard-1",
+		"image": "./Dockerfile",
 	}],
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["HostedChannel", "Compute"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["HostedChannel", "Compute"] },
+		{ "tag": "v2", "new_sqlite_classes": ["Sandbox"] },
+	],
 	"observability": { "enabled": true },
 }

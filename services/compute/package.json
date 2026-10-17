@@ -11,8 +11,11 @@
 	"dependencies": {
 		"@ace/channel": "workspace:*",
 		"@ace/directory": "workspace:*",
+		"@cloudflare/sandbox": "0.12.9",
 		"@earendil-works/chord": "catalog:pi",
-		"@earendil-works/pi-durable": "catalog:pi"
+		"@earendil-works/pi-durable": "catalog:pi",
+		"@sandbox-sdk/cloudflare": "file:./vendor/sandbox-sdk/cloudflare",
+		"@sandbox-sdk/core": "file:./vendor/sandbox-sdk/core"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "catalog:cloudflare",
