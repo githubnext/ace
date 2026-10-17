@@ -10,39 +10,12 @@ const code = (text: string) => <code className="font-mono">{text}</code>;
 
 function describe({ name, path, link, shell }: CommandState) {
 	const dir = path.slice(0, -name.length - 1);
-	if (link === "missing") {
-		return (
-			<>
-				Use this app's channels from Terminal with {code(name)}. Ace links it in{" "}
-				{dir}, so app updates keep it current.
-			</>
-		);
-	}
-	if (link === "other") {
-		return <>{path} exists and isn't Ace's. Remove it to install {code(name)}.</>;
-	}
-	if (link === "stale") {
-		return <>{path} links to another copy of Ace. Install to point it at this one.</>;
-	}
-	if (shell === path) {
-		return (
-			<>
-				Run {code(name)} in Terminal. {path} links to this app, so app updates keep it current.
-			</>
-		);
-	}
-	if (shell) {
-		return (
-			<>Installed at {path}, but your shell runs {shell} first. Put {dir} earlier on your PATH.</>
-		);
-	}
-	return (
-		<>
-			Installed at {path}, but your shell can't find it. Add {code(`export PATH="${dir}:$PATH"`)}
-			{" "}
-			to your shell profile.
-		</>
-	);
+	if (link === "missing") return <>Run Ace from Terminal as {code(name)}</>;
+	if (link === "other") return <>{path} belongs to something else</>;
+	if (link === "stale") return <>{path} points to another copy of Ace</>;
+	if (shell === path) return path;
+	if (shell) return <>Your shell runs {shell} first</>;
+	return <>{dir} isn't on your PATH</>;
 }
 
 /** The desktop app's own CLI; a browser has no app to link. */
@@ -69,7 +42,7 @@ export function CommandLine({ active }: { active: boolean }) {
 	const current = state.value;
 	return (
 		<Row
-			label={current ? <>Command line tool {code(current.name)}</> : "Command line tool"}
+			label="Command line tool"
 			description={<span role="status">{current ? describe(current) : "Checking…"}</span>}
 			footer={
 				<>

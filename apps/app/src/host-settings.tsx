@@ -6,80 +6,96 @@ import type { Diagnostics } from "@ace/host/protocol";
 
 import { CommandLine } from "./command-settings";
 import { desktop } from "./desktop";
-import { TeamDirectory } from "./directory-settings";
 import { host } from "./host";
-import { Disclosure, Group, Problem, Row, Status } from "./settings-layout";
+import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
-const tailnet = {
-	missing: "Tailscale is not installed",
-	offline: "Tailscale is disconnected",
-	running: "Tailscale is connected",
-	error: "Tailscale could not be checked",
-};
-
-export function HostStatus({ active }: { active: boolean }) {
+/** The host's tool and team checks, re-read while `active` and whenever `refresh` is called. */
+export function useDiagnostics(active: boolean) {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const [retry, setRetry] = useState(0);
-	/** Refresh also syncs the team directory, so its row shows that attempt rather than a stale one. */
+	/** A refresh can also sync the team directory, so its row shows that attempt rather than a stale one. */
 	const syncing = useRef(false);
 	const [checks, setChecks] = useState<{ value?: Diagnostics; error?: string }>({});
-	const [helper, setHelper] = useState<{ value?: HelperState; error?: string }>({});
-	const [action, setAction] = useState<{ busy?: HelperAction; error?: string }>({});
-	const [confirm, setConfirm] = useState(false);
 
-	// Re-read when the section is shown again; results from an action in flight still land here.
 	useEffect(() => {
-		if (!active) return;
+		if (!active || status !== "open") return;
 		let live = true;
 		const sync = syncing.current;
 		syncing.current = false;
-		if (desktop) {
-			desktop.helper("status").then(
-				(value) => {
-					if (live) setHelper({ value });
-				},
-				(error: Error) => {
-					if (live) setHelper({ error: error.message });
-				},
-			);
-		}
-		if (status === "open") {
-			host.request<Diagnostics>({ op: "diagnostics", ...(sync ? { sync } : {}) }).then(
-				(value) => {
-					if (live) setChecks({ value });
-				},
-				(error: Error) => {
-					if (live) setChecks({ error: error.message });
-				},
-			);
-		}
+		host.request<Diagnostics>({ op: "diagnostics", ...(sync ? { sync } : {}) }).then(
+			(value) => {
+				if (live) setChecks({ value });
+			},
+			(error: Error) => {
+				if (live) setChecks({ error: error.message });
+			},
+		);
 		return () => {
 			live = false;
 		};
 	}, [active, status, retry]);
 
-	// The helper retries loading its shell environment in the background; clear the warning once it does.
+	// The shell environment, the first directory sync, and a keychain read waiting on a prompt all
+	// land in the background; show their results without a manual refresh.
 	useEffect(() => {
-		if (!active || checks.value?.shell.state !== "pending") return;
-		const timer = setTimeout(() => setRetry((value) => value + 1), 5000);
-		return () => clearTimeout(timer);
-	}, [active, checks]);
-
-	// The first directory sync and a keychain read waiting on a prompt land in the background; show
-	// their results without a manual refresh.
-	useEffect(() => {
-		const directory = checks.value?.directory;
-		if (!active || !directory) return;
-		if (!directory.secret.waiting && (!directory.url || directory.synced || directory.failed)) {
-			return;
-		}
+		const value = checks.value;
+		if (!active || !value) return;
+		const { directory, shell } = value;
+		const pending = shell.state === "pending"
+			|| directory.secret.waiting
+			|| (directory.url && !directory.synced && !directory.failed);
+		if (!pending) return;
 		const timer = setTimeout(() => setRetry((value) => value + 1), 3000);
 		return () => clearTimeout(timer);
 	}, [active, checks]);
 
+	return {
+		open: status === "open",
+		...checks,
+		refresh(sync?: boolean) {
+			syncing.current = !!sync;
+			setRetry((value) => value + 1);
+		},
+	};
+}
+
+function describe(helper?: HelperState) {
+	if (!helper) return "Checking…";
+	if (helper.running && !helper.managed) {
+		return "Run by ace serve. Stop it to manage Ace Helper here.";
+	}
+	if (helper.running) return "Running. Starts at login.";
+	if (helper.unresponsive) return "Not responding yet";
+	if (helper.service === "approval") return "Needs approval in Login Items";
+	return "Stopped";
+}
+
+export function HostStatus({ active }: { active: boolean }) {
+	const checks = useDiagnostics(active);
+	const [tick, setTick] = useState(0);
+	const [helper, setHelper] = useState<{ value?: HelperState; error?: string }>({});
+	const [action, setAction] = useState<{ busy?: HelperAction; error?: string }>({});
+	const [confirm, setConfirm] = useState(false);
+
+	useEffect(() => {
+		if (!active || !desktop) return;
+		let live = true;
+		desktop.helper("status").then(
+			(value) => {
+				if (live) setHelper({ value });
+			},
+			(error: Error) => {
+				if (live) setHelper({ error: error.message });
+			},
+		);
+		return () => {
+			live = false;
+		};
+	}, [active, tick]);
+
 	useEffect(() => {
 		if (!active || !helper.value?.unresponsive) return;
-		const timer = setTimeout(() => setRetry((value) => value + 1), 2000);
+		const timer = setTimeout(() => setTick((value) => value + 1), 2000);
 		return () => clearTimeout(timer);
 	}, [active, helper]);
 
@@ -90,7 +106,7 @@ export function HostStatus({ active }: { active: boolean }) {
 		try {
 			setHelper({ value: await desktop.helper(command) });
 			setAction({});
-			setRetry((value) => value + 1);
+			checks.refresh();
 		} catch (error) {
 			setAction({ error: (error as Error).message });
 		}
@@ -102,41 +118,22 @@ export function HostStatus({ active }: { active: boolean }) {
 	const checked = checks.value;
 
 	return (
-		<div className="flex flex-col gap-6">
+		<Page>
 			{desktop && (
 				<Group>
 					<Row
-						label="Ace Helper"
-						description={
-							<span role="status">
-								{terminal
-									? "Using a command-line host. Stop ace serve before managing Ace Helper here."
-									: current?.running
-									? "Running in the background. It starts at login and keeps channels available after you quit Ace."
-									: current?.unresponsive
-									? "Running, but not responding yet. Ace keeps checking; channels on this Mac wait until it answers."
-									: current?.service === "approval"
-									? "macOS approval required. Allow Ace in Login Items to run Ace Helper in the background."
-									: current
-									? "Stopped. Ace Helper starts at login and keeps channels available after you quit Ace."
-									: "Checking Ace Helper…"}
-							</span>
-						}
+						label="Status"
+						description={<span role="status">{describe(current)}</span>}
 						footer={
 							<>
 								{confirm && (
-									<div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3 @md:flex-row @md:items-center @md:justify-between">
-										<p>
-											This host's channels and tools will go offline. Work resumes when you start
-											Ace Helper. Background hosting will stay off until you enable it again.
-										</p>
-										<div className="flex shrink-0 gap-2">
-											<Button variant="destructive" onClick={() => void control("stop")}>
-												Stop Ace Helper
-											</Button>
-											<Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button>
-										</div>
-									</div>
+									<Confirm
+										action="Stop"
+										onConfirm={() => void control("stop")}
+										onCancel={() => setConfirm(false)}
+									>
+										Channels on this Mac go offline until you start Ace Helper again.
+									</Confirm>
 								)}
 								{action.busy && <Status>Updating Ace Helper…</Status>}
 								{(action.error || helper.error) && (
@@ -181,107 +178,67 @@ export function HostStatus({ active }: { active: boolean }) {
 								</>
 							)}
 					</Row>
+					<Row label="Log">
+						<Button
+							variant="outline"
+							disabled={!!action.busy}
+							onClick={() => void control("log")}
+						>
+							Show
+						</Button>
+					</Row>
 					<CommandLine active={active} />
 				</Group>
 			)}
-			{status !== "open"
-				? <Status>Connect to Ace Helper to check tools and team connectivity.</Status>
-				: checked
-				? (
-					<>
-						<Group title="Team">
-							<Row
-								label="Tailscale"
-								description={`${tailnet[checked.tailscale.state]}${
-									checked.tailscale.name ? ` as ${checked.tailscale.name}` : ""
-								}. ${
-									checked.tailscale.loopback
-										? "This host runs loopback-only, so teammates can't reach it and it stays out of the team directory."
-										: "Teammates reach this host over Tailscale; restart Ace Helper after connecting or changing it."
-								}`}
-								footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
-							/>
-							<TeamDirectory
-								directory={checked.directory}
-								onChange={() => setRetry((value) => value + 1)}
-							/>
-						</Group>
-						<Group title="Tools">
-							<Row
-								label="Shell environment"
-								description={checked.shell.state === "adopted"
-									? "Tools resolve from your login shell's PATH."
-									: checked.shell.state === "pending"
-									? "Not loaded yet, so tools resolve from a minimal PATH and may be reported missing. Ace Helper keeps retrying in the background."
-									: "Not loaded, so tools resolve from a minimal PATH and may be reported missing. Restart Ace Helper to try again."}
-								footer={checked.shell.error && <Problem>{checked.shell.error}</Problem>}
-							>
-								<span className="text-xs text-muted-foreground">
-									{checked.shell.state === "adopted" ? "Loaded" : "Needs attention"}
-								</span>
-							</Row>
-							{checked.tools.map((tool) => (
-								<Row
-									key={tool.name}
-									label={tool.name}
-									footer={tool.error && <Problem>{tool.error}</Problem>}
-								>
-									<span className="text-xs text-muted-foreground">
-										{tool.error ? "Needs attention" : "Available"}
-									</span>
-								</Row>
-							))}
-						</Group>
-					</>
-				)
-				: !checks.error && <Status>Checking this host…</Status>}
-			{checks.error && status === "open" && <Problem>{checks.error}</Problem>}
-			<Disclosure summary="Troubleshooting">
-				{checked && (
-					<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
-						{checked.tools.map((tool) => (
-							<div key={tool.name} className="contents">
-								<dt className="text-muted-foreground">{tool.name}</dt>
-								<dd className="break-all">
-									{[tool.version, tool.path].filter(Boolean).join(" · ") || "Not found"}
-								</dd>
-							</div>
-						))}
-						<dt className="text-muted-foreground">Directory</dt>
-						<dd className="break-all">{checked.directory.url || "Not configured"}</dd>
-					</dl>
-				)}
-				<div className="flex flex-wrap gap-2">
+			<Group
+				title="Tools"
+				action={
 					<Button
-						variant="outline"
-						disabled={!!action.busy}
-						onClick={() => {
-							syncing.current = true;
-							setRetry((value) => value + 1);
-						}}
+						variant="ghost"
+						size="sm"
+						disabled={!checks.open}
+						onClick={() => checks.refresh(true)}
 					>
-						Refresh status
+						Refresh
 					</Button>
-					{desktop && (
-						<>
-							<Button
-								variant="outline"
-								disabled={!!action.busy}
-								onClick={() => void control("log")}
+				}
+			>
+				{checked && (
+					<>
+						<Row
+							label="Shell environment"
+							description={checked.shell.state === "adopted"
+								? undefined
+								: checked.shell.state === "pending"
+								? "Using a minimal PATH until your login shell loads"
+								: "Using a minimal PATH. Restart Ace Helper to retry."}
+							footer={checked.shell.error && <Problem>{checked.shell.error}</Problem>}
+						>
+							<Value>
+								{checked.shell.state === "adopted"
+									? "Login shell"
+									: checked.shell.state === "pending"
+									? "Loading…"
+									: "Not loaded"}
+							</Value>
+						</Row>
+						{checked.tools.map((tool) => (
+							<Row
+								key={tool.name}
+								label={tool.name}
+								description={tool.path}
+								footer={tool.error && <Problem>{tool.error}</Problem>}
 							>
-								Show helper log
-							</Button>
-							<Button
-								variant="outline"
-								disabled={!!action.busy}
-								onClick={() => void control("settings")}
-							>
-								macOS Login Items
-							</Button>
-						</>
-					)}
-				</div>
-			</Disclosure>
-		</div>
+								{(tool.version || !tool.path) && <Value>{tool.version || "Not found"}</Value>}
+							</Row>
+						))}
+					</>
+				)}
+			</Group>
+			{!checks.open
+				? <Status>Waiting for Ace Helper…</Status>
+				: !checked && !checks.error && <Status>Checking…</Status>}
+			{checks.error && checks.open && <Problem>{checks.error}</Problem>}
+		</Page>
 	);
 }

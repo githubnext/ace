@@ -4,7 +4,6 @@ import {
 	Button,
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogTitle,
 	Input,
 	Switch,
@@ -13,9 +12,9 @@ import {
 } from "@ace/ui";
 import {
 	IconArrowDownToLine,
-	IconCloud,
+	IconBolt,
+	IconGlobe,
 	IconKey,
-	IconLaptop,
 	IconPointer,
 	type IconProps,
 	IconServer,
@@ -25,60 +24,52 @@ import type { ProviderSettings, Settings as HostSettings } from "@ace/host/proto
 
 import { useCompute } from "./compute";
 import { desktop } from "./desktop";
+import { TeamSettings } from "./directory-settings";
 import { useFolder } from "./folder";
 import { host } from "./host";
 import { HostStatus } from "./host-settings";
 import { NativeStatus } from "./native-settings";
-import { Group, Problem, Row, Select, Status } from "./settings-layout";
+import {
+	Confirm,
+	Group,
+	Page,
+	Problem,
+	Row,
+	Segmented,
+	Select,
+	Status,
+	TextRow,
+} from "./settings-layout";
 import { UpdateSettings } from "./updates";
 
-type Section = "general" | "providers" | "computer" | "host" | "updates" | "beta";
+type Section = "general" | "providers" | "team" | "beta" | "host" | "computer" | "updates";
 
-type Info = { id: Section; label: string; description: string; icon: ComponentType<IconProps> };
+type Info = { id: Section; label: string; icon: ComponentType<IconProps>; desktop?: boolean };
 
-const all: (Info & { desktop?: boolean })[] = [
+const only = (sections: Info[]) => sections.filter((section) => !section.desktop || desktop);
+
+const groups: { label?: string; sections: Info[] }[] = [
 	{
-		id: "general",
-		label: "General",
-		description: "Appearance, where cloned projects go, and the model new chats start with.",
-		icon: IconSettings,
+		sections: [
+			{ id: "general", label: "General", icon: IconSettings },
+			{ id: "providers", label: "Providers", icon: IconKey },
+			{ id: "team", label: "Team", icon: IconGlobe },
+			{ id: "beta", label: "Beta", icon: IconBolt },
+		],
 	},
 	{
-		id: "providers",
-		label: "Providers",
-		description:
-			"Provider keys stay in your system keychain. Changes apply to the next model request.",
-		icon: IconKey,
-	},
-	{
-		id: "computer",
-		label: "Computer use",
-		description: "Let agents see and operate apps on this Mac.",
-		icon: IconPointer,
-		desktop: true,
-	},
-	{
-		id: "host",
 		label: desktop ? "This Mac" : "This host",
-		description: "Ace Helper, team connectivity, and tools.",
-		icon: desktop ? IconLaptop : IconServer,
-	},
-	{
-		id: "updates",
-		label: "Updates",
-		description: "Keep Ace and Ace Helper up to date.",
-		icon: IconArrowDownToLine,
-		desktop: true,
-	},
-	{
-		id: "beta",
-		label: "Beta",
-		description: "Unfinished features to try. They may change or go away.",
-		icon: IconCloud,
+		sections: only([
+			{ id: "host", label: desktop ? "Ace Helper" : "Host", icon: IconServer },
+			{ id: "computer", label: "Computer use", icon: IconPointer, desktop: true },
+			{ id: "updates", label: "Updates", icon: IconArrowDownToLine, desktop: true },
+		]),
 	},
 ];
 
-const sections = all.filter((section) => !section.desktop || desktop);
+const labels = Object.fromEntries(
+	groups.flatMap((group) => group.sections).map(({ id, label }) => [id, label]),
+) as Record<Section, string>;
 
 const themes: { value: Theme; label: string }[] = [
 	{ value: "system", label: "System" },
@@ -88,8 +79,8 @@ const themes: { value: Theme; label: string }[] = [
 
 const sources = {
 	keychain: "Saved in Keychain",
-	environment: "Using an environment key",
-	missing: "No key added",
+	environment: "From the environment",
+	missing: "Not set",
 	unavailable: "Keychain access needed",
 };
 
@@ -118,8 +109,8 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 				message: op === "key-check"
 					? "Connection verified."
 					: op === "key-remove"
-					? "Saved key removed."
-					: "Key checked and saved.",
+					? "Key removed."
+					: "Key saved.",
 			});
 		} catch (error) {
 			setAction({ error: (error as Error).message });
@@ -130,19 +121,9 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 		<Row
 			id={`${id}-label`}
 			label={provider.name}
-			description={
-				<>
-					{sources[provider.source]}
-					{provider.override && (
-						<>
-							{" · "}
-							{provider.override}{" "}
-							takes priority over a saved key. Remove that environment override and restart Ace
-							Helper to use Keychain.
-						</>
-					)}
-				</>
-			}
+			description={provider.override
+				? `${provider.override} overrides Keychain`
+				: sources[provider.source]}
 			footer={
 				<>
 					{editing && (
@@ -163,7 +144,7 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 								value={value}
 								maxLength={4096}
 								disabled={locked}
-								placeholder={provider.stored ? "Enter a replacement key" : "Paste your API key"}
+								placeholder="API key"
 								onChange={(event) => setValue(event.target.value)}
 								onKeyDown={(event) => {
 									if (event.key !== "Escape" || action.busy) return;
@@ -190,26 +171,18 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 						</form>
 					)}
 					{confirm && (
-						<div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3 @md:flex-row @md:items-center @md:justify-between">
-							<p>Remove this saved key? New model requests will need another credential.</p>
-							<div className="flex shrink-0 gap-2">
-								<Button
-									variant="destructive"
-									aria-label={`Remove ${provider.name} key`}
-									disabled={locked}
-									onClick={() => void run("key-remove")}
-								>
-									Remove key
-								</Button>
-								<Button variant="ghost" disabled={action.busy} onClick={() => setConfirm(false)}>
-									Cancel
-								</Button>
-							</div>
-						</div>
+						<Confirm
+							action="Remove key"
+							busy={locked}
+							onConfirm={() => void run("key-remove")}
+							onCancel={() => setConfirm(false)}
+						>
+							Remove the saved {provider.name} key?
+						</Confirm>
 					)}
 					{provider.waiting && <Status>{provider.waiting}…</Status>}
 					{provider.error && <Problem>{provider.error}</Problem>}
-					{action.busy && <Status>Checking with {provider.name} or waiting for Keychain…</Status>}
+					{action.busy && <Status>Checking…</Status>}
 					{action.error && <Problem>{action.error}</Problem>}
 					{action.message && <Status>{action.message}</Status>}
 				</>
@@ -235,7 +208,7 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 						setEditing(true);
 					}}
 				>
-					{provider.stored ? "Replace key" : "Add key"}
+					{provider.stored ? "Replace" : "Add key"}
 				</Button>
 			)}
 			{provider.stored && !confirm && (
@@ -279,20 +252,17 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 		<Row
 			id="default-model-label"
 			label="Default model"
-			description={settings?.modelOverride
-				? "ACE_MODEL overrides this preference. Remove it and restart Ace Helper to use your saved choice."
-				: "Used for a chat's first agent run. Existing chats keep their model."}
+			description={settings?.modelOverride ? "Set by ACE_MODEL" : "For new chats"}
 			footer={
 				<>
 					{settings?.waiting && <Status>{settings.waiting}…</Status>}
-					{action.busy && <Status>Saving default model…</Status>}
 					{action.error && <Problem>{action.error}</Problem>}
 				</>
 			}
 		>
 			<Select
 				aria-labelledby="default-model-label"
-				className="w-60"
+				className="w-64"
 				value={value}
 				disabled={!settings || disabled || action.busy || !!settings.modelOverride}
 				onChange={(event) => void save(event.target.value)}
@@ -308,17 +278,17 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 }
 
 function CloudCompute({ disabled }: { disabled: boolean }) {
-	const { compute: saved, error } = useCompute();
-	const [url, setUrl] = useState<string>();
+	const { compute, error } = useCompute();
 	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
-	const draft = url ?? saved?.url ?? "";
-	const locked = !saved || disabled || action.busy;
 
-	async function save(enabled: boolean, value: string) {
+	async function save(enabled: boolean, url: string | null) {
+		await host.request({ op: "preferences", compute: { enabled, url: url || null } });
+	}
+
+	async function toggle(enabled: boolean) {
 		setAction({ busy: true });
 		try {
-			await host.request({ op: "preferences", compute: { enabled, url: value.trim() || null } });
-			setUrl(undefined);
+			await save(enabled, compute!.url);
 			setAction({});
 		} catch (error) {
 			setAction({ error: (error as Error).message });
@@ -326,126 +296,29 @@ function CloudCompute({ disabled }: { disabled: boolean }) {
 	}
 
 	return (
-		<Row
-			id="cloud-compute-label"
-			label="Cloud compute"
-			description="Offer Run in cloud when starting a channel in a GitHub project. Its agent works in a container on your team's compute service, authenticated with the team's ACE_SECRET. Each cloud channel is its own container."
-			footer={
-				<>
-					<form
-						className="flex flex-col gap-2 @md:flex-row"
-						onSubmit={(event) => {
-							event.preventDefault();
-							void save(!!saved?.enabled, draft);
-						}}
-					>
-						<Input
-							type="url"
-							spellCheck={false}
-							aria-label="Cloud compute service URL"
-							placeholder="https://ace-compute.example.workers.dev"
-							value={draft}
-							disabled={locked}
-							onChange={(event) => setUrl(event.target.value)}
-						/>
-						<Button
-							type="submit"
-							variant="outline"
-							disabled={locked || draft.trim() === (saved?.url || "")}
-						>
-							Save URL
-						</Button>
-					</form>
-					{error && <Problem>{error}</Problem>}
-					{action.error && <Problem>{action.error}</Problem>}
-				</>
-			}
-		>
-			<Switch
-				aria-labelledby="cloud-compute-label"
-				checked={!!saved?.enabled}
-				disabled={locked}
-				onCheckedChange={(enabled) => void save(enabled, draft)}
-			/>
-		</Row>
-	);
-}
-
-/** A text field: the host expands `~`, and browsers cannot pick a host folder. */
-function ProjectsFolder({ disabled }: { disabled: boolean }) {
-	const { folder: saved, error } = useFolder();
-	const [value, setValue] = useState<string>();
-	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
-	const draft = value ?? saved ?? "";
-	const locked = !saved || disabled || action.busy;
-
-	async function save() {
-		setAction({ busy: true });
-		try {
-			await host.request({ op: "preferences", folder: draft });
-			setValue(undefined);
-			setAction({});
-		} catch (error) {
-			setAction({ error: (error as Error).message });
-		}
-	}
-
-	return (
-		<Row
-			id="projects-folder-label"
-			label="Projects folder"
-			description={`Clone from URL suggests a folder here, named after the repository, on ${
-				desktop ? "this Mac" : "this host"
-			}.`}
-			footer={
-				<>
-					<form
-						className="flex flex-col gap-2 @md:flex-row"
-						onSubmit={(event) => {
-							event.preventDefault();
-							void save();
-						}}
-					>
-						<Input
-							spellCheck={false}
-							aria-labelledby="projects-folder-label"
-							placeholder="~/code"
-							value={draft}
-							disabled={locked}
-							onChange={(event) => setValue(event.target.value)}
-						/>
-						<Button
-							type="submit"
-							variant="outline"
-							disabled={locked || !draft.trim() || draft.trim() === saved}
-						>
-							Save folder
-						</Button>
-					</form>
-					{error && <Problem>{error}</Problem>}
-					{action.error && <Problem>{action.error}</Problem>}
-				</>
-			}
-		/>
-	);
-}
-
-function Appearance() {
-	const { theme, set } = useTheme();
-	return (
-		<Row
-			id="theme-label"
-			label="Theme"
-			description="Match your system appearance or keep Ace light or dark."
-		>
-			<Select
-				aria-labelledby="theme-label"
-				value={theme}
-				onChange={(event) => set(event.target.value as Theme)}
+		<Group title="Cloud compute">
+			<Row
+				id="cloud-compute-label"
+				label="Run in cloud"
+				description="Offer cloud containers when starting a channel in a GitHub project"
+				footer={(error || action.error) && <Problem>{error || action.error}</Problem>}
 			>
-				{themes.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
-			</Select>
-		</Row>
+				<Switch
+					aria-labelledby="cloud-compute-label"
+					checked={!!compute?.enabled}
+					disabled={!compute || disabled || action.busy}
+					onCheckedChange={(enabled) => void toggle(enabled)}
+				/>
+			</Row>
+			<TextRow
+				label="Service URL"
+				type="url"
+				placeholder="https://ace-compute.example.workers.dev"
+				saved={compute && (compute.url || "")}
+				disabled={disabled}
+				onSave={(url) => save(!!compute?.enabled, url)}
+			/>
+		</Group>
 	);
 }
 
@@ -465,8 +338,9 @@ export function Settings(
 	/** Only Refresh reads again a key whose last read waited on a Keychain prompt. */
 	const refreshing = useRef(false);
 	const [result, setResult] = useState<{ settings?: HostSettings; error?: string }>({});
+	const { theme, set: setTheme } = useTheme();
+	const { folder, error: folderError } = useFolder();
 	const offline = status !== "open";
-	const current = sections.find(({ id }) => id === section)!;
 
 	function show(next: Section) {
 		setSection(next);
@@ -527,8 +401,8 @@ export function Settings(
 	);
 	const problems = (
 		<>
-			{offline && <Status>Waiting for Ace Helper to reconnect…</Status>}
-			{reading && <Status>Reading provider settings…</Status>}
+			{offline && <Status>Waiting for Ace Helper…</Status>}
+			{reading && <Status>Loading…</Status>}
 			{result.error && <Problem>{result.error}</Problem>}
 			{result.settings?.error && <Problem>{result.settings.error}</Problem>}
 		</>
@@ -544,62 +418,99 @@ export function Settings(
 			<DialogContent className="grid h-[min(40rem,var(--dialog-max))] w-[min(56rem,calc(100vw-2rem))] max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-none sm:grid-cols-[11.5rem_minmax(0,1fr)] sm:grid-rows-1">
 				<div className="flex min-w-0 flex-col gap-3 border-b border-border/60 bg-muted/40 p-3 sm:border-r sm:border-b-0">
 					<DialogTitle className="px-2 pt-1">Settings</DialogTitle>
-					<nav aria-label="Settings sections">
-						<ul className="flex gap-0.5 overflow-x-auto scrollbar-hidden sm:flex-col">
-							{sections.map(({ id, label, icon: Icon }) => (
-								<li key={id} className="shrink-0">
-									<button
-										type="button"
-										aria-current={section === id ? "page" : undefined}
-										onClick={() => show(id)}
-										className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-muted-foreground outline-none transition-colors duration-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:text-foreground motion-reduce:transition-none"
-									>
-										<Icon className="size-3.5 shrink-0" aria-hidden />
-										{label}
-									</button>
-								</li>
-							))}
-						</ul>
+					<nav
+						aria-label="Settings sections"
+						className="flex gap-0.5 overflow-x-auto scrollbar-hidden sm:flex-col sm:gap-4"
+					>
+						{groups.map((group) => (
+							<div key={group.label || "app"} className="flex shrink-0 gap-0.5 sm:flex-col">
+								{group.label && (
+									<h3 className="hidden px-2 pb-1 text-xs text-muted-foreground sm:block">
+										{group.label}
+									</h3>
+								)}
+								<ul className="flex gap-0.5 sm:flex-col">
+									{group.sections.map(({ id, label, icon: Icon }) => (
+										<li key={id} className="shrink-0">
+											<button
+												type="button"
+												aria-current={section === id ? "page" : undefined}
+												onClick={() =>
+													show(id)}
+												className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-muted-foreground outline-none transition-colors duration-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:text-foreground motion-reduce:transition-none"
+											>
+												<Icon className="size-3.5 shrink-0" aria-hidden />
+												{label}
+											</button>
+										</li>
+									))}
+								</ul>
+							</div>
+						))}
 					</nav>
 				</div>
 				<div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]">
-					<header className="flex flex-col gap-1 py-4 pr-12 pl-6">
-						<h2 className="text-sm font-medium">{current.label}</h2>
-						<DialogDescription>{current.description}</DialogDescription>
+					<header className="py-4 pr-12 pl-6">
+						<h2 className="text-lg font-semibold">{labels[section]}</h2>
 					</header>
 					<div className="@container min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
 						{visited.has("general") && (
-							<div hidden={section !== "general"} className="flex flex-col gap-6">
-								<Group title="Appearance">
-									<Appearance />
-								</Group>
-								<Group title="Projects">
-									<ProjectsFolder disabled={offline} />
-								</Group>
-								<Group title="Models">
-									<DefaultModel settings={result.settings} disabled={offline} />
-								</Group>
-								{problems}
-								{result.error && <div>{refresh("Try again")}</div>}
+							<div hidden={section !== "general"}>
+								<Page>
+									<Group title="Appearance">
+										<Row id="theme-label" label="Theme">
+											<Segmented
+												aria-labelledby="theme-label"
+												value={theme}
+												options={themes}
+												onChange={setTheme}
+											/>
+										</Row>
+									</Group>
+									<Group title="Projects">
+										<TextRow
+											label="Projects folder"
+											description="Where Clone from URL puts repositories"
+											placeholder="~/code"
+											saved={folder}
+											disabled={offline}
+											footer={folderError && <Problem>{folderError}</Problem>}
+											onSave={async (value) => {
+												await host.request({ op: "preferences", folder: value });
+											}}
+										/>
+									</Group>
+									<Group title="Models">
+										<DefaultModel settings={result.settings} disabled={offline} />
+									</Group>
+									{problems}
+									{result.error && <div>{refresh("Try again")}</div>}
+								</Page>
 							</div>
 						)}
 						{visited.has("providers") && (
-							<div hidden={section !== "providers"} className="flex flex-col gap-3">
-								{result.settings && (
-									<Group>
-										{result.settings.providers.map((provider) => (
+							<div hidden={section !== "providers"}>
+								<Page>
+									{/* Keychain unlocks and environment changes happen outside Ace. */}
+									<Group title="API keys" action={refresh("Refresh")}>
+										{result.settings?.providers.map((provider) => (
 											<Provider key={provider.id} provider={provider} disabled={offline} />
 										))}
 									</Group>
-								)}
-								{problems}
-								{/* Keychain unlocks and environment changes happen outside Ace. */}
-								<div className="flex justify-end">{refresh("Refresh settings")}</div>
+									{problems}
+								</Page>
 							</div>
 						)}
-						{desktop && visited.has("computer") && (
-							<div hidden={section !== "computer"}>
-								<NativeStatus native={desktop.native} active={section === "computer"} />
+						{visited.has("team") && (
+							<div hidden={section !== "team"}>
+								<TeamSettings active={section === "team"} />
+							</div>
+						)}
+						{visited.has("beta") && (
+							<div hidden={section !== "beta"}>
+								<Page>
+									<CloudCompute disabled={offline} />
+								</Page>
 							</div>
 						)}
 						{visited.has("host") && (
@@ -607,11 +518,9 @@ export function Settings(
 								<HostStatus active={section === "host"} />
 							</div>
 						)}
-						{visited.has("beta") && (
-							<div hidden={section !== "beta"} className="flex flex-col gap-3">
-								<Group>
-									<CloudCompute disabled={offline} />
-								</Group>
+						{desktop && visited.has("computer") && (
+							<div hidden={section !== "computer"}>
+								<NativeStatus native={desktop.native} active={section === "computer"} />
 							</div>
 						)}
 						{desktop && visited.has("updates") && (

@@ -4,7 +4,7 @@ import { Button, Switch, toast } from "@ace/ui";
 import type { UpdateAction, UpdateState } from "@ace/desktop/protocol";
 
 import { desktop } from "./desktop";
-import { Disclosure, Group, Problem, Row, Status } from "./settings-layout";
+import { Group, Page, Problem, Row, Status } from "./settings-layout";
 
 let state: UpdateState | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -57,16 +57,16 @@ export function UpdateNotice({ onOpen }: { onOpen: () => void }) {
 }
 
 const labels: Record<UpdateState["phase"], string> = {
-	disabled: "Updates are disabled in development builds.",
-	idle: "Ace is up to date.",
-	checking: "Checking for updates…",
-	available: "An update is ready to download.",
-	preparing: "Pausing Ace Helper and saving work…",
-	downloading: "Downloading the update…",
-	installing: "Verifying and installing the update…",
-	restarting: "Restarting Ace…",
+	disabled: "Updates are off in development builds",
+	idle: "Up to date",
+	checking: "Checking…",
+	available: "Update ready",
+	preparing: "Pausing Ace Helper…",
+	downloading: "Downloading…",
+	installing: "Installing…",
+	restarting: "Restarting…",
 	recovering: "Resuming Ace Helper…",
-	error: "The update could not finish.",
+	error: "Update failed",
 };
 
 export function UpdateSettings() {
@@ -87,30 +87,30 @@ export function UpdateSettings() {
 		}
 	}
 
-	if (!update) return <Status>Reading update settings…</Status>;
+	if (!update) return <Status>Loading…</Status>;
 	const disabled = update.phase === "disabled";
 	const channel = update.channel === "stable"
-		? "Stable releases"
+		? "Stable"
 		: update.channel === "canary"
-		? "Canary releases"
-		: "Development build";
+		? "Canary"
+		: "Development";
 	return (
-		<div className="flex flex-col gap-6" aria-label="App updates">
+		<Page>
 			<Group>
 				<Row
 					label={`Ace ${update.version}`}
 					description={
-						<>
-							<span role="status">
-								{update.phase === "available"
-									? `Ace ${update.available} is available.`
-									: update.phase === "idle" && !update.checked
-									? "Check for a new version of Ace."
-									: labels[update.phase]}
-							</span>{" "}
-							{channel}
-							{update.checked && ` · Last checked ${new Date(update.checked).toLocaleString()}`}
-						</>
+						<span role="status">
+							{[
+								update.phase === "available"
+									? `Ace ${update.available} is available`
+									: update.phase !== "idle" || update.checked
+									? labels[update.phase]
+									: undefined,
+								channel,
+								update.checked && `Checked ${new Date(update.checked).toLocaleString()}`,
+							].filter(Boolean).join(" · ")}
+						</span>
 					}
 					footer={
 						<>
@@ -165,7 +165,6 @@ export function UpdateSettings() {
 					<Row
 						id="automatic-updates-label"
 						label="Check automatically"
-						description="Look for new versions in the background and show a notice when one is ready."
 					>
 						<Switch
 							aria-labelledby="automatic-updates-label"
@@ -176,15 +175,6 @@ export function UpdateSettings() {
 					</Row>
 				)}
 			</Group>
-			{!disabled && (
-				<Disclosure summary="What happens during an update">
-					<p className="text-muted-foreground">
-						Ace Helper pauses while an update downloads and installs. Unfinished runs resume after
-						restart; terminal shells close. Your projects, history, and provider keys stay on this
-						Mac.
-					</p>
-				</Disclosure>
-			)}
-		</div>
+		</Page>
 	);
 }
