@@ -678,6 +678,10 @@ reachable peer (`shares-changed`) to read the directory again, since a lobby can
 who just got access. After each directory read, a host whose shares changed resends each peer
 the channels its person can access and ends their watches on channels they no longer can. Each
 peer's listing is filtered for its person, and is resent when a peer's GitHub login arrives late.
+The owner's host also filters everything else it shows its app, since the directory, lobby
+events, and hosts from before project access carry every channel: peers' and the directory's
+listings, lobby subscriptions and their presence, and hosted or relayed channels it would open.
+A project the owner loses access to leaves the sidebar and project picker on the next listing.
 
 **Known limitation: project access is cooperative.** It holds between hosts running unmodified
 Ace, not against a teammate who tampers with theirs. The team services accept one credential

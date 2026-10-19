@@ -157,10 +157,25 @@ function listed(seen: Set<string>): Listing[] {
 		);
 }
 
-/** Every channel the owner's app lists: this host's, reachable peers', and the directory's. */
-function everyone(own: Listing[]): Listing[] {
-	const reachable = [...own, ...peers.listings()];
-	return [...reachable, ...listed(new Set(reachable.map((value) => value.id)))];
+/**
+ * Every channel the owner's app lists: this host's, then reachable peers' and the directory's in
+ * projects the owner can access. The directory, lobby events, and hosts from before project access
+ * carry every channel, so the owner's host filters them too.
+ */
+async function everyone(own: Listing[]): Promise<Listing[]> {
+	const reachable = peers.listings();
+	const others = [
+		...reachable,
+		...listed(new Set([...own, ...reachable].map((value) => value.id))),
+	];
+	return [...own, ...await visible(others)];
+}
+
+async function visible(others: Listing[]): Promise<Listing[]> {
+	const checks = await Promise.all(
+		others.map((value) => access.canAccess(catalog.user, channelProject(value))),
+	);
+	return others.filter((_, index) => checks[index]);
 }
 
 /** A peer's person sees this host's channels in projects they can access; the owner sees all. */
@@ -304,7 +319,7 @@ let known = new Set<string>();
 async function lobbyProjects(own?: Listing[]): Promise<void> {
 	if (!directory.url()) return;
 	own ||= await local();
-	projectOf = new Map(everyone(own).map((value) => [value.id, channelProject(value)]));
+	projectOf = new Map((await everyone(own)).map((value) => [value.id, channelProject(value)]));
 	known = new Set(projectOf.values());
 	for (const value of await projects.list()) known.add(projectId(name, value.path, value.repo));
 	lobbyChanged();
@@ -328,6 +343,8 @@ function lobbyChanged(): void {
 		if (window.focused !== false) found.away = false;
 	}
 	lobby.update(known, here);
+	// A project the owner lost access to keeps its lobby until the next publication, but not its people.
+	presenceChanged();
 }
 
 let presenceSent = "";
@@ -753,6 +770,9 @@ async function handle(
 					));
 			const hosted = known && known.hosted ? known : undefined;
 			if (hosted) {
+				if (!(await visible([hosted])).length) {
+					throw new Error("You don't have access to this channel's project");
+				}
 				if (request.request.op === "kill" && client.user !== hosted.owner) {
 					throw new Error("Only the channel's owner can kill it");
 				}
@@ -762,6 +782,10 @@ async function handle(
 			}
 			const machine = !client.peer && peers.find(request.channel);
 			if (!machine) throw new Error("No reachable host runs that channel");
+			const listing = peers.listings().find((value) => value.id === request.channel)!;
+			if (!(await visible([listing])).length) {
+				throw new Error("You don't have access to this channel's project");
+			}
 			const target = await remote(client, machine.name);
 			return target.channel(request.channel, request.request, watch, trace);
 		}
