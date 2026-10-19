@@ -92,9 +92,17 @@ async function lanes(root: string, prefix: string): Promise<Lane[]> {
 	const unready: string[] = [];
 	const ready: Lane[] = [];
 	for (const lane of found) {
+		// lane clones the project's ignored files, such as node_modules, into worktrees whose branch may
+		// not ignore them, so untracked files can't block a move; they stay on this host.
+		const changed = lane.branch
+			? (await output(lane.path, ["diff", "--name-only", "HEAD"])).split("\n").filter(Boolean)
+			: [];
 		if (!lane.branch) unready.push(`${lane.name} (no branch)`);
-		else if (await output(lane.path, ["status", "--porcelain"])) {
-			unready.push(`${lane.name} (uncommitted changes)`);
+		else if (changed.length) {
+			const more = changed.length > 3 ? `, and ${changed.length - 3} more` : "";
+			unready.push(
+				`${lane.name} (uncommitted changes to ${changed.slice(0, 3).join(", ")}${more})`,
+			);
 		} else if (pushed.get(lane.branch) !== lane.head) unready.push(`${lane.name} (not pushed)`);
 		else {
 			const base = (await git(root, ["config", "--get", `lane.${lane.branch}.base`])).stdout.trim();
