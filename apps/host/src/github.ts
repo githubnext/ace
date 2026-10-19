@@ -204,15 +204,15 @@ export async function clone(repo: string, path: string): Promise<void> {
 let owner: string | undefined;
 let checked = 0;
 
-/**
- * The owner's GitHub login from gh, for avatars. Unknown until resolved; a missing or signed-out
- * gh is checked again at most every five minutes, so signing in later takes effect.
- */
 /** The owner's GitHub login if gh already told it, without asking again. */
 export function known(): string | undefined {
 	return owner;
 }
 
+/**
+ * The owner's GitHub login from gh, for avatars. Unknown until resolved; a missing or signed-out
+ * gh is checked again at most every five minutes, so signing in later takes effect.
+ */
 export function login(changed: () => void): string | undefined {
 	if (!owner && Date.now() - checked > 300_000) {
 		checked = Date.now();
