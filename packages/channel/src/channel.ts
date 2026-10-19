@@ -127,6 +127,11 @@ export type Options = {
 	images?: Images;
 	tabs?: Tabs;
 	directory: Directory;
+	/**
+	 * Reserve a new name among the runtime's channels: `exact` refuses a taken name, otherwise the
+	 * name actually reserved comes back numbered. Hosted channels cannot see other channels yet.
+	 */
+	claim?(name: string, exact: boolean): Promise<string>;
 	/** Publish a projection of committed metadata to the runtime's channel catalog. */
 	onMetadata?(value: Metadata): void;
 	/** Publish when the transcript last grew, in epoch milliseconds. */
@@ -210,7 +215,7 @@ export class Channel {
 		if (options.tabs) registry.install(tabs(options.tabs));
 		registry.install(lanes({ ...options, name: options.prefix || options.name }));
 		registry.install(subagent(questions.extension));
-		registry.install(metadata((value) => channel.#changed(value)));
+		registry.install(metadata((value) => channel.#changed(value), options.claim));
 		registry.install(messaging(options.directory));
 		registry.install(
 			defineExtension({ name: "ace-channel", sections: [room.section(options), instructions] }),
@@ -734,8 +739,10 @@ export class Channel {
 		const name = validateName(request.name);
 		const value = await this.#harness.commit(async (tx) => {
 			const doc = await tx.doc(MetadataDoc);
-			if (doc.name !== name) doc.revision++;
-			doc.name = name;
+			if (doc.name !== name) {
+				doc.name = await this.#options.claim?.(name, true) || name;
+				doc.revision++;
+			}
 			doc.named = true;
 			return { name: doc.name, summary: doc.summary, revision: doc.revision };
 		}, context);

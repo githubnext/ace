@@ -27,7 +27,10 @@ export function validateName(value: string): string {
 	return name;
 }
 
-export function metadata(changed: (value: Metadata) => void) {
+export function metadata(
+	changed: (value: Metadata) => void,
+	claim?: (name: string, exact: boolean) => Promise<string>,
+) {
 	return defineExtension({
 		...MetadataExtension,
 		tools: [
@@ -61,14 +64,16 @@ export function metadata(changed: (value: Metadata) => void) {
 						throw new Error("A channel summary must contain 1 to 1000 characters");
 					}
 					const name = args.name === undefined ? undefined : validateName(args.name);
+					let taken = false;
 					const value = await api.commit(async (tx) => {
 						const doc = await tx.doc(MetadataDoc);
 						// A recovered tool must not restore metadata that a later update replaced.
 						if (api.taskId > doc.lastTask) {
 							const previous = doc.name;
 							if (name && (!doc.named || args.rename)) {
-								doc.name = name;
+								if (name !== doc.name) doc.name = await claim?.(name, false) || name;
 								doc.named = true;
+								taken = doc.name !== name;
 							}
 							if (doc.name !== previous || doc.summary !== summary) doc.revision++;
 							doc.summary = summary;
@@ -77,7 +82,10 @@ export function metadata(changed: (value: Metadata) => void) {
 						return { name: doc.name, summary: doc.summary, revision: doc.revision };
 					}, context);
 					changed(value);
-					return { content: [{ type: "text", text: `${value.name}\n${value.summary}` }] };
+					const text = taken
+						? `Another channel is named ${name}, so this channel is named ${value.name}`
+						: value.name;
+					return { content: [{ type: "text", text: `${text}\n${value.summary}` }] };
 				},
 			}),
 		],

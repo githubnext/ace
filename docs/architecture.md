@@ -218,8 +218,10 @@ directory holds `channel.json` and `channel.sqlite`; lanes live in the project. 
 records the tailnet (MagicDNS suffix) the channel was created on, and the host lists, opens,
 serves, and publishes only channels of the tailnet it found when it started. Other tailnets'
 channels and records from before tailnets were recorded stay on disk, hidden. A host without
-Tailscale has no channels and cannot create one. Names stay unique across hidden channels, whose
-lane branches share the projects. Clients start a
+Tailscale has no channels and cannot create one. Names stay unique across the host's channels,
+hidden ones included, whose lane branches share the projects. Creation and renames check and write
+a name under the host-wide `names.lock`; a person's taken name is refused, and an agent's is
+numbered (`name-2`). Hosted channels' renames are not checked yet. Clients start a
 channel's worker on demand and talk to it over `channel.sock` with newline-delimited JSON. A worker
 retires when it has no clients and no live work.
 

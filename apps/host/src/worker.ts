@@ -56,6 +56,7 @@ const channel = await Channel.open({
 	name: record.name,
 	prefix: record.prefix,
 	named: record.named,
+	claim: async (name, exact) => catalog.claim(id, name, exact),
 	onMetadata: (value) => catalog.metadata(id, value),
 	onActivity: (at) => catalog.activity(id, at),
 	onBusy: (busy) => catalog.busy(id, busy),
