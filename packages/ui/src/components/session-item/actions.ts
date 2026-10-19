@@ -10,7 +10,3 @@ export type ActionProps = {
 export function canTogglePin({ pinned, onPin, onUnpin }: ActionProps) {
 	return pinned ? Boolean(onUnpin) : Boolean(onPin);
 }
-
-export function hasVisibleActions(actions: ActionProps) {
-	return canTogglePin(actions) || Boolean(actions.onArchive);
-}
