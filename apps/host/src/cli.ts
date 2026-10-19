@@ -457,7 +457,7 @@ async function main() {
 					return console.log((await session.request<{ chat: number }>(body)).chat);
 				}
 				case "stop":
-					return void (await session.request({ op: "stop", chat: chat() }));
+					return void (await session.request({ op: "stop", chat: chat(), author: catalog.user }));
 			}
 		} finally {
 			session.close();

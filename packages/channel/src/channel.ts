@@ -379,9 +379,15 @@ export class Channel {
 				const entry = request.entry as EntryId;
 				return edit(this.#harness, id, entry, request.author, request.text, context);
 			}
-			case "stop":
+			case "stop": {
+				this.#author(request.author);
+				// Whoever can't start a run here can't end the owner's either.
+				await this.#mayInvoke(request.author);
 				return (await this.#conversation(request.chat)).abort(context);
+			}
 			case "kill":
+				this.#author(request.author);
+				await this.#mayInvoke(request.author);
 				return this.kill();
 			case "share":
 				return this.#share(request);

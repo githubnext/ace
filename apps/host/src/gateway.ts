@@ -376,6 +376,16 @@ const localOps = new Set<HostRequest["op"]>([
 	"terminal-close",
 ]);
 
+type ChannelRequest = Extract<HostRequest, { op: "channel" }>["request"];
+
+/** The verified person replaces any claimed author. Older clients send stop and kill without one. */
+function authored(request: ChannelRequest, user: string): ChannelRequest {
+	if (request.op === "stop" || request.op === "kill" || "author" in request) {
+		return { ...request, author: user };
+	}
+	return request;
+}
+
 async function handle(
 	socket: ServerWebSocket<Client>,
 	request: HostRequest,
@@ -649,9 +659,7 @@ async function handle(
 					if (client.user !== catalog.user) throw new Error("Only the channel's owner can kill it");
 					terminals.closeChannel(request.channel);
 				}
-				const forwarded = "author" in request.request
-					? { ...request.request, author: client.user }
-					: request.request;
+				const forwarded = authored(request.request, client.user);
 				const target = await connection(client, request.channel);
 				return target.request(forwarded, watch, trace);
 			}
@@ -668,9 +676,7 @@ async function handle(
 				if (request.request.op === "kill" && client.user !== hosted.owner) {
 					throw new Error("Only the channel's owner can kill it");
 				}
-				const forwarded = "author" in request.request
-					? { ...request.request, author: client.user }
-					: request.request;
+				const forwarded = authored(request.request, client.user);
 				const target = await connection(client, request.channel, hosted.hosted);
 				return target.request(forwarded, watch, trace);
 			}
