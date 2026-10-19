@@ -1,11 +1,5 @@
 @reference "../../shadcn.css";
 
-@property --ace-beam {
-	syntax: "<angle>";
-	initial-value: 0deg;
-	inherits: false;
-}
-
 .composer\:body::before {
 	@apply squircle;
 	content: "";
@@ -26,56 +20,13 @@ button[data-beam] {
 	transition: background-color 300ms ease, color 300ms ease, box-shadow 300ms ease;
 }
 
-button[data-beam="ace"] {
+/* Ace mode is shown with a still fill and glow: any motion on the submit button reads as a send in flight (#491). Disabled keeps its muted color. */
+button[data-beam="ace"]:not(:disabled) {
 	background: var(--primary);
 	color: var(--primary-foreground);
 	box-shadow: 0 0 12px 0 oklch(0.6 0.17 140 / 0.55);
 }
 
-.dark button[data-beam="ace"] {
+.dark button[data-beam="ace"]:not(:disabled) {
 	box-shadow: 0 0 10px -2px oklch(0.86 0.2 140 / 0.55);
-}
-
-button[data-beam="ace"]::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: 9999px;
-	padding: 1px;
-	background: conic-gradient(
-		from var(--ace-beam),
-		transparent 0deg,
-		transparent 200deg,
-		oklch(0.75 0.18 140 / 0.35) 260deg,
-		oklch(0.92 0.2 140) 320deg,
-		oklch(0.75 0.18 140 / 0.35) 360deg,
-		transparent 360deg
-	);
-	-webkit-mask:
-		linear-gradient(#fff 0 0) content-box,
-		linear-gradient(#fff 0 0);
-	-webkit-mask-composite: xor;
-	mask:
-		linear-gradient(#fff 0 0) content-box,
-		linear-gradient(#fff 0 0);
-	mask-composite: exclude;
-	filter: blur(0.5px);
-	pointer-events: none;
-	opacity: 0;
-	animation: ace-beam-spin 2.2s linear infinite, ace-beam-fade-in 400ms ease-out forwards;
-}
-
-@keyframes ace-beam-spin {
-	to {
-		--ace-beam: 360deg;
-	}
-}
-
-@keyframes ace-beam-fade-in {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
 }
