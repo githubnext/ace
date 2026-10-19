@@ -19,6 +19,7 @@ export type Capabilities = {
 	rename: boolean;
 	archive: boolean;
 	delete?: boolean;
+	fork?: boolean;
 	move?: boolean;
 	/** The channel's workspace is a cloud container its host can stop and start. */
 	compute?: boolean;

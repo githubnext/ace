@@ -125,6 +125,8 @@ function row(
 	outcome?: Outcome,
 ): SidebarRow {
 	const place = placement(channel);
+	// A host's channels are all its owner's, so this is also the host's owner-only check.
+	const own = channel.owner === user && channel.host === host;
 	return {
 		uid: channel.id,
 		kind: "session",
@@ -138,12 +140,13 @@ function row(
 		member: true,
 		capabilities: {
 			rename: channel.owner === user && channel.state !== "offline",
-			archive: channel.host === host,
-			delete: channel.host === host,
-			move: channel.owner === user && channel.host === host && channel.state !== "archived"
-				&& !channel.compute,
+			archive: own,
+			delete: own,
+			// A cloud compute channel's lanes are in its container, out of the host's reach.
+			fork: own && !channel.compute,
+			move: own && channel.state !== "archived" && !channel.compute,
 			// The applicable action follows the transition's end, so none is offered during it.
-			compute: !!channel.compute && channel.host === host && !channel.computing,
+			compute: own && !!channel.compute && !channel.computing,
 		},
 		connection: channel.computing
 			? "warming"
