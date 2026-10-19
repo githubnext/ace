@@ -4,8 +4,9 @@ anchor: function toCompute
 created: 2026-10-19T20:56:11Z
 norm: '1'
 sig: 21af9e438a769213
-body_hash: 8574c71308234fbf
-raw_hash: beeaf7b2694ba561
+body_hash: 06f3a62fc503ff0b
+raw_hash: ee652da2e9d57120
+vouched: 2026-10-19T21:09:57Z
 lines: 260-326
 ---
 

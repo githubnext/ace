@@ -4,9 +4,9 @@ anchor: function move
 created: 2026-10-15T04:09:38Z
 norm: '1'
 sig: 8cd687d651283c6b
-body_hash: 1bd46335713b89d5
-raw_hash: 7a9e8ac3b20028f5
-vouched: 2026-10-19T16:56:54Z
+body_hash: 2ff747cd385d660c
+raw_hash: 3689b92e77a90616
+vouched: 2026-10-19T21:09:57Z
 lines: 257-271
 ---
 
