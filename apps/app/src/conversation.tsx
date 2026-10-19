@@ -26,7 +26,7 @@ type Props = {
 	user: string;
 	draft?: string;
 	onDraftLoaded: () => void;
-	onSettings?: () => void;
+	onProviders?: () => void;
 	onOpen: (channel: Listing) => void;
 	/** Called once the chat loads and whenever its agent may have changed files since. */
 	onWork?: () => void;
@@ -34,7 +34,7 @@ type Props = {
 
 /** One chat's timeline and composer over its transcript; the content of a Chat tab. */
 export function Conversation(
-	{ channel, channels, chat: id, user, draft, onDraftLoaded, onSettings, onOpen, onWork }: Props,
+	{ channel, channels, chat: id, user, draft, onDraftLoaded, onProviders, onOpen, onWork }: Props,
 ) {
 	const offline = channel.state === "offline";
 	const placement = channel.hosted || channel.host;
@@ -289,7 +289,7 @@ export function Conversation(
 						draft={draft}
 						onDraftLoaded={onDraftLoaded}
 						returned={transcript.returned}
-						onSettings={onSettings}
+						onProviders={onProviders}
 						accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
 					/>
 				</div>

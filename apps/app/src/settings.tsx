@@ -42,7 +42,7 @@ import {
 } from "./settings-layout";
 import { UpdateSettings } from "./updates";
 
-type Section = "general" | "providers" | "team" | "beta" | "host" | "computer" | "updates";
+export type Section = "general" | "providers" | "team" | "beta" | "host" | "computer" | "updates";
 
 type Info = { id: Section; label: string; icon: ComponentType<IconProps>; desktop?: boolean };
 
@@ -323,12 +323,13 @@ function CloudCompute({ disabled }: { disabled: boolean }) {
 }
 
 export function Settings(
-	{ onClose, initialSection }: { onClose: () => void; initialSection?: "updates" },
+	{ onClose, initialSection }: { onClose: () => void; initialSection?: Section },
 ) {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const [section, setSection] = useState<Section>(
 		// Updates exist only in the desktop app; browsers keep their usual first section.
-		(desktop && initialSection) || (status === "open" ? "general" : "host"),
+		(initialSection !== "updates" || desktop ? initialSection : undefined)
+			|| (status === "open" ? "general" : "host"),
 	);
 	// Sections stay mounted after their first visit so in-flight key, helper, and update actions
 	// keep their busy state and results; hidden sections stop their own polling.
