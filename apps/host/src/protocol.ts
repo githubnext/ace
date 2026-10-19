@@ -101,7 +101,10 @@ export type Listing = {
 	computing?: "starting" | "stopping";
 	/** The cloud compute workspace is stopped; the chat stays readable. Absent on older hosts. */
 	stopped?: true;
-	/** Where a move under way is taking the channel: a hosting service's host, or this host's name. */
+	/**
+	 * Where a move under way is taking the channel: a hosting service's host, "cloud workspace", or
+	 * this host's name.
+	 */
 	moving?: string;
 	/** Its peer host stopped answering while relaying a request or watch here; absent on older hosts. */
 	stalled?: boolean;

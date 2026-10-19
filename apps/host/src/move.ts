@@ -1,5 +1,5 @@
 /**
- * Moving an idle channel between this host and a hosting service, or from this host to a cloud
+ * Moving an idle channel between this host and a hosting service, or from either to a cloud
  * workspace. The channel keeps its ID and lanes; its pi store travels as one verified snapshot. A `moving` fence on the record keeps
  * both copies from running while the move is under way, and an unknown activation keeps it.
  */
@@ -61,8 +61,10 @@ function movable(record: catalog.Listing): void {
 	if (record.busy) throw new Error("The channel is busy; stop its work before moving it");
 }
 
-/** The target that moves a local channel to a cloud workspace on the team's compute service. */
+/** The target that moves a channel to a cloud workspace on the team's compute service. */
 const COMPUTE = "compute";
+
+const WORKSPACE: MoveTarget = { target: COMPUTE, label: "cloud workspace", place: "cloud" };
 
 /** `host` is this host's name as the app shows it, its tailnet machine name when it has one. */
 export async function targets(id: string, host: string): Promise<MoveTarget[]> {
@@ -73,7 +75,8 @@ export async function targets(id: string, host: string): Promise<MoveTarget[]> {
 		return [];
 	}
 	if (record.hosted) {
-		return [{ target: "local", label: `this host (${host})`, place: "local" }];
+		const local: MoveTarget = { target: "local", label: `this host (${host})`, place: "local" };
+		return await available(record.project) ? [local, WORKSPACE] : [local];
 	}
 	const team = directory.read().hosted;
 	const hosted = new Set([
@@ -87,7 +90,7 @@ export async function targets(id: string, host: string): Promise<MoveTarget[]> {
 		place: "hosted",
 	}));
 	if (!(await available(record.project))) return services;
-	return [...services, { target: COMPUTE, label: "cloud workspace", place: "cloud" }];
+	return [...services, WORKSPACE];
 }
 
 /** A transfer whose answer never arrived may still have taken effect at the service. */
@@ -194,6 +197,22 @@ async function readLocal(id: string): Promise<Snapshot> {
 	}
 }
 
+/** A refused or unanswered freeze may still have frozen the service, so its caller thaws on failure. */
+async function exportHosted(auth: Auth, url: string, id: string): Promise<Snapshot> {
+	const { digest } = await transfer<{ digest: string }>(auth, url, id, { action: "freeze" });
+	const snapshot = await transfer<Snapshot>(auth, url, id, { action: "export" });
+	if (snapshot.digest !== digest) {
+		throw new Error("The exported snapshot does not match the frozen channel");
+	}
+	return snapshot;
+}
+
+async function thaw(auth: Auth, url: string, id: string): Promise<void> {
+	await transfer(auth, url, id, { action: "thaw" }).catch((cause: Error) =>
+		log("warn", "move.thaw.failed", { channel: id, error: cause.message })
+	);
+}
+
 async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promise<void> {
 	const { id } = record;
 	let digest = record.moving?.digest;
@@ -235,30 +254,41 @@ async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promi
 
 /**
  * Like `toHosted`, except the compute service creates the workspace that adopts the channel, and
- * the channel stays stopped until its workspace starts.
+ * the channel stays stopped until its workspace starts. A hosted channel goes straight from its
+ * service to the compute service, frozen there like a move back to this host.
  */
 async function toCompute(
 	auth: Auth,
 	record: catalog.Listing,
 	waiting: (text: string | null) => void,
 ): Promise<void> {
-	const { id } = record;
-	const { url, body } = await adoption(record);
+	const { id, hosted: source } = record;
+	const where = source
+		? `The channel is still on ${new URL(source).host}.`
+		: "The channel is still on this Mac.";
 	let digest = record.moving?.digest;
+	// A resumed move froze its source on the first attempt; thawing an active one is refused.
+	let freezing = !!digest;
+	const lift = async () => {
+		if (source && freezing) await thaw(auth, source, id);
+		catalog.write({ ...catalog.read(id), moving: undefined });
+		catalog.unlock(id);
+	};
+	const { url, body } = await adoption(record);
 	if (!digest) {
 		catalog.write({ ...record, moving: { to: COMPUTE } });
 		try {
 			await park(id);
-			const snapshot = await readLocal(id);
+			freezing = true;
+			const snapshot = source ? await exportHosted(auth, source, id) : await readLocal(id);
 			if (Buffer.byteLength(JSON.stringify(snapshot)) > MAX_SNAPSHOT) {
 				throw new Error("The channel is too large to move yet");
 			}
 			await post(auth, `${url}/workspaces/${id}/import`, { ...body, snapshot });
 			digest = snapshot.digest;
 		} catch (error) {
-			catalog.write({ ...catalog.read(id), moving: undefined });
-			catalog.unlock(id);
-			throw stranded(error, "The channel is still on this Mac.");
+			await lift();
+			throw stranded(error, where);
 		}
 		catalog.write({ ...catalog.read(id), moving: { to: COMPUTE, digest } });
 	}
@@ -271,9 +301,8 @@ async function toCompute(
 				"The channel may now be active there, so this copy stays fenced; run the same move again to finish it.",
 			);
 		}
-		catalog.write({ ...catalog.read(id), moving: undefined });
-		catalog.unlock(id);
-		throw stranded(error, "The channel is still on this Mac.");
+		await lift();
+		throw stranded(error, where);
 	}
 	catalog.write({
 		...catalog.read(id),
@@ -307,11 +336,7 @@ async function toLocal(auth: Auth, record: catalog.Listing): Promise<void> {
 	try {
 		await park(id);
 		freezing = true;
-		const { digest } = await transfer<{ digest: string }>(auth, url, id, { action: "freeze" });
-		const snapshot = await transfer<Snapshot>(auth, url, id, { action: "export" });
-		if (snapshot.digest !== digest) {
-			throw new Error("The exported snapshot does not match the frozen channel");
-		}
+		const snapshot = await exportHosted(auth, url, id);
 		for (const path of [incoming, `${incoming}-wal`, `${incoming}-shm`]) {
 			rmSync(path, { force: true });
 		}
@@ -325,11 +350,7 @@ async function toLocal(auth: Auth, record: catalog.Listing): Promise<void> {
 		for (const path of [`${storage}-wal`, `${storage}-shm`]) rmSync(path, { force: true });
 		renameSync(incoming, storage);
 	} catch (error) {
-		if (freezing) {
-			await transfer(auth, url, id, { action: "thaw" }).catch((cause: Error) =>
-				log("warn", "move.thaw.failed", { channel: id, error: cause.message })
-			);
-		}
+		if (freezing) await thaw(auth, url, id);
 		catalog.write({ ...catalog.read(id), moving: undefined });
 		catalog.unlock(id);
 		throw stranded(error, `The channel is still on ${new URL(url).host}.`);
@@ -344,7 +365,9 @@ function ready(id: string, to: string): catalog.Listing {
 	// Only an outbound move whose activation went unanswered resumes; anything else starts fresh.
 	if (!(record.moving?.digest && record.moving.to === to)) movable(record);
 	if (to === "local" && !record.hosted) throw new Error("The channel is already on this host");
-	if (to !== "local" && record.hosted) throw new Error("Move the channel to this host first");
+	if (to !== "local" && to !== COMPUTE && record.hosted) {
+		throw new Error("Move the channel to this host first");
+	}
 	return record;
 }
 

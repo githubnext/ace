@@ -567,14 +567,17 @@ atomically replaces the parked one; the frozen object remains. A later move out 
 A failed step before activation lifts the fence. An unanswered activation keeps it, and repeating
 the same move retries activation. Watches on the old placement end and clients reattach.
 
-When Cloud compute is available for the project, a local channel's menu also offers Move to cloud
-workspace (`ace move <channel> --compute`). Its workspace starts from a fresh clone, so the host first
-refuses any of the channel's lanes that have uncommitted or unpushed work. It then imports the
-snapshot through the compute service's `import`, which stores the channel inactive with this host's
-project path and the lanes' branches, activates it, saves the record as a stopped `compute` channel,
-and starts it. The runner links that project path to its clone and checks each lane's branch out
-at its old path, so the channel's records keep naming real paths. A start failure after activation
-leaves the channel moved and stopped, for Start compute to retry.
+When Cloud compute is available for the project, a local channel's menu, or a hosted channel's
+whose workspace is this host, also offers Move to cloud workspace (`ace move <channel> --compute`).
+Its workspace starts from a fresh clone, so the host first refuses any of the channel's lanes that
+have uncommitted or unpushed work. It then imports the snapshot through the compute service's
+`import`, which stores the channel inactive with this host's project path and the lanes' branches,
+activates it, saves the record as a stopped `compute` channel, and starts it. A local channel's
+snapshot comes from its parked store. A hosted channel's comes straight from its service, frozen and
+exported as in a move back, never through local storage; a failure before activation thaws it, and
+after activation the frozen object remains. The runner links that project path to its clone and
+checks each lane's branch out at its old path, so the channel's records keep naming real paths. A
+start failure after activation leaves the channel moved and stopped, for Start compute to retry.
 
 ## Shared services
 

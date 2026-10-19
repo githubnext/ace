@@ -134,7 +134,12 @@ async function local(): Promise<Listing[]> {
 		const transition = computing.get(id);
 		if (transition) listing.computing = transition;
 		if (record.moving && moves.has(id)) {
-			listing.moving = record.moving.to === "local" ? name : new URL(record.moving.to).host;
+			const { to } = record.moving;
+			listing.moving = to === "local"
+				? name
+				: to === "compute"
+				? "cloud workspace"
+				: new URL(to).host;
 		}
 		return listing;
 	});
