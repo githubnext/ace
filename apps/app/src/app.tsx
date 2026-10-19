@@ -54,6 +54,7 @@ import { present } from "./presence";
 import { type AppProject, label, projects, title } from "./projects";
 import { type Section, Settings } from "./settings";
 import { SetupProject } from "./setup-project";
+import { ShareProject, useCanShare } from "./share-project";
 import { UpdateNotice } from "./updates";
 import { useWindowStorage } from "./window-storage";
 
@@ -291,6 +292,7 @@ export function App() {
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
+	const [sharing, setSharing] = useState(false);
 	const [moving, setMoving] = useState<{ item: SidebarRow; target: MoveTarget }>();
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
@@ -357,6 +359,7 @@ export function App() {
 	);
 	const connected = status === "open" && !!hello.host;
 	const { compute } = useCompute();
+	const canShare = useCanShare(allProjects ? undefined : current?.id, connected);
 	const local = current?.host === hello.host;
 	const needsGit = local && current?.git === false;
 	// GitHub projects can be cloned here; other folders exist only on the hosts that hold them.
@@ -788,6 +791,9 @@ export function App() {
 										onArchiveInactive={!allProjects && local && connected
 											? () => void archiveInactive(current.path)
 											: undefined}
+										onShareProject={!allProjects && canShare && connected
+											? () => setSharing(true)
+											: undefined}
 										onCompute={connected
 											? (item, action) =>
 												void (action === "stop" ? stopCompute : startCompute)({
@@ -981,6 +987,15 @@ export function App() {
 						required
 						onSave={rename}
 						onCancel={() => setRenaming(undefined)}
+					/>
+				)}
+				{sharing && current && (
+					<ShareProject
+						project={current.id}
+						name={label(current, hello.host)}
+						user={hello.user}
+						channels={visible}
+						onClose={() => setSharing(false)}
 					/>
 				)}
 				{deleting && (

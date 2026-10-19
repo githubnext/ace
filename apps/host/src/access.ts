@@ -91,16 +91,17 @@ function team(): Set<string> {
 	return people;
 }
 
-/** Who on the team can see a project and why, for its owner's Share dialog. */
+/** Everyone on the team this host knows and how they can see a project, for its Share dialog. */
 export async function describe(project: string): Promise<ProjectAccess> {
-	const people = await Promise.all([...team()].map(async (person): Promise<Person | undefined> => {
-		const reason = await via(person, project) || shared(person, project);
-		return reason && { person, github: githubOf(person), via: reason };
-	}));
+	const people = await Promise.all([...team()].map(async (person): Promise<Person> => ({
+		person,
+		github: githubOf(person),
+		via: await via(person, project) || shared(person, project),
+	})));
 	return {
 		direct: await isDirect(catalog.user, project),
 		shares: directory.read().shares.filter((share) => share.project === project),
-		people: people.filter((value) => !!value),
+		people,
 	};
 }
 

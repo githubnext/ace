@@ -96,6 +96,7 @@ import {
 	Trash,
 	Underline,
 	UnfoldVertical,
+	Users,
 	Wrench,
 	X,
 	Zap,
@@ -181,6 +182,7 @@ export const IconLock = outline(Lock);
 export const IconMerge = outline(GitMerge);
 export const IconMessage = outline(MessageCircle);
 export const IconMessageForward = outline(MessageSquareShare);
+export const IconUsers = outline(Users);
 export const IconMonitor = outline(Monitor);
 export const IconMusic = outline(Music);
 export const IconPaintBucket = outline(PaintBucket);

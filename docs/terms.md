@@ -48,6 +48,11 @@ access from a share cannot be passed on. Forking a channel into another project 
 of a share.
 _Avoid_: invite; share (for a channel's agent access)
 
+**Agent access**:
+A channel owner's setting for whether teammates with access may invoke the channel's agent, set
+from the channel header or with `ace agents <channel> on|off`.
+_Avoid_: sharing a channel
+
 **Directory**:
 The team's shared cell listing its projects, hosts, and where each channel lives. It holds no
 channel content.

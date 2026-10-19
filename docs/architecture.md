@@ -683,6 +683,10 @@ events, and hosts from before project access carry every channel: peers' and the
 listings, lobby subscriptions and their presence, and hosted or relayed channels it would open.
 A project the owner loses access to leaves the sidebar and project picker on the next listing.
 
+People with direct access share from **Share project…** in the project's channel header menus, or
+with `ace project share|unshare <project> team|<github login>`; `ace project access <project>`
+lists who can see it and why. Granting asks first and names whose channels the share exposes.
+
 **Known limitation: project access is cooperative.** It holds between hosts running unmodified
 Ace, not against a teammate who tampers with theirs. The team services accept one credential
 derived from `ACE_SECRET`, which every host holds, so anyone with that secret can read every
@@ -693,8 +697,8 @@ verifies. Hosts from before project access serve their channels to every peer. P
 credentials verified by the services would close this
 ([#511](https://github.com/githubnext/ace/issues/511)).
 
-The channel owner can turn collaborator agent invocation on or off with `ace share <channel> on|off`
-or the channel header's agent-access toggle. New channels start unshared; channels created before
+The channel owner can turn collaborator agent invocation on or off with `ace agents <channel> on|off`
+or the channel header's agent-access toggle. (The channel protocol's op is still `share`.) New channels start unshared; channels created before
 that keep their stored setting, and those without one stay shared. Turning sharing on states that
 teammates can run commands as the owner on this host. Turning it off prevents new collaborator
 invocations; active work continues until stopped or killed, and teammates with access to the
