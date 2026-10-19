@@ -39,6 +39,7 @@ import {
 	IconPlus,
 	IconRows,
 	IconTrash,
+	IconUsers,
 	IconX,
 } from "../../icons";
 
@@ -92,6 +93,8 @@ export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children
 	onArchive?: (row: SidebarRow) => void;
 	/** When provided, the channels header's context menu offers "Archive inactive". */
 	onArchiveInactive?: () => void;
+	/** When provided, the channels header's menus offer "Share project…". */
+	onShareProject?: () => void;
 	onFork?: (row: SidebarRow) => void;
 	onInfo?: (row: SidebarRow) => void;
 	onLeave?: (row: SidebarRow) => void;
@@ -487,6 +490,7 @@ function Group({
 	onUnpin,
 	onArchive,
 	onArchiveInactive,
+	onShareProject,
 	onFork,
 	onInfo,
 	onLeave,
@@ -518,6 +522,7 @@ function Group({
 	onMove?: (row: SidebarRow, target: MoveTarget) => Promise<void>;
 	onCompute?: (row: SidebarRow, action: "start" | "stop") => void;
 	onArchiveInactive?: () => void;
+	onShareProject?: () => void;
 	onToggleGroup?: (id: SessionSidebarGroupId) => void;
 	onNewSession?: () => void;
 	onContinuePr?: () => void;
@@ -547,6 +552,7 @@ function Group({
 		? `New channel in ${group.label}`
 		: "New channel";
 	let archiveInactive = group.id === "mine" ? onArchiveInactive : undefined;
+	let shareProject = group.id === "mine" ? onShareProject : undefined;
 	let create = useCallback(() => {
 		if (collapsed) onToggleGroup?.(group.id);
 		action?.();
@@ -614,7 +620,7 @@ function Group({
 			)}
 		>
 			{showHeader && (
-				<ContextMenu disabled={!archiveInactive && !group.onRemove}>
+				<ContextMenu disabled={!archiveInactive && !shareProject && !group.onRemove}>
 					<ContextMenuTrigger
 						render={
 							<div
@@ -664,6 +670,7 @@ function Group({
 										className={actionButtonClassName}
 										onContinuePr={onContinuePr}
 										onStartIssue={onStartIssue}
+										onShareProject={shareProject}
 									/>
 								)}
 							</div>
@@ -674,6 +681,12 @@ function Group({
 							<ContextMenuItem onClick={archiveInactive}>
 								<IconArchive className="size-3.5" />
 								Archive inactive
+							</ContextMenuItem>
+						)}
+						{shareProject && (
+							<ContextMenuItem onClick={shareProject}>
+								<IconUsers className="size-3.5" />
+								Share project…
 							</ContextMenuItem>
 						)}
 						{group.onRemove && (
@@ -924,6 +937,7 @@ export function SessionSidebar(
 		onUnpin,
 		onArchive,
 		onArchiveInactive,
+		onShareProject,
 		onFork,
 		onInfo,
 		onLeave,
@@ -1002,6 +1016,7 @@ export function SessionSidebar(
 		onUnpin,
 		onArchive,
 		onArchiveInactive,
+		onShareProject,
 		onFork,
 		onInfo,
 		onLeave,

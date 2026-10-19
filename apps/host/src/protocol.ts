@@ -180,14 +180,15 @@ export type TabRename = {
 export type TabResult = { ok: true; value: WindowState } | { ok: false; error: string };
 
 /**
- * Someone on the team who can see a project: through GitHub read access or their own folder, which
- * lets them share it, or through a share with the team or with them.
+ * Someone on the team and how they can see a project: through GitHub read access or their own
+ * folder, which lets them share it, or through a share with the team or with them. No `via` means
+ * they can't see it.
  */
 export type Person = {
 	/** Tailscale login. */
 	person: string;
 	github?: string;
-	via: "github" | "folder" | "team" | "share";
+	via?: "github" | "folder" | "team" | "share";
 };
 
 /** `direct` is whether this host's owner can share and unshare the project. */

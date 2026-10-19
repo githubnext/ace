@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { existsSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -19,7 +20,19 @@ import { health, HostConflict } from "./health";
 import { type Filter, follow, print } from "./logs";
 import * as loopback from "./loopback";
 import { preference } from "./preferences";
-import type { HostRequest, Listing, WindowInfo } from "./protocol";
+import * as projects from "./projects";
+import {
+	channelProject,
+	githubRepo,
+	type Hello,
+	type HostRequest,
+	type Listing,
+	type Person,
+	type ProjectAccess,
+	projectId,
+	TEAM,
+	type WindowInfo,
+} from "./protocol";
 import { setModel } from "./settings";
 import {
 	archive,
@@ -53,7 +66,10 @@ const HELP = `ace — channels on this host
   ace kill <channel>                             stop all work in the channel now
   ace move <channel> --hosted <url> | --local | --compute
                                                 move an idle channel to a hosting service, back, or to a cloud workspace
-  ace share <channel> on|off                     let others invoke agents
+  ace agents <channel> on|off                    let others invoke agents
+  ace project access <project>                   who can see a project, by folder or owner/name
+  ace project share|unshare <project> team|<github login>
+                                                give the team or one person every channel in it
   ace desktop <channel> on|off                   let the channel's agents use native desktop tools
   ace models
   ace model [provider/id|auto]                   show or set the model for a chat's first agent run
@@ -187,13 +203,51 @@ async function isHostRunning(): Promise<boolean> {
 const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
 
 /** What only a channel's owner can do, phrased for refusing a teammate's channel. */
+/** A project by its folder on this host, or by GitHub owner/name. */
+async function projectRef(value: string): Promise<string> {
+	if (!existsSync(value)) {
+		const repo = githubRepo(value);
+		if (!repo) throw new Error(`${value} is neither a folder here nor a GitHub owner/name`);
+		return projectId("", "", repo);
+	}
+	const { root, repo } = await projects.checkout(realpathSync(resolve(value)));
+	const { host } = await local<Hello>({ op: "hello" });
+	return projectId(host, root, repo);
+}
+
+function findPerson(people: Person[], login: string): Person {
+	const lower = login.toLowerCase();
+	const found = people.find((value) =>
+		value.github?.toLowerCase() === lower || value.person.toLowerCase() === lower
+	);
+	if (!found) throw new Error(`No one on the team is ${login} yet; their Ace must be running`);
+	return found;
+}
+
+const VIA: Record<NonNullable<Person["via"]>, string> = {
+	github: "reads it on GitHub",
+	folder: "their folder",
+	team: "shared with the team",
+	share: "shared with them",
+};
+
+function printAccess(access: ProjectAccess) {
+	for (const value of access.people) {
+		const name = value.github || value.person;
+		console.log(`${name.padEnd(24)} ${value.via ? VIA[value.via] : dim("no access")}`);
+	}
+	if (!access.direct) {
+		console.log(dim("Only people who read it on GitHub, or whose folder it is, can share it."));
+	}
+}
+
 const owned: Record<string, string> = {
 	backup: "back it up",
 	rename: "rename it",
 	fork: "fork it",
 	kill: "kill it",
 	move: "move it",
-	share: "change its sharing",
+	agents: "change its agent access",
 	desktop: "change its desktop tools",
 	archive: "archive it",
 	unarchive: "unarchive it",
@@ -358,6 +412,34 @@ async function main() {
 			for (const m of await models()) console.log(`${m.provider}/${m.modelId}`);
 			return;
 		}
+		case "project": {
+			const [value, who] = rest;
+			if (!value || !["access", "share", "unshare"].includes(ref!)) {
+				throw new Error("ace project access|share|unshare <project> [team|<github login>]");
+			}
+			const project = await projectRef(value);
+			const access = await local<ProjectAccess>({ op: "project-access", project });
+			if (ref === "access") return printAccess(access);
+			if (!who) throw new Error(`ace project ${ref} <project> team|<github login>`);
+			const person = who === "team" ? TEAM : findPerson(access.people, who).person;
+			const shared = ref === "share";
+			await local({ op: "project-share", project, person, shared });
+			if (!shared) return;
+			const channels = await local<Listing[]>({ op: "channels" });
+			const others = new Set(
+				channels.filter((value) => channelProject(value) === project).map((value) => value.owner),
+			);
+			others.delete(catalog.user);
+			others.delete(person);
+			const names = [...others].map((owner) =>
+				access.people.find((value) => value.person === owner)?.github || owner
+			);
+			return console.log(
+				`${person === TEAM ? "The team" : who} can now see every channel in it${
+					names.length ? `, including ${names.join(", ")}'s,` : ""
+				} and any created later.`,
+			);
+		}
 		case "directory": {
 			const url = ref === "off" ? null : ref;
 			if (ref && await isHostRunning()) await local({ op: "directory-set", url });
@@ -490,12 +572,12 @@ async function main() {
 				`${moved.name} now runs ${moved.hosted ? `at ${moved.hosted}` : "on this host"}`,
 			);
 		}
-		case "share": {
+		case "agents": {
 			const shared = rest[0] === "on";
 			await request(record.id, { op: "share", author: catalog.user, shared });
 			if (!shared) return;
 			return console.log(
-				`Sharing is on for ${record.name}. Teammates can run commands as you on this machine.`,
+				`Agent access is on for ${record.name}. Teammates can run commands as you on this machine.`,
 			);
 		}
 		case "desktop": {
