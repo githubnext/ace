@@ -220,9 +220,12 @@ const cloning = new Set<string>();
 
 /**
  * Sets up a GitHub repository on this host: clones it into `value`, or opens the checkout of it
- * already there. Anything else at `value` is left untouched.
+ * already there, marked `found`. Anything else at `value` is left untouched.
  */
-export async function setup(source: string, value: string): Promise<Project> {
+export async function setup(
+	source: string,
+	value: string,
+): Promise<Project & { found?: true }> {
 	const repo = parse(source);
 	const expanded = expand(value.trim());
 	if (!isAbsolute(expanded)) throw new Error("Enter a full folder path, such as ~/code/project");
@@ -238,7 +241,7 @@ export async function setup(source: string, value: string): Promise<Project> {
 			if (found?.toLowerCase() === repo.toLowerCase()) {
 				// An interrupted clone already names its remote but has no commit to work from.
 				const head = await git(real, ["rev-parse", "--verify", "-q", "HEAD"]);
-				if (head.status === 0) return await open(real);
+				if (head.status === 0) return { ...(await open(real)), found: true };
 				throw new Error(
 					`${path} has an incomplete clone of ${repo}. Remove it or choose another folder.`,
 				);

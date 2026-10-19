@@ -514,9 +514,14 @@ export function App() {
 	/** Channels only start on this host; setup may clone here first, never on the other host. */
 	async function finishSetup(repo: string, path: string) {
 		if (!setup) return;
-		const value = await host.request<Project>({ op: "project-clone", repo, path });
+		const value = await host.request<Project & { found?: true }>({
+			op: "project-clone",
+			repo,
+			path,
+		});
 		const id = projectId(hello.host, value.path, value.repo);
 		setSetup(undefined);
+		if (value.found) toast.success(`Opened the checkout already at ${value.path}`);
 		if (!setup.start) return chooseProject(id);
 		const target: AppProject = {
 			...value,
@@ -901,10 +906,9 @@ export function App() {
 									)}
 									{!allProjects && !local && (
 										<p className="max-w-[34rem] text-sm text-muted-foreground">
-											{current.label} is checked out on {[...current.hosts].join(", ")}.{" "}
-											{current.repo
-												? `Set it up on ${here} to start channels here.`
-												: "Open a checkout on this host to start channels here."}
+											{current.label} isn't on {here} yet. {current.repo
+												? "Set it up to start channels here."
+												: `Open a checkout of it on ${here} to start channels here.`}
 										</p>
 									)}
 									{!allProjects && needsGit && (
@@ -918,18 +922,23 @@ export function App() {
 									)}
 									{!allProjects && creatable && (
 										<div className="flex gap-2">
-											{!local && (
-												<Button
-													variant="outline"
-													disabled={!connected}
-													onClick={() => startSetup(current)}
-												>
-													Set up on {here}
-												</Button>
-											)}
-											<Button disabled={!connected} onClick={() => void create()}>
-												<IconPlus aria-hidden />New channel
-											</Button>
+											{local
+												? (
+													<Button
+														disabled={!connected}
+														onClick={() => void create()}
+													>
+														<IconPlus aria-hidden />New channel
+													</Button>
+												)
+												: (
+													<Button
+														disabled={!connected}
+														onClick={() => startSetup(current)}
+													>
+														Set up on {here}
+													</Button>
+												)}
 										</div>
 									)}
 								</div>
