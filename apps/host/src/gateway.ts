@@ -585,7 +585,11 @@ async function handle(
 			const first = !moves.has(request.channel);
 			moves.add(request.channel);
 			try {
-				await move(request.channel, request.target, (waiting) => send({ id, waiting }));
+				const run = () => move(request.channel, request.target, (waiting) => send({ id, waiting }));
+				// A move to a cloud workspace ends by starting it, which the app must wait out like Run in
+				// cloud before it opens the chat.
+				if (request.target === "compute") await lifecycle(request.channel, "starting", run);
+				else await run();
 			} finally {
 				if (first) moves.delete(request.channel);
 				// A failed move lifts its fence, which listings and reopened chats must see.
