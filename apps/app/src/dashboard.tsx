@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	Button,
@@ -24,10 +24,11 @@ import {
 	IconPlus,
 	IconRotate,
 } from "@ace/ui/icons";
-import type { GithubList } from "@ace/channel/protocol";
+import type { GithubList, ModelRef } from "@ace/channel/protocol";
 import type { Listing, People, Presence } from "@ace/host/protocol";
 
 import type { Outcome } from "./attention";
+import { Notice } from "./composer";
 import { desktop, here } from "./desktop";
 import { prompt, StateIcon } from "./github";
 import { useGithub } from "./github-cache";
@@ -270,6 +271,7 @@ export function Dashboard(
 		onClone,
 		onChannel,
 		onCreate,
+		onProviders,
 		cloud,
 	}: {
 		project: AppProject;
@@ -289,6 +291,7 @@ export function Dashboard(
 		onClone: () => void;
 		onChannel: (channel: Listing) => void;
 		onCreate: (text?: string, onCreated?: () => void, cloud?: boolean) => Promise<void>;
+		onProviders: () => void;
 		/** The cloud compute beta is on and this project has a GitHub repository. */
 		cloud?: boolean;
 	},
@@ -325,11 +328,29 @@ export function Dashboard(
 	const team = pulse(channels, presence, people, user, since, now);
 	const owner = (channel?: Listing) =>
 		channel && channel.owner !== user ? people[channel.owner] || channel.owner : undefined;
+	const settingsVersion = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
+	const [models, setModels] = useState<ModelRef[]>();
+	useEffect(() => {
+		if (!local || !connected) return;
+		let active = true;
+		// An unread answer offers no setup; starting then reports whatever failed.
+		host.request<ModelRef[]>({ op: "models" }).then(
+			(value) => active && setModels(value),
+			() => active && setModels(undefined),
+		);
+		return () => {
+			active = false;
+		};
+	}, [local, connected, settingsVersion]);
+	// A cloud channel runs on the service's credentials, not this host's.
+	const unprovided = models?.length === 0 && place === "local";
 	const hour = new Date().getHours();
 	const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
 	async function start(text?: string) {
 		if (busy) return;
+		// Its agent would fail for want of a key; setup keeps the text for sending after.
+		if (unprovided) return onProviders();
 		setBusy(true);
 		try {
 			await onCreate(text, () => {
@@ -415,6 +436,17 @@ export function Dashboard(
 						clearOnSend={false}
 						onSend={({ doc }) => void start(serialize(doc))}
 					/>
+					{unprovided && (
+						<Notice
+							action={
+								<Button size="sm" variant="outline" onClick={onProviders}>
+									Set up a provider
+								</Button>
+							}
+						>
+							Add a model provider's API key so Ace can work on {project.label}.
+						</Notice>
+					)}
 				</div>
 			)}
 			{waiting.length > 0 && (

@@ -52,7 +52,7 @@ import { Palette } from "./palette";
 import { placement } from "./placement";
 import { present } from "./presence";
 import { type AppProject, label, projects, title } from "./projects";
-import { Settings } from "./settings";
+import { type Section, Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { UpdateNotice } from "./updates";
 import { useWindowStorage } from "./window-storage";
@@ -284,7 +284,7 @@ export function App() {
 		project?: AppProject & { repo: string };
 		start?: { text?: string; onCreated?: () => void };
 	}>();
-	const [settings, setSettings] = useState<boolean | "updates">(false);
+	const [settings, setSettings] = useState<boolean | Section>(false);
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
@@ -557,7 +557,7 @@ export function App() {
 					setDraft({ channel: value.id, text });
 					toast.error("Could not invoke agent", {
 						description: (error as Error).message,
-						action: { label: "Settings", onClick: () => setSettings(true) },
+						action: { label: "Providers", onClick: () => setSettings("providers") },
 					});
 				}
 			}
@@ -858,6 +858,7 @@ export function App() {
 									onClone={cloneUrl}
 									onChannel={select}
 									onCreate={(text, onCreated, cloud) => create(text, onCreated, current, cloud)}
+									onProviders={() => setSettings("providers")}
 									cloud={local && !!current.repo && !!compute?.enabled}
 								/>
 							)
@@ -881,7 +882,7 @@ export function App() {
 									remote={channel.host !== hello.host}
 									draft={draft}
 									onDraftLoaded={() => setDraft(undefined)}
-									onSettings={() => setSettings(true)}
+									onProviders={() => setSettings("providers")}
 									onOpen={select}
 								/>
 							)
@@ -995,7 +996,7 @@ export function App() {
 				{settings && (
 					<Settings
 						key={String(settings)}
-						initialSection={settings === "updates" ? "updates" : undefined}
+						initialSection={settings === true ? undefined : settings}
 						onClose={() => setSettings(false)}
 					/>
 				)}

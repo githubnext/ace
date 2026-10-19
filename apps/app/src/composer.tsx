@@ -56,7 +56,7 @@ type Props = {
 	onDraftLoaded: () => void;
 	/** Messages withdrawn from the chat's queue; the user's own come back into the draft. */
 	returned: QueuedMessage[];
-	onSettings?: () => void;
+	onProviders?: () => void;
 	accessory?: ReactNode;
 };
 
@@ -72,7 +72,7 @@ function useInvocation(shared: boolean | undefined, owner: boolean, mode: string
 }
 
 /** Below the composer: its attachment tray rises over the space above it and takes clicks there. */
-function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
 	return (
 		<div
 			className="mt-2 flex items-center justify-between gap-3 px-3 text-xs text-muted-foreground"
@@ -115,7 +115,7 @@ export function Composer(
 		draft,
 		onDraftLoaded,
 		returned,
-		onSettings,
+		onProviders,
 		accessory,
 	}: Props,
 ) {
@@ -244,6 +244,10 @@ export function Composer(
 				description: "The owner has turned off teammate agent invocation.",
 			});
 		}
+		// The channel would refuse it for want of a key; setup keeps the draft for sending after.
+		if (mode === "ace" && models?.length === 0 && !modelError && onProviders) {
+			return onProviders();
+		}
 		const doc = composer.current?.get();
 		sending.current = true;
 		setPending(true);
@@ -278,7 +282,7 @@ export function Composer(
 		} catch (error) {
 			toast.error(invoke ? "Could not invoke agent" : "Could not send message", {
 				description: (error as Error).message,
-				...(invoke && onSettings ? { action: { label: "Settings", onClick: onSettings } } : {}),
+				...(invoke && onProviders ? { action: { label: "Providers", onClick: onProviders } } : {}),
 			});
 		} finally {
 			sending.current = false;
@@ -320,8 +324,10 @@ export function Composer(
 				? <Refusal mode={mode} onChat={toChat} />
 				: mode === "ace" && !offline && models?.length === 0 && (
 					<Notice
-						action={onSettings && (
-							<Button size="sm" variant="ghost" onClick={onSettings}>Provider settings</Button>
+						action={onProviders && (
+							<Button size="sm" variant="outline" onClick={onProviders}>
+								{modelError ? "Provider settings" : "Set up a provider"}
+							</Button>
 						)}
 					>
 						{modelError || "Add a provider to use Ace. You can still send messages in Chat mode."}

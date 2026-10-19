@@ -47,7 +47,7 @@ type Props = {
 	remote: boolean;
 	draft?: ChannelDraft;
 	onDraftLoaded: () => void;
-	onSettings?: () => void;
+	onProviders?: () => void;
 	onOpen: (channel: Listing) => void;
 };
 
@@ -279,7 +279,7 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 
 /** A channel's tabs: its chat, plus Diff and Terminal views of that chat's lane. */
 export function Channel(
-	{ channel, channels, user, remote, draft, onDraftLoaded, onSettings, onOpen }: Props,
+	{ channel, channels, user, remote, draft, onDraftLoaded, onProviders, onOpen }: Props,
 ) {
 	const place = placement(channel);
 	const [changed, setChanged] = useState<boolean>();
@@ -338,7 +338,7 @@ export function Channel(
 							user={user}
 							draft={draft?.channel === channel.id ? draft.text : undefined}
 							onDraftLoaded={onDraftLoaded}
-							onSettings={!remote && !channel.hosted ? onSettings : undefined}
+							onProviders={!remote && !channel.hosted ? onProviders : undefined}
 							onOpen={onOpen}
 							onWork={inspect}
 						/>
