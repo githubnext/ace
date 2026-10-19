@@ -4,7 +4,6 @@
  * both copies from running while the move is under way, and an unknown activation keeps it.
  */
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
 import { join } from "node:path";
 
 import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -65,7 +64,8 @@ function movable(record: catalog.Listing): void {
 /** The target that moves a local channel to a cloud workspace on the team's compute service. */
 const COMPUTE = "compute";
 
-export async function targets(id: string): Promise<MoveTarget[]> {
+/** `host` is this host's name as the app shows it, its tailnet machine name when it has one. */
+export async function targets(id: string, host: string): Promise<MoveTarget[]> {
 	const record = catalog.read(id);
 	try {
 		movable(record);
@@ -73,7 +73,7 @@ export async function targets(id: string): Promise<MoveTarget[]> {
 		return [];
 	}
 	if (record.hosted) {
-		return [{ target: "local", label: `this host (${hostname()})`, place: "local" }];
+		return [{ target: "local", label: `this host (${host})`, place: "local" }];
 	}
 	const team = directory.read().hosted;
 	const hosted = new Set([

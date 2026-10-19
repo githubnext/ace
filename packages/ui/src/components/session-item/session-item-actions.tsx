@@ -67,6 +67,12 @@ type RowMenuProps = ActionProps & {
 };
 
 const PLACES = { local: Hash, hosted: Radar, cloud: Cloud };
+// "Cloud" and "cloud workspace" alone don't say what moves, so each item says where tools run.
+const HINTS = {
+	local: "Chat and tools run on this Mac",
+	hosted: "Chat moves; tools stay on this Mac",
+	cloud: "Chat and tools move to a cloud container",
+};
 
 type Destinations =
 	| { state: "loading" }
@@ -190,8 +196,11 @@ function MoveSection(
 								onMove(target);
 							}}
 						>
-							<Icon className="size-3.5" />
-							<span className="min-w-0 flex-1 truncate">Move to {target.label}</span>
+							<Icon className="size-3.5 self-start mt-0.5" />
+							<span className="flex min-w-0 flex-1 flex-col">
+								<span className="truncate">Move to {target.label}</span>
+								<span className="truncate text-muted-foreground">{HINTS[target.place]}</span>
+							</span>
 							{moving === target.target && (
 								<span className="shrink-0 text-muted-foreground">Moving…</span>
 							)}
