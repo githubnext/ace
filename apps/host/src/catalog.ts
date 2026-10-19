@@ -132,8 +132,48 @@ function pick(words: string[]): string {
 }
 
 /** Hidden channels keep their lane branches in the same projects, so names stay unique across all. */
-function taken(): Set<string> {
-	return new Set(records().flatMap((record) => [record.name, record.prefix]));
+function taken(except?: string): Set<string> {
+	const others = records().filter((record) => record.id !== except);
+	return new Set(others.flatMap((record) => [record.name, record.prefix]));
+}
+
+/** `base`, or the first of `base-2`, `base-3`, … not in `names`, within the 63-character limit. */
+function unused(base: string, names: Set<string>): string {
+	let name = base;
+	for (let count = 2; names.has(name); count++) {
+		name = `${base.slice(0, 62 - String(count).length).replace(/-+$/, "")}-${count}`;
+	}
+	return name;
+}
+
+/**
+ * Serializes a name check with the record write that claims the name, across the host process
+ * and every channel worker; the transaction ends when the connection closes.
+ */
+function exclusive<T>(work: () => T): T {
+	mkdirSync(root, { recursive: true });
+	const db = new Database(join(root, "names.lock"));
+	try {
+		db.run("PRAGMA busy_timeout = 10000");
+		db.run("BEGIN EXCLUSIVE");
+		return work();
+	} finally {
+		db.close();
+	}
+}
+
+/**
+ * Writes a channel's new name to its record before pi commits it, so other workers see it as
+ * taken. A person's `exact` choice is refused when taken; an agent's is numbered past it.
+ */
+export function claim(id: string, name: string, exact: boolean): string {
+	return exclusive(() => {
+		const names = taken(id);
+		if (exact && names.has(name)) throw new Error(`A channel named ${name} already exists`);
+		const chosen = unused(name, names);
+		write({ ...read(id), name: chosen });
+		return chosen;
+	});
 }
 
 /**
@@ -142,12 +182,8 @@ function taken(): Set<string> {
  * fork's agent names it once its work takes shape, as it would a random one.
  */
 export function fork(source: Listing, model: ModelRef | undefined, branches: Set<string>): Listing {
-	const names = taken();
 	const base = `fork-of-${source.name}`.slice(0, 63).replace(/-+$/, "");
-	let name = base;
-	for (let count = 2; names.has(name) || branches.has(name); count++) {
-		name = `${base.slice(0, 62 - String(count).length).replace(/-+$/, "")}-${count}`;
-	}
+	const name = unused(base, new Set([...taken(), ...branches]));
 	return { ...draft(source.project, model), name, prefix: name };
 }
 
@@ -176,7 +212,7 @@ export function draft(project: string, model?: ModelRef, name?: string, hosted?:
 }
 
 export function create(project: string, model?: ModelRef, name?: string): Listing {
-	return save(draft(project, model, name));
+	return exclusive(() => save(draft(project, model, name)));
 }
 
 export function save(record: Listing): Listing {
