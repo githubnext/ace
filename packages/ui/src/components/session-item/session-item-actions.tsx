@@ -149,6 +149,12 @@ export function RowMenu(
 
 	let leave = data.member ? onLeave : undefined;
 	let canPin = canTogglePin({ pinned, onPin, onUnpin });
+	// Actions that can't succeed on this row are hidden, so a row may be left with none to offer.
+	let offered = lobby
+		? Boolean(onRebuild)
+		: archived
+		? Boolean(onArchive || onDelete)
+		: Boolean(canPin || onRename || onFork || onInfo || leave || movable || onCompute || onArchive);
 
 	function pin(event: MouseEvent<HTMLElement>) {
 		stop(event);
@@ -219,7 +225,7 @@ export function RowMenu(
 	}
 
 	return (
-		<ContextMenu.Root onOpenChange={change}>
+		<ContextMenu.Root disabled={!offered} onOpenChange={change}>
 			<ContextMenu.Trigger
 				render={
 					<div
@@ -253,20 +259,26 @@ export function RowMenu(
 											{pinned ? "Unpin channel" : "Pin channel"}
 										</ContextMenu.Item>
 									)}
-									<ContextMenu.Item className={MENU_ITEM} disabled={!onRename} onClick={rename}>
-										<Pencil className="size-3.5" />
-										Rename channel
-									</ContextMenu.Item>
-									<ContextMenu.Item className={MENU_ITEM} disabled={!onFork} onClick={fork}>
-										<Fork className="size-3.5" />
-										Fork channel
-									</ContextMenu.Item>
-									<ContextMenu.Item className={MENU_ITEM} disabled={!onInfo} onClick={info}>
-										<Info className="size-3.5" />
-										Channel info
-									</ContextMenu.Item>
-									{data.member && (
-										<ContextMenu.Item className={MENU_ITEM} disabled={!leave} onClick={exit}>
+									{onRename && (
+										<ContextMenu.Item className={MENU_ITEM} onClick={rename}>
+											<Pencil className="size-3.5" />
+											Rename channel
+										</ContextMenu.Item>
+									)}
+									{onFork && (
+										<ContextMenu.Item className={MENU_ITEM} onClick={fork}>
+											<Fork className="size-3.5" />
+											Fork channel
+										</ContextMenu.Item>
+									)}
+									{onInfo && (
+										<ContextMenu.Item className={MENU_ITEM} onClick={info}>
+											<Info className="size-3.5" />
+											Channel info
+										</ContextMenu.Item>
+									)}
+									{leave && (
+										<ContextMenu.Item className={MENU_ITEM} onClick={exit}>
 											<Leave className="size-3.5" />
 											Leave channel
 										</ContextMenu.Item>
@@ -302,14 +314,12 @@ export function RowMenu(
 										<ContextMenu.Separator className={MENU_SEPARATOR} />
 									</>
 								)}
-								<ContextMenu.Item
-									className={MENU_ITEM_DESTRUCTIVE_FULL}
-									disabled={!onArchive}
-									onClick={archive}
-								>
-									<ArchiveContent2 className="size-3.5" />
-									Archive channel
-								</ContextMenu.Item>
+								{onArchive && (
+									<ContextMenu.Item className={MENU_ITEM_DESTRUCTIVE_FULL} onClick={archive}>
+										<ArchiveContent2 className="size-3.5" />
+										Archive channel
+									</ContextMenu.Item>
+								)}
 								{onDelete && (
 									<ContextMenu.Item className={MENU_ITEM_DESTRUCTIVE_FULL} disabled>
 										<Trash className="size-3.5" />
@@ -321,26 +331,22 @@ export function RowMenu(
 						)}
 						{!lobby && archived && (
 							<>
-								<ContextMenu.Item className={MENU_ITEM} disabled={!onArchive} onClick={archive}>
-									<Unarchive className="size-3.5" />
-									Unarchive channel
-								</ContextMenu.Item>
-								<ContextMenu.Item
-									className={MENU_ITEM_DESTRUCTIVE_FULL}
-									disabled={!onDelete}
-									onClick={del}
-								>
-									<Trash className="size-3.5" />
-									Delete channel
-								</ContextMenu.Item>
+								{onArchive && (
+									<ContextMenu.Item className={MENU_ITEM} onClick={archive}>
+										<Unarchive className="size-3.5" />
+										Unarchive channel
+									</ContextMenu.Item>
+								)}
+								{onDelete && (
+									<ContextMenu.Item className={MENU_ITEM_DESTRUCTIVE_FULL} onClick={del}>
+										<Trash className="size-3.5" />
+										Delete channel
+									</ContextMenu.Item>
+								)}
 							</>
 						)}
-						{lobby && (
-							<ContextMenu.Item
-								className={MENU_ITEM_DESTRUCTIVE_FULL}
-								disabled={!onRebuild}
-								onClick={rebuild}
-							>
+						{lobby && onRebuild && (
+							<ContextMenu.Item className={MENU_ITEM_DESTRUCTIVE_FULL} onClick={rebuild}>
 								<Rebuild className="size-3.5" />
 								Rebuild Lobby
 							</ContextMenu.Item>

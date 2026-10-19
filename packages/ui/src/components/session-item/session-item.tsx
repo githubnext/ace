@@ -213,7 +213,7 @@ function actions(data: SidebarRow, props: RowActions): RowActions {
 	}
 	return {
 		...pins,
-		onFork: props.onFork,
+		onFork: data.capabilities?.fork === false ? undefined : props.onFork,
 		onInfo: props.onInfo,
 		onLeave: props.onLeave,
 		onArchive: data.capabilities?.archive === false ? undefined : props.onArchive,
