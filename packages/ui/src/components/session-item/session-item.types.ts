@@ -25,8 +25,6 @@ export type SidebarRow = {
 	private: boolean;
 	/** Runs on the team's cloud compute rather than a teammate's machine. */
 	cloud?: boolean;
-	/** Lives on the team's hosting service while a host runs its tools. */
-	hosted?: boolean;
 	mine: boolean;
 	member: boolean;
 	/** Omitted by local/legacy callers; explicit peer policy controls administrative actions. */

@@ -21,7 +21,6 @@ import {
 	IconPin as Pin,
 	IconPinOff as PinSlash,
 	IconPlay as Play,
-	IconRadar as Radar,
 	IconRotate as Rebuild,
 	IconStop as Stop,
 	IconTrash as Trash,
@@ -66,7 +65,7 @@ type RowMenuProps = ActionProps & {
 	children: ReactNode;
 };
 
-const PLACES = { local: Hash, hosted: Radar, cloud: Cloud };
+const PLACES = { local: Hash, hosted: Cloud, cloud: Cloud };
 // "Cloud" and "cloud workspace" alone don't say what moves, so each item says where tools run.
 const HINTS = {
 	local: "Chat and tools run on this Mac",
