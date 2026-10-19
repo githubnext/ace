@@ -26,7 +26,7 @@ Read [the trust model](docs/architecture.md#the-team) before running or sharing 
 
 Install Ace or Ace Canary from [releases](https://github.com/githubnext/ace/releases), add a key in
 `Settings → Providers`, and join your team's directory in `Settings → This Mac`. Press Cmd+O to
-open a folder as a project, then start a channel from its dashboard.
+open a folder as a project, then start a new channel from its dashboard.
 
 From a checkout, with Bun 1.4 or later:
 
