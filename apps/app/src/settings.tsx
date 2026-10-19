@@ -341,6 +341,7 @@ export function Settings(
 	const { theme, set: setTheme } = useTheme();
 	const { folder, error: folderError } = useFolder();
 	const offline = status !== "open";
+	const current = useRef<HTMLButtonElement>(null);
 
 	function show(next: Section) {
 		setSection(next);
@@ -415,7 +416,10 @@ export function Settings(
 				if (!open) onClose();
 			}}
 		>
-			<DialogContent className="grid h-[min(40rem,var(--dialog-max))] w-[min(56rem,calc(100vw-2rem))] max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-none sm:grid-cols-[11.5rem_minmax(0,1fr)] sm:grid-rows-1">
+			<DialogContent
+				initialFocus={current}
+				className="grid h-[min(40rem,var(--dialog-max))] w-[min(56rem,calc(100vw-2rem))] max-w-none grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-none sm:grid-cols-[11.5rem_minmax(0,1fr)] sm:grid-rows-1"
+			>
 				<div className="flex min-w-0 flex-col gap-3 border-b border-border/60 bg-muted/40 p-3 sm:border-r sm:border-b-0">
 					<DialogTitle className="px-2 pt-1">Settings</DialogTitle>
 					<nav
@@ -434,9 +438,14 @@ export function Settings(
 										<li key={id} className="shrink-0">
 											<button
 												type="button"
+												ref={section === id ? current : undefined}
 												aria-current={section === id ? "page" : undefined}
-												onClick={() =>
-													show(id)}
+												// WebKit leaves focus where it was when a button is pressed, so the
+												// focus ring would stay on the section the dialog opened with.
+												onClick={(event) => {
+													event.currentTarget.focus();
+													show(id);
+												}}
 												className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-muted-foreground outline-none transition-colors duration-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 aria-[current=page]:bg-foreground/[0.07] aria-[current=page]:text-foreground motion-reduce:transition-none"
 											>
 												<Icon className="size-3.5 shrink-0" aria-hidden />
