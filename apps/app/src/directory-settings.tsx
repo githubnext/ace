@@ -7,7 +7,7 @@ import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
-const SETUP = "https://github.com/githubnext/ace#team-directory";
+const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
 
 const secrets = {
 	keychain: "Saved in Keychain",
