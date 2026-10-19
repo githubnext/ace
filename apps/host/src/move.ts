@@ -13,7 +13,7 @@ import type { ChannelInfo } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
 import { Connection, hostedAuth } from "./client";
-import { adoption, available, start } from "./compute";
+import { adoption, available, listed, start, type Unready, unready } from "./compute";
 import * as directory from "./directory";
 import { refusal } from "./http";
 import { KEYCHAIN_WAITING } from "./keys";
@@ -168,6 +168,12 @@ function stranded(error: unknown, where: string): Error {
 	});
 }
 
+function remains(record: catalog.Listing): string {
+	return record.hosted
+		? `The channel is still on ${new URL(record.hosted).host}.`
+		: "The channel is still on this Mac.";
+}
+
 /** Worker startup checks the fence after taking this lock, so holding it keeps storage still. */
 async function park(id: string): Promise<void> {
 	if (isWorkerAlive(id)) {
@@ -263,9 +269,7 @@ async function toCompute(
 	waiting: (text: string | null) => void,
 ): Promise<void> {
 	const { id, hosted: source } = record;
-	const where = source
-		? `The channel is still on ${new URL(source).host}.`
-		: "The channel is still on this Mac.";
+	const where = remains(record);
 	let digest = record.moving?.digest;
 	// A resumed move froze its source on the first attempt; thawing an active one is refused.
 	let freezing = !!digest;
@@ -359,6 +363,61 @@ async function toLocal(auth: Auth, record: catalog.Listing): Promise<void> {
 	catalog.unlock(id);
 }
 
+function request(lanes: Unready[]): string {
+	return [
+		"Ace is moving this channel to a cloud workspace. The workspace starts from a fresh clone, so it can only check out lanes whose branches are pushed to origin. These lanes aren't ready:",
+		"",
+		...lanes.map((lane) =>
+			`- ${lane.name}, branch ${lane.branch}, at ${lane.path}: ${lane.problem}`
+		),
+		"",
+		"For each lane, commit its work if it has uncommitted changes, leaving out dependencies and build output such as node_modules, then run `lane push` in its worktree so its branch reaches origin. Don't open a pull request, and don't remove any lane. The move continues once this run ends with every lane pushed.",
+	].join("\n");
+}
+
+/**
+ * The channel's agent usually did a lane's work, so it pushes unready lanes before a move to a
+ * cloud workspace, in a run people can watch. A lane without a branch has nothing to push, so
+ * the person removes it.
+ */
+async function push(
+	record: catalog.Listing,
+	waiting: (text: string | null) => void,
+): Promise<void> {
+	const lanes = await unready(record);
+	if (!lanes.length) return;
+	const orphans = lanes.filter((lane) => !lane.branch).map((lane) => lane.name);
+	if (orphans.length) {
+		throw new Error(
+			`These lanes have no branch to push, so remove them first: ${orphans.join(", ")}`,
+		);
+	}
+	const names = lanes.map((lane) => lane.name).join(", ");
+	const connection = await Connection.open(record.id);
+	let status: string;
+	try {
+		const ask = { op: "ask", author: catalog.user, text: request(lanes) } as const;
+		const { submission } = await connection.request<{ submission: number }>(ask);
+		waiting(`Waiting for the agent to push ${names}…`);
+		status = await connection.request<string>({ op: "wait", submission });
+	} finally {
+		connection.close();
+		waiting(null);
+	}
+	const left = await unready(catalog.read(record.id));
+	if (status !== "done") {
+		const unpushed = left.length ? `; these lanes still need pushing: ${listed(left)}` : "";
+		throw new Error(`The agent's run was stopped, so the move stopped${unpushed}`);
+	}
+	if (left.length) {
+		throw new Error(
+			`The agent's run ended without pushing every lane, so commit and push these or remove them: ${
+				listed(left)
+			}`,
+		);
+	}
+}
+
 /** The channel's record, if it can move to `to` now: "local", "compute", or a canonical service URL. */
 function ready(id: string, to: string): catalog.Listing {
 	const record = catalog.read(id);
@@ -373,21 +432,29 @@ function ready(id: string, to: string): catalog.Listing {
 
 /**
  * Move a channel to `target`: "local", "compute", or a hosting service URL. The frozen source is
- * kept, not deleted.
+ * kept, not deleted. `starting` wraps a move to a cloud workspace from its fence through the
+ * workspace's start, which the app waits out before it opens the chat again.
  */
 export async function move(
 	id: string,
 	target: string,
 	waiting: (text: string | null) => void = () => {},
+	starting: (run: () => Promise<void>) => Promise<void> = (run) => run(),
 ): Promise<void> {
 	const to = target === "local" || target === COMPUTE ? target : canonical(target);
-	ready(id, to);
+	const checked = ready(id, to);
+	// A resumed move is already fenced, so its lanes were ready before.
+	if (to === COMPUTE && !checked.moving) {
+		await push(checked, waiting).catch((error) => {
+			throw stranded(error, remains(checked));
+		});
+	}
 	const auth = await credentials(waiting);
 	// The record may have changed during the wait; nothing from here awaits before the fence.
 	const record = ready(id, to);
 	log("info", "move.start", { channel: id, from: record.hosted || "local", to });
 	if (to === "local") await toLocal(auth, record);
-	else if (to === COMPUTE) await toCompute(auth, record, waiting);
+	else if (to === COMPUTE) await starting(() => toCompute(auth, record, waiting));
 	else await toHosted(auth, record, to);
 	log("info", "move.done", { channel: id, to });
 }

@@ -55,6 +55,13 @@ export async function available(root: string): Promise<boolean> {
 
 type Lane = { path: string; branch: string; base?: string };
 
+/** A lane a cloud workspace can't check out yet, and why. */
+export type Unready = { name: string; path: string; branch?: string; problem: string };
+
+export function listed(lanes: Unready[]): string {
+	return lanes.map((lane) => `${lane.name} (${lane.problem})`).join(", ");
+}
+
 async function output(dir: string, args: string[]): Promise<string> {
 	const result = await git(dir, args);
 	if (result.status !== 0) {
@@ -64,7 +71,7 @@ async function output(dir: string, args: string[]): Promise<string> {
 }
 
 /** A cloud workspace starts from a fresh clone, so lanes travel only as pushed branches. */
-async function lanes(root: string, prefix: string): Promise<Lane[]> {
+async function lanes(root: string, prefix: string): Promise<{ ready: Lane[]; unready: Unready[] }> {
 	// Git lists real paths; the channel's records name lanes under its project path.
 	const trees = `${realpathSync(root)}/.lane/trees/${prefix}/`;
 	const found = (await output(root, ["worktree", "list", "--porcelain"])).split("\n\n").flatMap(
@@ -80,7 +87,7 @@ async function lanes(root: string, prefix: string): Promise<Lane[]> {
 			}];
 		},
 	);
-	if (!found.length) return [];
+	if (!found.length) return { ready: [], unready: [] };
 	const pushed = new Map(
 		(await output(root, ["ls-remote", "origin", `refs/heads/${prefix}/*`])).split("\n")
 			.filter(Boolean)
@@ -89,34 +96,34 @@ async function lanes(root: string, prefix: string): Promise<Lane[]> {
 				return [ref!.slice("refs/heads/".length), commit];
 			}),
 	);
-	const unready: string[] = [];
+	const unready: Unready[] = [];
 	const ready: Lane[] = [];
-	for (const lane of found) {
+	for (const { path, name, head, branch } of found) {
+		const blocked = (problem: string) =>
+			unready.push({ name, path, ...(branch ? { branch } : {}), problem });
+		if (!branch) {
+			blocked("no branch");
+			continue;
+		}
 		// lane clones the project's ignored files, such as node_modules, into worktrees whose branch may
 		// not ignore them, so untracked files can't block a move; they stay on this host.
-		const changed = lane.branch
-			? (await output(lane.path, ["diff", "--name-only", "HEAD"])).split("\n").filter(Boolean)
-			: [];
-		if (!lane.branch) unready.push(`${lane.name} (no branch)`);
-		else if (changed.length) {
+		const changed = (await output(path, ["diff", "--name-only", "HEAD"])).split("\n")
+			.filter(Boolean);
+		if (changed.length) {
 			const more = changed.length > 3 ? `, and ${changed.length - 3} more` : "";
-			unready.push(
-				`${lane.name} (uncommitted changes to ${changed.slice(0, 3).join(", ")}${more})`,
-			);
-		} else if (pushed.get(lane.branch) !== lane.head) unready.push(`${lane.name} (not pushed)`);
+			blocked(`uncommitted changes to ${changed.slice(0, 3).join(", ")}${more}`);
+		} else if (pushed.get(branch) !== head) blocked("not pushed");
 		else {
-			const base = (await git(root, ["config", "--get", `lane.${lane.branch}.base`])).stdout.trim();
-			ready.push({ path: lane.path, branch: lane.branch, ...(base ? { base } : {}) });
+			const base = (await git(root, ["config", "--get", `lane.${branch}.base`])).stdout.trim();
+			ready.push({ path, branch, ...(base ? { base } : {}) });
 		}
 	}
-	if (unready.length) {
-		throw new Error(
-			`The cloud workspace starts from a fresh clone, so commit and push these lanes first, or remove them: ${
-				unready.join(", ")
-			}.`,
-		);
-	}
-	return ready;
+	return { ready, unready };
+}
+
+/** The channel's lanes that must be committed and pushed before it moves to a cloud workspace. */
+export async function unready(record: catalog.Listing): Promise<Unready[]> {
+	return (await lanes(record.project, record.prefix)).unready;
 }
 
 /**
@@ -127,6 +134,14 @@ export async function adoption(record: catalog.Listing) {
 	const { url } = compute();
 	if (!url || !(await available(record.project))) {
 		throw new Error("Moving to a cloud workspace needs Cloud compute and a GitHub project.");
+	}
+	const { ready, unready } = await lanes(record.project, record.prefix);
+	if (unready.length) {
+		throw new Error(
+			`The cloud workspace starts from a fresh clone, so commit and push these lanes first, or remove them: ${
+				listed(unready)
+			}.`,
+		);
 	}
 	return {
 		url,
@@ -139,7 +154,7 @@ export async function adoption(record: catalog.Listing) {
 			named: record.named,
 			model: record.model,
 			project: record.project,
-			lanes: await lanes(record.project, record.prefix),
+			lanes: ready,
 		},
 	};
 }

@@ -569,10 +569,17 @@ the same move retries activation. Watches on the old placement end and clients r
 
 When Cloud compute is available for the project, a local channel's menu, or a hosted channel's
 whose workspace is this host, also offers Move to cloud workspace (`ace move <channel> --compute`).
-Its workspace starts from a fresh clone, so the host first refuses any of the channel's lanes that
-have uncommitted or unpushed work. It then imports the snapshot through the compute service's
-`import`, which stores the channel inactive with this host's project path and the lanes' branches,
-activates it, saves the record as a stopped `compute` channel, and starts it. A local channel's
+Its workspace starts from a fresh clone, so lanes travel only as pushed branches. When any lane has
+uncommitted or unpushed work, the host first asks the channel's agent, in its first chat as the
+owner, to commit each one and `lane push` it, without opening a pull request or removing lanes. The
+move's progress waits for that run while the chat stays open, then the host checks the lanes again.
+A stopped run or a lane still unready ends the move with the channel where it was, naming the lanes
+left. A lane with no branch has nothing to push, so the move refuses it for the person to remove,
+and a busy channel is refused before any of this. Only then does the host fence the channel, and
+the listing reports `computing` from the fence until the workspace starts. The host imports the
+snapshot through the compute service's `import`, which stores the channel inactive with this host's
+project path and the lanes' branches, activates it, saves the record as a stopped `compute`
+channel, and starts it. A local channel's
 snapshot comes from its parked store. A hosted channel's comes straight from its service, frozen and
 exported as in a move back, never through local storage; a failure before activation thaws it, and
 after activation the frozen object remains. The runner links that project path to its clone and

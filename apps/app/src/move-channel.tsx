@@ -14,7 +14,7 @@ const OUTCOMES = {
 	hosted:
 		"The channel becomes a hosted channel there, with this host as its workspace. It keeps its chats, messages, and lanes.",
 	cloud:
-		"Its tools then run in a container on the team's compute service, which starts from a fresh clone with the channel's pushed lanes; untracked files stay on this Mac. It keeps its chats and messages, and can't move back yet.",
+		"Its tools then run in a container on the team's compute service, which starts from a fresh clone with the channel's lanes. Its agent first pushes any lane with unpushed work; untracked files stay on this Mac. It keeps its chats and messages, and can't move back yet.",
 };
 
 type Props = {
