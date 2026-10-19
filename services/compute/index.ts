@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 import { validateName } from "@ace/channel";
 import type { ModelRef } from "@ace/channel/protocol";
+import type { Snapshot } from "@ace/channel/transfer";
 import { credential } from "@ace/directory/credential";
 import { authorized, refused } from "@ace/directory/scope";
 
@@ -24,7 +25,12 @@ type Settings = {
 	owner: { name: string; email: string };
 	size: Size;
 	started?: boolean;
+	/** A moved channel's project path on its old host, which its records still name. */
+	project?: string;
+	/** A moved channel's lanes, as pushed branches the workspace checks out at their old paths. */
+	lanes?: Lane[];
 };
+type Lane = { path: string; branch: string; base?: string };
 type Manifest = {
 	version: 1;
 	generation: string;
@@ -125,6 +131,8 @@ export class Compute extends DurableObject<Env> {
 			secret: await credential(this.env.ACE_SECRET!, this.env.TAILNET!),
 			gitToken: this.env.GITHUB_TOKEN,
 			owner: settings.owner,
+			project: settings.project,
+			lanes: settings.lanes,
 		});
 		if (thaw && this.ctx.storage.kv.get("frozen")) await this.#channel("thaw");
 	}
@@ -251,8 +259,12 @@ export class Compute extends DurableObject<Env> {
 		}
 		if (request.method !== "POST") return new Response("Use POST", { status: 405 });
 		const body = await request.json() as Record<string, unknown>;
-		if (action === "init") {
-			if (this.ctx.storage.kv.get("settings")) throw new Error("Pilot already initialized");
+		if (action === "init" || action === "import") {
+			const existing = this.ctx.storage.kv.get<Settings>("settings");
+			// An import whose answer was lost is retried; the channel refuses it once activated.
+			if (existing && (action === "init" || existing.started)) {
+				throw new Error("Pilot already initialized");
+			}
 			const repository = new URL(String(body.repository));
 			if (
 				repository.protocol !== "https:" || repository.hostname !== "github.com"
@@ -264,29 +276,38 @@ export class Compute extends DurableObject<Env> {
 			}
 			if (!author?.name || !author.email) throw new Error("Author name and email are required");
 			const name = validateName(String(body.name || id));
+			const project = action === "import" ? String(body.project) : "/workspace/project";
 			const settings: Settings = {
 				id,
 				repository: repository.href,
 				hosted: url.origin,
 				owner: author,
 				size: size(body.size || "standard-1"),
+				...(action === "import" ? { project, lanes: body.lanes as Lane[] } : {}),
+			};
+			const config = {
+				version: 2,
+				id,
+				name,
+				prefix: validateName(String(body.prefix || name)),
+				named: !!body.named,
+				owner: body.owner,
+				project,
+				lanes: "/workspace/lanes",
+				workspace: `compute:${id}`,
+				model: body.model as ModelRef | undefined,
 			};
 			const response = await this.env.CHANNEL.getByName(id).fetch(
-				`https://channel/channels/${id}`,
+				action === "import"
+					? `https://channel/channels/${id}/transfer`
+					: `https://channel/channels/${id}`,
 				{
 					method: "POST",
-					body: JSON.stringify({
-						version: 2,
-						id,
-						name,
-						prefix: validateName(String(body.prefix || name)),
-						named: !!body.named,
-						owner: body.owner,
-						project: "/workspace/project",
-						lanes: "/workspace/lanes",
-						workspace: `compute:${id}`,
-						model: body.model as ModelRef | undefined,
-					}),
+					body: JSON.stringify(
+						action === "import"
+							? { action, config, snapshot: body.snapshot as Snapshot }
+							: config,
+					),
 				},
 			);
 			if (!response.ok) throw new Error(await response.text());

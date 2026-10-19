@@ -12,13 +12,16 @@ import type { MoveTarget, SidebarRow } from "./session-item.types";
 import {
 	IconArchive as ArchiveContent2,
 	IconArchiveRestore as Unarchive,
+	IconCloud as Cloud,
 	IconExit as Leave,
 	IconFork as Fork,
+	IconHash as Hash,
 	IconInfo as Info,
 	IconPencil as Pencil,
 	IconPin as Pin,
 	IconPinOff as PinSlash,
 	IconPlay as Play,
+	IconRadar as Radar,
 	IconRotate as Rebuild,
 	IconStop as Stop,
 	IconTrash as Trash,
@@ -32,7 +35,6 @@ const MENU_ITEM =
 const MENU_ITEM_DESTRUCTIVE =
 	"text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/20";
 const MENU_ITEM_DESTRUCTIVE_FULL = `${MENU_ITEM} ${MENU_ITEM_DESTRUCTIVE}`;
-const MENU_LABEL = "px-2 py-1.5 text-xs text-muted-foreground";
 const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border/50";
 // The enlarged hit area spills into neighbouring rows, so only the hovered row's may catch presses.
 const ACTION_BUTTON = cn(
@@ -63,6 +65,8 @@ type RowMenuProps = ActionProps & {
 	onCompute?: (data: SidebarRow, action: "start" | "stop") => void;
 	children: ReactNode;
 };
+
+const PLACES = { local: Hash, hosted: Radar, cloud: Cloud };
 
 type Destinations =
 	| { state: "loading" }
@@ -161,9 +165,8 @@ function MoveSection(
 		<>
 			<ContextMenu.Separator className={MENU_SEPARATOR} />
 			<ContextMenu.Group>
-				<ContextMenu.GroupLabel className={MENU_LABEL}>Move to:</ContextMenu.GroupLabel>
 				{destinations.state === "loading" && (
-					<ContextMenu.Item className={MENU_ITEM} disabled>Loading…</ContextMenu.Item>
+					<ContextMenu.Item className={MENU_ITEM} disabled>Loading destinations…</ContextMenu.Item>
 				)}
 				{destinations.state === "error" && (
 					<ContextMenu.Item className={MENU_ITEM} disabled>
@@ -175,22 +178,26 @@ function MoveSection(
 						No available destinations
 					</ContextMenu.Item>
 				)}
-				{destinations.state === "ready" && destinations.targets.map((target) => (
-					<ContextMenu.Item
-						key={target.target}
-						className={MENU_ITEM}
-						disabled={Boolean(moving)}
-						onClick={(event) => {
-							stop(event);
-							onMove(target);
-						}}
-					>
-						<span className="min-w-0 flex-1 truncate">{target.label}</span>
-						{moving === target.target && (
-							<span className="shrink-0 text-muted-foreground">Moving…</span>
-						)}
-					</ContextMenu.Item>
-				))}
+				{destinations.state === "ready" && destinations.targets.map((target) => {
+					const Icon = PLACES[target.place];
+					return (
+						<ContextMenu.Item
+							key={target.target}
+							className={MENU_ITEM}
+							disabled={Boolean(moving)}
+							onClick={(event) => {
+								stop(event);
+								onMove(target);
+							}}
+						>
+							<Icon className="size-3.5" />
+							<span className="min-w-0 flex-1 truncate">Move to {target.label}</span>
+							{moving === target.target && (
+								<span className="shrink-0 text-muted-foreground">Moving…</span>
+							)}
+						</ContextMenu.Item>
+					);
+				})}
 			</ContextMenu.Group>
 			<ContextMenu.Separator className={MENU_SEPARATOR} />
 		</>

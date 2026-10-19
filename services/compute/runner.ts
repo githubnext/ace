@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { chmod, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -30,6 +30,9 @@ type Setup = {
 	secret: string;
 	gitToken?: string;
 	owner: { name: string; email: string };
+	/** A moved channel's project path on its old host, which its records still name. */
+	project?: string;
+	lanes?: { path: string; branch: string; base?: string }[];
 };
 
 const MAX_OUTPUT = 64 * 1024;
@@ -257,11 +260,56 @@ function validate(input: Setup): Setup {
 	if (repository.search || repository.hash) {
 		throw new Error("Repository URL cannot contain a query or fragment");
 	}
+	const project = input.project;
+	if (
+		project !== undefined
+		&& (project !== resolve(project) || project === "/" || project === WORKSPACE_ROOT
+			|| project.startsWith(`${WORKSPACE_ROOT}/`))
+	) {
+		throw new Error("Project must be an absolute path outside the workspace");
+	}
+	for (const lane of input.lanes || []) {
+		if (
+			!project || lane.path !== resolve(lane.path)
+			|| !lane.path.startsWith(`${project}/.lane/trees/`)
+		) {
+			throw new Error("Each lane must be in the project's .lane/trees");
+		}
+		if (!/^[\w.-]+(\/[\w.-]+)*$/.test(lane.branch) || (lane.base && /\s/.test(lane.base))) {
+			throw new Error(`Invalid lane branch ${lane.branch}`);
+		}
+	}
 	return {
 		...input,
 		repository: repository.href.replace(/\/$/, ""),
 		hosted: hosted.href.replace(/\/$/, ""),
 	};
+}
+
+/**
+ * A moved channel's records name its old host's paths, so the clone answers to that project path
+ * too. Lanes are added at their real paths, since checkpoints hold only the workspace and worktree
+ * metadata keeps absolute paths.
+ */
+async function adopt(project: string, lanes: NonNullable<Setup["lanes"]>): Promise<void> {
+	if (!existsSync(project)) {
+		await mkdir(dirname(project), { recursive: true });
+		await symlink(PROJECT_ROOT, project);
+	}
+	for (const lane of lanes) {
+		const path = PROJECT_ROOT + lane.path.slice(project.length);
+		if (existsSync(path)) continue;
+		const remote = `refs/remotes/origin/${lane.branch}`;
+		await run(["git", "fetch", "origin", `+refs/heads/${lane.branch}:${remote}`], PROJECT_ROOT);
+		await run(["git", "worktree", "add", "-B", lane.branch, path, remote], PROJECT_ROOT);
+		await run(
+			["git", "branch", `--set-upstream-to=origin/${lane.branch}`, lane.branch],
+			PROJECT_ROOT,
+		);
+		if (lane.base) {
+			await run(["git", "config", `lane.${lane.branch}.base`, lane.base], PROJECT_ROOT);
+		}
+	}
 }
 
 async function setup(input: Setup): Promise<void> {
@@ -279,6 +327,7 @@ async function setup(input: Setup): Promise<void> {
 	await run(["git", "config", "user.name", next.owner.name], PROJECT_ROOT);
 	await run(["git", "config", "user.email", next.owner.email], PROJECT_ROOT);
 	await run(["lane", "install", "hooks"], PROJECT_ROOT);
+	if (next.project) await adopt(next.project, next.lanes || []);
 	link = connect(next);
 }
 

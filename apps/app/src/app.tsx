@@ -134,6 +134,7 @@ function row(
 		lifecycle: channel.state === "archived" ? "archived" : "live",
 		private: false,
 		cloud: place.kind === "cloud",
+		hosted: place.kind === "hosted",
 		mine: channel.owner === user,
 		member: true,
 		capabilities: {
@@ -983,7 +984,7 @@ export function App() {
 				{moving && (
 					<MoveChannel
 						name={moving.item.name}
-						target={moving.target.target}
+						place={moving.target.place}
 						label={moving.target.label}
 						onMove={() => {
 							setMoving(undefined);

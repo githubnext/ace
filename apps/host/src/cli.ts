@@ -51,7 +51,8 @@ const HELP = `ace — channels on this host
   ace chat <channel> [--model <provider/id>]     open another chat
   ace stop <channel> [--chat <id>]               stop the chat's current run
   ace kill <channel>                             stop all work in the channel now
-  ace move <channel> --hosted <url> | --local    move an idle channel to a hosting service or back
+  ace move <channel> --hosted <url> | --local | --compute
+                                                move an idle channel to a hosting service, back, or to a cloud workspace
   ace share <channel> on|off                     let others invoke agents
   ace desktop <channel> on|off                   let the channel's agents use native desktop tools
   ace models
@@ -84,6 +85,7 @@ const { values: flags, positionals } = parseArgs({
 		model: { type: "string" },
 		hosted: { type: "string" },
 		local: { type: "boolean" },
+		compute: { type: "boolean" },
 		chat: { type: "string" },
 		port: { type: "string" },
 		all: { type: "boolean" },
@@ -479,10 +481,10 @@ async function main() {
 		case "kill":
 			return kill(record.id);
 		case "move": {
-			if (!!flags.hosted === !!flags.local) {
-				throw new Error("ace move <channel> --hosted <url> | --local");
+			if ([flags.hosted, flags.local, flags.compute].filter(Boolean).length !== 1) {
+				throw new Error("ace move <channel> --hosted <url> | --local | --compute");
 			}
-			await move(record.id, flags.local ? "local" : flags.hosted!);
+			await move(record.id, flags.local ? "local" : flags.compute ? "compute" : flags.hosted!);
 			const moved = catalog.read(record.id);
 			return console.log(
 				`${moved.name} now runs ${moved.hosted ? `at ${moved.hosted}` : "on this host"}`,

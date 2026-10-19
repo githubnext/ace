@@ -3,6 +3,8 @@
  * service (services/compute) instead of this host. Its record keeps `hosted`, so clients reach
  * the channel at the service's `/channels/:id` like any hosted channel.
  */
+import { realpathSync } from "node:fs";
+
 import type { ModelRef } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
@@ -43,6 +45,95 @@ async function author(root: string): Promise<{ name: string; email: string }> {
 		throw new Error("Set Git's user.name and user.email for this project to run it in the cloud.");
 	}
 	return { name, email };
+}
+
+/** Whether this host can move a channel in `root` to a cloud workspace. */
+export async function available(root: string): Promise<boolean> {
+	const { enabled, url } = compute();
+	return enabled && !!url && !!(await repoOf(root));
+}
+
+type Lane = { path: string; branch: string; base?: string };
+
+async function output(dir: string, args: string[]): Promise<string> {
+	const result = await git(dir, args);
+	if (result.status !== 0) {
+		throw new Error(`git ${args[0]} failed: ${result.stderr.trim() || `exit ${result.status}`}`);
+	}
+	return result.stdout.trim();
+}
+
+/** A cloud workspace starts from a fresh clone, so lanes travel only as pushed branches. */
+async function lanes(root: string, prefix: string): Promise<Lane[]> {
+	// Git lists real paths; the channel's records name lanes under its project path.
+	const trees = `${realpathSync(root)}/.lane/trees/${prefix}/`;
+	const found = (await output(root, ["worktree", "list", "--porcelain"])).split("\n\n").flatMap(
+		(block) => {
+			const path = /^worktree (.+)$/m.exec(block)?.[1];
+			if (!path?.startsWith(trees)) return [];
+			const name = path.slice(trees.length);
+			return [{
+				path: `${root}/.lane/trees/${prefix}/${name}`,
+				name,
+				head: /^HEAD (\w+)$/m.exec(block)?.[1],
+				branch: /^branch refs\/heads\/(.+)$/m.exec(block)?.[1],
+			}];
+		},
+	);
+	if (!found.length) return [];
+	const pushed = new Map(
+		(await output(root, ["ls-remote", "origin", `refs/heads/${prefix}/*`])).split("\n")
+			.filter(Boolean)
+			.map((line) => {
+				const [commit, ref] = line.split("\t");
+				return [ref!.slice("refs/heads/".length), commit];
+			}),
+	);
+	const unready: string[] = [];
+	const ready: Lane[] = [];
+	for (const lane of found) {
+		if (!lane.branch) unready.push(`${lane.name} (no branch)`);
+		else if (await output(lane.path, ["status", "--porcelain"])) {
+			unready.push(`${lane.name} (uncommitted changes)`);
+		} else if (pushed.get(lane.branch) !== lane.head) unready.push(`${lane.name} (not pushed)`);
+		else {
+			const base = (await git(root, ["config", "--get", `lane.${lane.branch}.base`])).stdout.trim();
+			ready.push({ path: lane.path, branch: lane.branch, ...(base ? { base } : {}) });
+		}
+	}
+	if (unready.length) {
+		throw new Error(
+			`The cloud workspace starts from a fresh clone, so commit and push these lanes first, or remove them: ${
+				unready.join(", ")
+			}.`,
+		);
+	}
+	return ready;
+}
+
+/**
+ * What the compute service needs to adopt a moved channel. The channel's records name paths on
+ * this host, so the workspace serves its clone at the same project path.
+ */
+export async function adoption(record: catalog.Listing) {
+	const { url } = compute();
+	if (!url || !(await available(record.project))) {
+		throw new Error("Moving to a cloud workspace needs Cloud compute and a GitHub project.");
+	}
+	return {
+		url,
+		body: {
+			repository: `https://github.com/${await repoOf(record.project)}.git`,
+			owner: record.owner,
+			author: await author(record.project),
+			name: record.name,
+			prefix: record.prefix,
+			named: record.named,
+			model: record.model,
+			project: record.project,
+			lanes: await lanes(record.project, record.prefix),
+		},
+	};
 }
 
 /** Creates the channel and its stopped workspace; `start` brings the workspace up. */
