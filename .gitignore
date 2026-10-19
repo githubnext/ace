@@ -10,5 +10,5 @@ artifacts/
 .dev.vars
 .wrangler/
 dist-web/
-apps/desktop/native/.build/
+apps/desktop/native/.build*/
 apps/desktop/native/.swiftpm/
