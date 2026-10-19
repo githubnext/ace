@@ -80,7 +80,6 @@ import {
 	PinOff,
 	Play,
 	Plus,
-	Radar,
 	RotateCw,
 	Rows2,
 	Search,
@@ -194,7 +193,6 @@ export const IconPointer = outline(MousePointer2);
 export const IconPullRequest = outline(GitPullRequest);
 export const IconPullRequestClosed = outline(GitPullRequestClosed);
 export const IconPush = outline(ArrowUpFromLine);
-export const IconRadar = outline(Radar);
 export const IconReact = outline(FaceSlightlySmilingPlus);
 export const IconRecord = outline(CircleDot);
 export const IconReview = outline(MessageSquareDiff);

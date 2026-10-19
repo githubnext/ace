@@ -576,7 +576,7 @@ async function handle(
 			return archived.length;
 		}
 		case "move-targets":
-			return catalog.owns(request.channel) ? targets(request.channel) : [];
+			return catalog.owns(request.channel) ? targets(request.channel, name) : [];
 		case "move": {
 			if (!catalog.owns(request.channel)) {
 				throw new Error("Move channels from the host that runs them");

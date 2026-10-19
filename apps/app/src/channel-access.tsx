@@ -44,14 +44,14 @@ function reach(channel: Listing): { agents: string; confirm: string; desktop: bo
 	};
 }
 
-/** The machine the channel's tools run on: its host's, or a container on the compute service. */
+/** Where the channel runs: a cloud for a hosted or compute channel, otherwise its host. */
 function Machine({ channel }: { channel: Listing }) {
 	const place = placement(channel);
 	const [Icon, name, detail] = place.kind === "cloud"
 		? [IconCloud, "Cloud", `Tools run in a container on ${place.service}.`]
 		: place.kind === "hosted"
 		? [
-			IconLaptop,
+			IconCloud,
 			place.workspace,
 			`Hosted on ${place.service}. Tools run on ${place.workspace}.`,
 		]
@@ -60,7 +60,7 @@ function Machine({ channel }: { channel: Listing }) {
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<span className="mr-1 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground" />
+					<span className="mr-3 inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground" />
 				}
 			>
 				<Icon className="size-3.5 shrink-0" aria-hidden />

@@ -237,7 +237,7 @@ function Add({ onAdd }: { onAdd: (choice: Choice) => void }) {
 						variant="ghost"
 						size="icon-sm"
 						aria-label="New tab"
-						className="mx-0.5 shrink-0 text-muted-foreground electrobun-webkit-app-region-no-drag"
+						className="mr-2 ml-0.5 shrink-0 text-muted-foreground electrobun-webkit-app-region-no-drag"
 					/>
 				}
 			>
