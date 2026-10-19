@@ -666,6 +666,19 @@ channels, and only people with direct access change them. Existing projects beco
 upgrade. The host that runs a channel names each caller with `tailscale whois` and refuses
 callers without access, and each host shows its owner only the projects the owner can access.
 
+`apps/host/src/access.ts` decides access. A host's owner always reaches its own channels, from any
+of their machines. GitHub access is checked with the deciding host's `gh` account and kept for five
+minutes: a public repository is open to everyone, its own account reads the repository, and
+anyone else needs a collaborator permission other than `none`. GitHub shows those only to
+accounts that can push, so a host whose owner can only read a private repository cannot confirm
+teammates' access and they need a share. A check GitHub could not answer refuses access for a
+minute. The directory keeps shares in its `shares` table; `GET /` returns them and
+`POST /shares` adds or removes one. Hosts check direct access before writing, then tell every
+reachable peer (`shares-changed`) to read the directory again, since a lobby can't reach someone
+who just got access. After each directory read, a host whose shares changed resends each peer
+the channels its person can access and ends their watches on channels they no longer can. Each
+peer's listing is filtered for its person, and is resent when a peer's GitHub login arrives late.
+
 **Known limitation: project access is cooperative.** It holds between hosts running unmodified
 Ace, not against a teammate who tampers with theirs. The team services accept one credential
 derived from `ACE_SECRET`, which every host holds, so anyone with that secret can read every

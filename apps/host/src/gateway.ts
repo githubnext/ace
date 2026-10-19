@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import type { Server, ServerWebSocket } from "bun";
 
+import * as access from "./access";
 import * as auth from "./auth";
 import * as catalog from "./catalog";
 import { Connection } from "./client";
@@ -162,9 +163,55 @@ function everyone(own: Listing[]): Listing[] {
 	return [...reachable, ...listed(new Set(reachable.map((value) => value.id)))];
 }
 
+/** A peer's person sees this host's channels in projects they can access; the owner sees all. */
+async function allowed(user: string, own: Listing[]): Promise<Listing[]> {
+	if (user === catalog.user) return own;
+	const checks = await Promise.all(
+		own.map((value) => access.canAccess(user, channelProject(value))),
+	);
+	return own.filter((_, index) => checks[index]);
+}
+
 async function listings(client: Client, own?: Listing[]): Promise<Listing[]> {
 	own ||= await local();
-	return client.peer ? own : everyone(own);
+	return client.peer ? allowed(client.user, own) : everyone(own);
+}
+
+async function projectOfChannel(channel: string): Promise<string> {
+	const { root, repo } = await projects.checkout(catalog.read(channel).project);
+	return projectId(name, root, repo);
+}
+
+async function mayOpen(client: Client, channel: string): Promise<boolean> {
+	return !client.peer || client.user === catalog.user
+		|| access.canAccess(client.user, await projectOfChannel(channel));
+}
+
+let shares = "";
+
+/**
+ * After a directory read: when shares changed, peers' listings follow and watches on projects their
+ * person can no longer access end, as a closed channel's do.
+ */
+function sharesChanged(): Promise<void> {
+	const current = JSON.stringify(directory.read().shares);
+	if (current === shares) return ownersChanged();
+	shares = current;
+	return queue(async () => {
+		await revoke();
+		await deliver(await local());
+	});
+}
+
+async function revoke(): Promise<void> {
+	for (const socket of sockets) {
+		for (const [channel, open] of socket.data.channels) {
+			if (!catalog.owns(channel) || await mayOpen(socket.data, channel)) continue;
+			socket.data.channels.delete(channel);
+			log("info", "gateway.access.revoked", { user: socket.data.user, channel });
+			void open.then((connection) => connection.close(), () => {});
+		}
+	}
 }
 
 const sockets = new Set<ServerWebSocket<Client>>();
@@ -185,12 +232,25 @@ function queue(send: () => Promise<void>): Promise<void> {
  * two hosts relaying each other's frames would loop forever, starving both event loops.
  */
 function broadcast(): Promise<void> {
-	return queue(async () => {
-		const own = await local();
-		const frame = JSON.stringify({ channels: own } satisfies HostFrame);
-		for (const socket of sockets) if (socket.data.peer) socket.send(frame);
-		await owners(own);
-	});
+	return queue(async () => deliver(await local()));
+}
+
+/** Each peer's person gets the channels they can access, worked out once per person. */
+async function deliver(own: Listing[]): Promise<void> {
+	const frames = new Map<string, Promise<string>>();
+	for (const socket of sockets) {
+		if (!socket.data.peer) continue;
+		const { user } = socket.data;
+		let frame = frames.get(user);
+		if (!frame) {
+			frame = allowed(user, own).then((channels) =>
+				JSON.stringify({ channels } satisfies HostFrame)
+			);
+			frames.set(user, frame);
+		}
+		socket.send(await frame);
+	}
+	await owners(own);
 }
 
 function ownersChanged(): Promise<void> {
@@ -227,6 +287,8 @@ function peopleChanged(): void {
 	if (frame === sent) return;
 	sent = frame;
 	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
+	// Peers' GitHub logins decide which of this host's channels they see, and can arrive late.
+	void broadcast();
 }
 
 function loginChanged(): void {
@@ -350,6 +412,8 @@ const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
 const keychainOps = new Set<HostRequest["op"]>(["key-store", "key-forget", "directory-set"]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
+	"project-access",
+	"project-share",
 	"project-open",
 	"project-init",
 	"project-clone",
@@ -468,6 +532,14 @@ async function handle(
 			return;
 		case "hello":
 			return { user: client.user, host: name, github: github.login(loginChanged) };
+		case "project-access":
+			return access.describe(request.project);
+		case "project-share":
+			await access.share(request.project, request.person, request.shared);
+			peers.sharesChanged();
+			return sharesChanged();
+		case "shares-changed":
+			return directory.refresh();
 		case "channels":
 			return listings(client);
 		case "projects":
@@ -506,7 +578,12 @@ async function handle(
 					.some(({ root }) => root === request.project)
 				: (await projects.list()).some((project) => project.path === request.project);
 			if (!known) throw new Error("Open this project in Ace first");
-			return github.project(request.project);
+			const repo = await github.project(request.project);
+			const id = projectId(name, request.project, repo || undefined);
+			if (client.peer && client.user !== catalog.user && !await access.canAccess(client.user, id)) {
+				throw new Error("You don't have access to this project");
+			}
+			return repo;
 		}
 		case "github-list":
 			return github.list(request);
@@ -655,6 +732,9 @@ async function handle(
 				}
 				: undefined;
 			if (catalog.owns(request.channel)) {
+				if (!await mayOpen(client, request.channel)) {
+					throw new Error("You don't have access to this channel's project");
+				}
 				if (request.request.op === "kill") {
 					if (client.user !== catalog.user) throw new Error("Only the channel's owner can kill it");
 					terminals.closeChannel(request.channel);
@@ -962,12 +1042,15 @@ export async function serve(port: number, loopback = false): Promise<never> {
 	}
 	const machine = loopback ? undefined : await self();
 	if (closing) return new Promise(() => {});
-	if (machine) name = machine.name;
+	if (machine) {
+		name = machine.name;
+		access.identify(name);
+	}
 	const address = machine ? { address: machine.address } : {};
 	const publish = loopback ? undefined : directory.watch({
 		self: () => ({ name, login: catalog.user, github: github.login(loginChanged), ...address }),
 		channels: local,
-		changed: () => void ownersChanged(),
+		changed: () => void sharesChanged(),
 		published: (before, after) => before && lobby.published(before, after),
 		covered: lobby.isCovered,
 	});

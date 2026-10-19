@@ -65,3 +65,15 @@ export type LobbyDown<Listing = unknown> =
 /** Sent as text; the lobby answers `pong` without waking. */
 export const PING = "ping";
 export const PONG = "pong";
+
+/**
+ * Access to a whole project, every host's channels in it, for one person by Tailscale login or
+ * for the team (`*`). The directory stores what hosts send; hosts decide who may share.
+ */
+export type Share = {
+	project: string;
+	person: string;
+	/** Who shared it, by Tailscale login. */
+	by: string;
+	at: number;
+};

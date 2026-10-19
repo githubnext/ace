@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import type { Lobby } from "./lobby";
+import type { Share } from "./protocol";
 import { authorized, refused } from "./scope";
 
 export { Lobby } from "./lobby";
@@ -35,6 +36,28 @@ export type Publication = {
 export type Host = Omit<Publication, "channels"> & { name: string; seen: number };
 
 /**
+ * Applied in order and counted in the `version` key, since Durable Object SQLite refuses
+ * `PRAGMA user_version`. Never edit one that has shipped. The first predates the key, so it must
+ * stay idempotent for directories created before it.
+ */
+const MIGRATIONS = [
+	`CREATE TABLE IF NOT EXISTS hosts (name TEXT PRIMARY KEY, host TEXT NOT NULL);
+	CREATE TABLE IF NOT EXISTS channels (
+		id TEXT PRIMARY KEY,
+		host TEXT NOT NULL,
+		listing TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS channels_host ON channels (host);`,
+	`CREATE TABLE shares (
+		project TEXT NOT NULL,
+		person TEXT NOT NULL,
+		shared_by TEXT NOT NULL,
+		at INTEGER NOT NULL,
+		PRIMARY KEY (project, person)
+	);`,
+];
+
+/**
  * The team's list of hosts and where each channel lives. It answers lookups; channel traffic never
  * passes through it. Each publication replaces the host's whole channel set, so a removed channel
  * disappears on the host's next publish.
@@ -42,15 +65,12 @@ export type Host = Omit<Publication, "channels"> & { name: string; seen: number 
 export class Directory extends DurableObject<Env> {
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
-		ctx.storage.sql.exec(`
-			CREATE TABLE IF NOT EXISTS hosts (name TEXT PRIMARY KEY, host TEXT NOT NULL);
-			CREATE TABLE IF NOT EXISTS channels (
-				id TEXT PRIMARY KEY,
-				host TEXT NOT NULL,
-				listing TEXT NOT NULL
-			);
-			CREATE INDEX IF NOT EXISTS channels_host ON channels (host);
-		`);
+		const version = ctx.storage.kv.get<number>("version") || 0;
+		if (version >= MIGRATIONS.length) return;
+		ctx.storage.transactionSync(() => {
+			for (const migration of MIGRATIONS.slice(version)) ctx.storage.sql.exec(migration);
+			ctx.storage.kv.put("version", MIGRATIONS.length);
+		});
 	}
 
 	publish(name: string, publication: Publication): void {
@@ -78,7 +98,7 @@ export class Directory extends DurableObject<Env> {
 		});
 	}
 
-	read(): { hosts: Host[]; channels: unknown[] } {
+	read(): { hosts: Host[]; channels: unknown[]; shares: Share[] } {
 		const sql = this.ctx.storage.sql;
 		return {
 			hosts: sql.exec<{ host: string }>("SELECT host FROM hosts").toArray().map((row) =>
@@ -87,7 +107,24 @@ export class Directory extends DurableObject<Env> {
 			channels: sql.exec<{ listing: string }>("SELECT listing FROM channels").toArray().map((
 				row,
 			) => JSON.parse(row.listing)),
+			shares: sql.exec<Share>('SELECT project, person, shared_by AS "by", at FROM shares')
+				.toArray(),
 		};
+	}
+
+	share(share: Share, shared: boolean): void {
+		const sql = this.ctx.storage.sql;
+		if (shared) {
+			sql.exec(
+				"INSERT OR REPLACE INTO shares VALUES (?, ?, ?, ?)",
+				share.project,
+				share.person,
+				share.by,
+				share.at,
+			);
+		} else {
+			sql.exec("DELETE FROM shares WHERE project = ? AND person = ?", share.project, share.person);
+		}
 	}
 }
 
@@ -114,10 +151,11 @@ export default {
 		}
 		const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName("team"));
 		if (pathname === "/" && request.method === "GET") {
-			const { hosts, channels } = await directory.read();
+			const { hosts, channels, shares } = await directory.read();
 			return Response.json({
 				hosts,
 				channels,
+				shares,
 				app: env.APP,
 				hosted: env.HOSTED,
 				compute: env.COMPUTE,
@@ -133,6 +171,17 @@ export default {
 				return new Response("Invalid publication", { status: 400 });
 			}
 			await directory.publish(host[1], publication);
+			return new Response(null, { status: 204 });
+		}
+		if (pathname === "/shares" && request.method === "POST") {
+			const { shared, ...share } = await request.json<Share & { shared: boolean }>();
+			if (
+				typeof share.project !== "string" || typeof share.person !== "string"
+				|| typeof share.by !== "string" || typeof shared !== "boolean"
+			) {
+				return new Response("Invalid share", { status: 400 });
+			}
+			await directory.share({ ...share, at: Date.now() }, shared);
 			return new Response(null, { status: 204 });
 		}
 		return new Response("Not found", { status: 404 });

@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Lifecycle } from "@ace/directory/protocol";
+import type { Lifecycle, Share } from "@ace/directory/protocol";
 
 import * as catalog from "./catalog";
 import { hostedAuth, rejection, serviceAuth } from "./client";
@@ -31,18 +31,19 @@ export function url(): string | undefined {
 type Known = {
 	hosts: Host[];
 	channels: Listing[];
+	shares: Share[];
 	app?: string;
 	hosted?: string;
 	compute?: string;
 };
 
-let known: Known = { hosts: [], channels: [] };
+let known: Known = { hosts: [], channels: [], shares: [] };
 let synced: number | undefined;
 /** The last sync's failure, kept until a sync succeeds so Settings can say what is wrong and since when. */
 let error: string | undefined;
 let failed: number | undefined;
 /** The running host's watch, so a change made through it takes effect without waiting for a heartbeat. */
-let active: { sync(): Promise<void>; changed(): void } | undefined;
+let active: { sync(): Promise<void>; again(): Promise<void>; changed(): void } | undefined;
 
 /** A directory base URL without a trailing slash. */
 export function canonical(value: string): string {
@@ -62,7 +63,7 @@ export function canonical(value: string): string {
 export function configure(value: string | undefined): Promise<void> | undefined {
 	if (value) writeFileSync(config, JSON.stringify({ url: canonical(value) }));
 	else rmSync(config, { force: true });
-	known = { hosts: [], channels: [] };
+	known = { hosts: [], channels: [], shares: [] };
 	synced = undefined;
 	error = undefined;
 	failed = undefined;
@@ -103,6 +104,11 @@ export function sync(): Promise<void> {
 	return active?.sync() ?? Promise.resolve();
 }
 
+/** Read the directory again even if a sync is under way, which may have read it before a change. */
+export function refresh(): Promise<void> {
+	return active?.again() ?? Promise.resolve();
+}
+
 /** The directory's last answer; empty until it first responds or without a directory. */
 export function read() {
 	return known;
@@ -120,6 +126,17 @@ function patch(channels: Listing[], event: Lifecycle<Listing>): Listing[] {
 export function apply(event: Lifecycle<Listing>) {
 	reading?.push(event);
 	known = { ...known, channels: patch(known.channels, event) };
+}
+
+/** Shares are the directory's to keep, so a change waits for it and the next sync reads it back. */
+export async function share(share: Omit<Share, "at">, shared: boolean): Promise<void> {
+	const base = url();
+	if (!base) throw new Error("Join a team directory to share projects.");
+	await call(base, "/shares", AbortSignal.timeout(10_000), {
+		method: "POST",
+		body: JSON.stringify({ ...share, shared }),
+	});
+	await refresh();
 }
 
 async function call(
@@ -183,6 +200,8 @@ export function watch({ self, channels, changed, published, covered }: Options) 
 			// The directory changed while this sync was under way; its answer belongs to the old one.
 			if (url() !== base) return;
 			for (const event of reading) answer.channels = patch(answer.channels, event);
+			// Directories deployed before project access keep no shares.
+			answer.shares ||= [];
 			known = answer;
 			synced = Date.now();
 			error = undefined;
@@ -221,7 +240,7 @@ export function watch({ self, channels, changed, published, covered }: Options) 
 		if (!running || running.base !== url()) return join();
 		return running.again ??= running.done.then(join);
 	};
-	active = { sync: join, changed };
+	active = { sync: join, again: sync, changed };
 	void join();
 	const interval = setInterval(() => {
 		// A failed publish keeps retrying every heartbeat; lobbies only carry what was published.
