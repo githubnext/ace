@@ -5,8 +5,7 @@ import { Facepile } from "../facepile/facepile";
 import { cn } from "../../lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 
-import { RowMenu, SessionActions } from "./session-item-actions";
-import { hasVisibleActions } from "./actions";
+import { RowMenu } from "./session-item-actions";
 import { RowGlyph } from "./session-item-glyph";
 import type { MoveTarget, SidebarRow } from "./session-item.types";
 import {
@@ -23,11 +22,6 @@ const EXPANDED_CONTENT_PADDING_BOTTOM =
 	"data-[open=true]:pb-(--session-item-expanded-padding-bottom)";
 const TITLE_TO_EXPANDED_CONTENT_GAP = "data-[open=true]:mt-(--session-item-title-to-content-gap)";
 const EXPANDED_CONTENT_ROW_GAP = "gap-y-1";
-// The facepile and the actions sit side by side so pointing at a face never reaches pin, and
-// neither moves on hover. The 8px gap equals the spill of the pin's 40px hit area around its 24px
-// button, so that hit area ends at the facepile's edge; the facepile also stacks above it.
-const TRAILING =
-	"pointer-events-none absolute top-1/2 right-1 z-20 inline-flex -translate-y-1/2 items-center gap-2 *:pointer-events-auto";
 
 export type SessionItemProps = ComponentPropsWithRef<"button"> & {
 	data: SidebarRow;
@@ -72,6 +66,9 @@ export function Presence({ members }: { members: SidebarRow["online"] }) {
 				render={
 					<span
 						aria-label={`Here: ${visible.map((member) => member.alt).join(", ")}`}
+						// The facepile sits inside the row's button; an empty title keeps the row's summary
+						// tooltip from covering this one.
+						title=""
 						className="shrink-0 rounded-full"
 					/>
 				}
@@ -232,12 +229,7 @@ function expandedBody(data: SidebarRow, content: SessionItemProps["expandedConte
 	return typeof content === "function" ? content(data) : content ?? defaultExpandedContent(data);
 }
 
-function buttonClass(
-	hoverExpand: boolean | undefined,
-	hasActions: boolean,
-	online: number,
-	className?: string,
-) {
+function buttonClass(hoverExpand: boolean | undefined, className?: string) {
 	return cn(
 		"relative flex h-[calc(var(--spacing)*8-2px)] w-full px-1 text-left",
 		hoverExpand ? "flex-col items-stretch justify-center gap-0" : "items-center gap-1.5",
@@ -247,14 +239,9 @@ function buttonClass(
 		"data-[status=active]:selected-surface",
 		"data-[status=active]:text-accent-text data-[status=active]:font-medium",
 		hoverExpand
-			? "transition-[background-color,filter,padding-right] duration-150 ease-out motion-reduce:transition-none data-[expanded=true]:rounded-b-none data-[expanded=true]:bg-popover data-[expanded=true]:hover:bg-popover"
-			: "transition-[padding-right] duration-150 ease-out motion-reduce:transition-none",
+			&& "transition-[background-color,filter] duration-150 ease-out motion-reduce:transition-none data-[expanded=true]:rounded-b-none data-[expanded=true]:bg-popover data-[expanded=true]:hover:bg-popover",
 		"group-data-[primary=true]/menu:active:translate-y-px group-data-[primary=true]/menu:active:brightness-95",
 		"outline-2 outline-offset-0 outline-transparent focus-visible:outline-ring/50",
-		hasActions
-			&& online === 0
-			&& "group-hover/row:pr-13 group-focus-within/row:pr-13 group-data-[menu-open=true]/menu:pr-13",
-		online > 0 && (hasActions ? "pr-24" : "pr-17"),
 		className,
 	);
 }
@@ -290,7 +277,7 @@ export function SessionItem(
 		...props
 	}: SessionItemProps,
 ) {
-	let { onPin: actionPin, onUnpin: actionUnpin, ...menu } = actions(data, {
+	let menu = actions(data, {
 		onPin,
 		onUnpin,
 		onFork,
@@ -304,7 +291,6 @@ export function SessionItem(
 		onMove,
 		onCompute,
 	});
-	let hasActions = hasVisibleActions({ pinned, onPin: actionPin, onUnpin: actionUnpin });
 	let [hovered, setHovered] = useState(false);
 	let timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	let content = hoverExpand ? expandedBody(data, expandedContent) : null;
@@ -320,7 +306,8 @@ export function SessionItem(
 			<span className="@container grid size-6 place-items-center shrink-0 text-muted-foreground group-data-[status=active]/row:text-current/80 [&_svg]:size-4.5 [&_svg]:shrink-0">
 				<RowGlyph data={data} selected={selected} />
 			</span>
-			<span className="min-w-0 flex-1 truncate">{data.name}</span>
+			<span className="min-w-0 truncate">{data.name}</span>
+			<Presence members={data.online} />
 		</>
 	);
 
@@ -342,13 +329,7 @@ export function SessionItem(
 	}, []);
 
 	return (
-		<RowMenu
-			data={data}
-			pinned={pinned}
-			onPin={actionPin}
-			onUnpin={actionUnpin}
-			{...menu}
-		>
+		<RowMenu data={data} pinned={pinned} {...menu}>
 			<div
 				data-status={status}
 				data-lifecycle={data.lifecycle}
@@ -383,7 +364,7 @@ export function SessionItem(
 					title={preview}
 					onMouseEnter={enter}
 					onMouseLeave={leave}
-					className={buttonClass(hoverExpand, hasActions, data.online.length, className)}
+					className={buttonClass(hoverExpand, className)}
 					{...props}
 				>
 					{hoverExpand
@@ -411,19 +392,6 @@ export function SessionItem(
 						)
 						: line}
 				</button>
-				<span className={TRAILING}>
-					{data.online.length > 0 && (
-						<span className="relative z-1 inline-flex">
-							<Presence members={data.online} />
-						</span>
-					)}
-					<SessionActions
-						data={data}
-						pinned={pinned}
-						onPin={actionPin}
-						onUnpin={actionUnpin}
-					/>
-				</span>
 			</div>
 		</RowMenu>
 	);

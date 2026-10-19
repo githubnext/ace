@@ -1,12 +1,9 @@
-import { type ActionProps, canTogglePin, hasVisibleActions } from "./actions";
+import { type ActionProps, canTogglePin } from "./actions";
 import type { MouseEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
 
-import { hitArea } from "../../lib/hit-area";
-import { cn } from "../../lib/utils";
 import { motion } from "../../ui/popup";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 
 import type { MoveTarget, SidebarRow } from "./session-item.types";
 import {
@@ -35,20 +32,6 @@ const MENU_ITEM_DESTRUCTIVE =
 	"text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/20";
 const MENU_ITEM_DESTRUCTIVE_FULL = `${MENU_ITEM} ${MENU_ITEM_DESTRUCTIVE}`;
 const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border/50";
-// The enlarged hit area spills into neighbouring rows, so only the hovered row's may catch presses.
-const ACTION_BUTTON = cn(
-	hitArea,
-	"before:pointer-events-none group-hover/row:before:pointer-events-auto",
-	"grid size-6 place-items-center rounded-md squircle text-muted-foreground outline-2 outline-offset-[-1px] outline-transparent transition-[background-color,color,transform] duration-150 ease-out hover:bg-background/70 hover:text-foreground group-data-[primary=true]/menu:active:translate-y-px focus-visible:outline-ring/50",
-);
-// Hit-testing must not wait for :hover. A press that arrives before hover styles apply lands on the
-// row, its release lands on the button, and the click then reaches neither.
-const SESSION_ACTIONS =
-	"inline-flex items-center gap-0 -space-x-0.5 opacity-0 transition-opacity duration-150 ease-out motion-reduce:transition-none group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-[menu-open=true]/menu:opacity-100";
-
-type SessionActionsProps = ActionProps & {
-	data: SidebarRow;
-};
 
 type RowMenuProps = ActionProps & {
 	data: SidebarRow;
@@ -80,83 +63,6 @@ type Destinations =
 
 function stop(event: MouseEvent<HTMLElement>) {
 	event.stopPropagation();
-}
-
-function ActionButton(
-	{
-		label,
-		children,
-		onClick,
-	}: {
-		label: string;
-		children: ReactNode;
-		onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
-	},
-) {
-	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={
-					<button
-						type="button"
-						aria-label={label}
-						className={ACTION_BUTTON}
-						onClick={onClick}
-					/>
-				}
-			>
-				{children}
-			</TooltipTrigger>
-			<TooltipContent side="right" sideOffset={8}>
-				{label}
-			</TooltipContent>
-		</Tooltip>
-	);
-}
-
-export function SessionActions(
-	{
-		data,
-		pinned,
-		onPin,
-		onUnpin,
-		onArchive,
-	}: SessionActionsProps,
-) {
-	let canPin = canTogglePin({ pinned, onPin, onUnpin, onArchive });
-	if (!hasVisibleActions({ pinned, onPin, onUnpin, onArchive })) return null;
-
-	function pin(event: MouseEvent<HTMLButtonElement>) {
-		stop(event);
-		if (pinned) onUnpin?.(data);
-		else onPin?.(data);
-	}
-
-	function archive(event: MouseEvent<HTMLElement>) {
-		stop(event);
-		onArchive?.(data);
-	}
-
-	return (
-		<span className={SESSION_ACTIONS}>
-			{canPin && (
-				<ActionButton label={pinned ? "Unpin channel" : "Pin channel"} onClick={pin}>
-					{pinned ? <PinSlash className="size-3.5" /> : <Pin className="size-3.5" />}
-				</ActionButton>
-			)}
-			{onArchive && (data.lifecycle === "archived"
-				? (
-					<ActionButton label="Unarchive channel" onClick={archive}>
-						<Unarchive className="size-3.5" />
-					</ActionButton>
-				)
-				: (
-					<ActionButton label="Archive channel" onClick={archive}>
-						<ArchiveContent2 className="size-3.5" />
-					</ActionButton>
-				))}
-		</span>
-	);
 }
 
 function MoveSection(
