@@ -142,3 +142,13 @@ export function find(channel: string): Machine | undefined {
 export function machine(name: string): Machine | undefined {
 	return hosts.get(name)?.machine;
 }
+
+/**
+ * Peers read shares from the directory, which a lobby can't announce to someone just given
+ * access, so the host that changed them tells every reachable peer to read it again.
+ */
+export function sharesChanged(): void {
+	for (const { client } of hosts.values()) {
+		if (client.status === "open") client.request({ op: "shares-changed" }).catch(() => {});
+	}
+}

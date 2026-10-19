@@ -8,7 +8,12 @@ import type {
 	Request,
 	RunEnd,
 } from "@ace/channel/protocol";
-import type { Presence } from "@ace/directory/protocol";
+import type { Presence, Share } from "@ace/directory/protocol";
+
+export type { Share };
+
+/** A share's `person` when it gives the whole team access. */
+export const TEAM = "*";
 
 export const HOST_PROTOCOL = 10;
 
@@ -174,6 +179,20 @@ export type TabRename = {
 };
 export type TabResult = { ok: true; value: WindowState } | { ok: false; error: string };
 
+/**
+ * Someone on the team who can see a project: through GitHub read access or their own folder, which
+ * lets them share it, or through a share with the team or with them.
+ */
+export type Person = {
+	/** Tailscale login. */
+	person: string;
+	github?: string;
+	via: "github" | "folder" | "team" | "share";
+};
+
+/** `direct` is whether this host's owner can share and unshare the project. */
+export type ProjectAccess = { direct: boolean; shares: Share[]; people: Person[] };
+
 /** A folder opened on this host, independent of its channels and provider setup. */
 export type Project = {
 	/** The repository's main checkout, or the folder itself outside Git. */
@@ -233,6 +252,15 @@ export type HostRequest =
 	 * expands `~`.
 	 */
 	| { op: "project-clone"; repo: string; path: string }
+	/** Who can see a project by its ID, and whether this host's owner can share it. */
+	| { op: "project-access"; project: string }
+	/**
+	 * Share a project with a person by Tailscale login, or with the team as `TEAM`, or unshare it.
+	 * Only someone with direct access can, and peers hear at once so their listings follow.
+	 */
+	| { op: "project-share"; project: string; person: string; shared: boolean }
+	/** From a peer whose owner changed shares: read the directory again. */
+	| { op: "shares-changed" }
 	/** Resolve a known project's GitHub remote on the machine that holds its checkout. */
 	| { op: "project-repo"; project: string; host?: string }
 	/** GitHub reads use the local owner's GitHub CLI credentials, never a peer's account. */

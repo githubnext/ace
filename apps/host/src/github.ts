@@ -74,6 +74,37 @@ export function repository(value: string): string {
 	return value;
 }
 
+/** GitHub hides what this host's account can't read, and collaborator permissions from readers. */
+const MISSING = /HTTP 404|Not Found/;
+const PUSH = /HTTP 403/;
+
+/**
+ * Whether `login` can read `repo`, as this host's gh account sees it: a public repository is
+ * readable by everyone, even without a known login, this host's own account by reading it, and anyone else through their
+ * collaborator permission, which GitHub shows only to accounts that can push; without push, others
+ * can't be confirmed and get false. Throws when GitHub can't answer, so callers decide how long to
+ * trust that.
+ */
+export async function readable(repo: string, login?: string): Promise<boolean> {
+	const path = `repos/${repository(repo)}`;
+	const found = await gh<{ private: boolean }>(["api", path]).catch((error: Error) => {
+		if (MISSING.test(error.message)) return undefined;
+		throw error;
+	});
+	if (!found) return false;
+	if (!found.private) return true;
+	if (!login || !/^[A-Za-z0-9-]{1,39}$/.test(login)) return false;
+	if (login.toLowerCase() === owner?.toLowerCase()) return true;
+	const { permission } = await gh<{ permission: string }>([
+		"api",
+		`${path}/collaborators/${login}/permission`,
+	]).catch((error: Error) => {
+		if (MISSING.test(error.message) || PUSH.test(error.message)) return { permission: "none" };
+		throw error;
+	});
+	return permission !== "none";
+}
+
 /** A GitHub repository URL, SSH remote, or owner/name, as a valid owner/name. */
 export function parse(value: string): string {
 	const repo = githubRepo(value);
@@ -172,6 +203,11 @@ export async function clone(repo: string, path: string): Promise<void> {
 
 let owner: string | undefined;
 let checked = 0;
+
+/** The owner's GitHub login if gh already told it, without asking again. */
+export function known(): string | undefined {
+	return owner;
+}
 
 /**
  * The owner's GitHub login from gh, for avatars. Unknown until resolved; a missing or signed-out
