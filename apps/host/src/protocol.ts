@@ -26,7 +26,7 @@ export type HostInfo = {
 };
 
 /** A place a channel can move to: "local" for this host, or a hosting service's base URL. */
-export type MoveTarget = { target: string; label: string };
+export type MoveTarget = { target: string; label: string; place: "local" | "hosted" | "cloud" };
 
 export type WorkerInfo = { id: string; pid: number };
 /** `freeze` drains admitted requests and exits the worker for a move, or fails if work remains. */

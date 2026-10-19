@@ -98,7 +98,7 @@ export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children
 	onDelete?: (row: SidebarRow) => void;
 	onRebuildLobby?: (row: SidebarRow) => void;
 	onRename?: (row: SidebarRow) => void;
-	/** Rows whose capabilities allow moving list these destinations under "Move to:". */
+	/** Rows whose capabilities allow moving list these destinations as "Move to …" items. */
 	onMoveTargets?: (row: SidebarRow) => Promise<MoveTarget[]>;
 	onMove?: (row: SidebarRow, target: MoveTarget) => Promise<void>;
 	onCompute?: (row: SidebarRow, action: "start" | "stop") => void;

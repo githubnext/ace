@@ -25,6 +25,8 @@ export type SidebarRow = {
 	private: boolean;
 	/** Runs on the team's cloud compute rather than a teammate's machine. */
 	cloud?: boolean;
+	/** Lives on the team's hosting service while a host runs its tools. */
+	hosted?: boolean;
 	mine: boolean;
 	member: boolean;
 	/** Omitted by local/legacy callers; explicit peer policy controls administrative actions. */
@@ -77,5 +79,7 @@ export type SidebarRow = {
 	openTodos?: number;
 };
 
-/** A place a channel can move to; `target` is opaque to the sidebar. */
-export type MoveTarget = { target: string; label: string };
+/**
+ * A place a channel can move to; `target` is opaque to the sidebar, and `label` completes "Move to".
+ */
+export type MoveTarget = { target: string; label: string; place: "local" | "hosted" | "cloud" };

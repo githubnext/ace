@@ -16,6 +16,7 @@ import {
 	IconMessage as Msg,
 	IconPullRequest,
 	IconPullRequestClosed,
+	IconRadar,
 } from "../../icons";
 
 type BadgeState = ReturnType<typeof resolveBadge>;
@@ -105,6 +106,7 @@ function resolveIcon(data: SidebarRow) {
 	}
 	if (data.private) return <IconLock aria-label="Private channel" />;
 	if (data.cloud) return <IconCloud aria-label="Cloud channel" />;
+	if (data.hosted) return <IconRadar aria-label="Hosted channel" />;
 	return <IconHash aria-label="Channel" />;
 }
 

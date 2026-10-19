@@ -3,9 +3,10 @@ id: 01M5314FQ002GKKHTQ5G9Q4NZJ
 anchor: function targets
 created: 2026-10-16T18:56:03Z
 norm: '1'
-sig: 876a65c3bca2edd6
-body_hash: cc777125158a7178
-raw_hash: 9cbdc9c81a6f7d7a
+sig: 7b9616ffd24e6d4f
+body_hash: 601506fe4d4d38d9
+raw_hash: 0f2a5a6a1e5af55a
+vouched: 2026-10-19T16:56:54Z
 lines: 64-79
 ---
 

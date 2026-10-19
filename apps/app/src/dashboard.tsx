@@ -22,6 +22,7 @@ import {
 	IconLaptop,
 	IconMessage,
 	IconPlus,
+	IconRadar,
 	IconRotate,
 } from "@ace/ui/icons";
 import type { GithubList } from "@ace/channel/protocol";
@@ -538,6 +539,13 @@ export function Dashboard(
 											<IconCloud
 												className="size-4 shrink-0 text-muted-foreground"
 												aria-label="Cloud channel"
+											/>
+										)
+										: channel.hosted
+										? (
+											<IconRadar
+												className="size-4 shrink-0 text-muted-foreground"
+												aria-label="Hosted channel"
 											/>
 										)
 										: <IconHash className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
