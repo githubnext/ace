@@ -196,10 +196,11 @@ function seed(info: ChannelInfo, changes: Changes, lane: { name: string } | unde
 }
 
 export async function kill(id: string): Promise<void> {
-	const { hosted, compute } = catalog.read(id);
+	// Only the owner reaches this, through archive, delete, or ace kill.
+	const { hosted, compute, owner } = catalog.read(id);
 	if (hosted) {
 		if (compute && await frozen(id)) return;
-		return request<void>(id, { op: "kill" });
+		return request<void>(id, { op: "kill", author: owner });
 	}
 	const connection = await Connection.running(id);
 	if (!connection) return;
@@ -207,7 +208,7 @@ export async function kill(id: string): Promise<void> {
 	try {
 		await Promise.race([
 			(async () => {
-				await connection.request({ op: "kill" });
+				await connection.request({ op: "kill", author: owner });
 				// The reply only confirms the abort; the worker closes sockets after storage and tools.
 				await connection.closed;
 			})(),

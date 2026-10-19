@@ -22,9 +22,10 @@ const MODES = [
 	{ id: "chat", name: "Chat", placeholder: "Mention @ace to ask the agent" },
 	ACE_MODE,
 ];
-// Teammates keep the Ace mode and their drafts while the owner has turned invocation off.
-const BLOCKED_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }, ACE_MODE];
+// A teammate the owner hasn't let invoke sees no @ace; the stored mode brings it back with access.
+const BLOCKED_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }];
 const MENTIONS = [{ name: "ace", avatar: aceAvatar }];
+const NO_MENTIONS: typeof MENTIONS = [];
 export const EFFORTS: Record<Effort, string> = {
 	off: "Off",
 	minimal: "Minimal",
@@ -60,17 +61,6 @@ type Props = {
 	accessory?: ReactNode;
 };
 
-/** The channel refuses these too; holding them here keeps the draft instead of failing a send. */
-function useInvocation(shared: boolean | undefined, owner: boolean, mode: string) {
-	const [mentioned, setMentioned] = useState(false);
-	const blocked = shared === false && !owner;
-	return {
-		blocked,
-		refused: blocked && (mode === "ace" || mentioned),
-		onText: (text: string) => setMentioned(ACE.test(text)),
-	};
-}
-
 /** Below the composer: its attachment tray rises over the space above it and takes clicks there. */
 export function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
 	return (
@@ -81,22 +71,6 @@ export function Notice({ children, action }: { children: ReactNode; action?: Rea
 			<p>{children}</p>
 			{action}
 		</div>
-	);
-}
-
-/** Why a teammate's invoking draft is held while the owner has turned invocation off. */
-function Refusal({ mode, onChat }: { mode: string; onChat: () => void }) {
-	return (
-		<Notice
-			action={
-				<Button size="sm" variant="ghost" onClick={onChat}>
-					{mode === "ace" ? "Switch to Chat" : "Remove @ace"}
-				</Button>
-			}
-		>
-			The owner has turned off teammate agent invocation.{" "}
-			{mode === "ace" ? "Switch to Chat" : "Remove @ace"} to send this as a message.
-		</Notice>
 	);
 }
 
@@ -125,7 +99,10 @@ export function Composer(
 	const [attached, setAttached] = useState<Attachment[]>([]);
 	// Kept beside the channel's draft so a deliberate mode and an unsent model pick survive relaunch.
 	const scope = `/channels/${channel.id}`;
-	const [mode, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
+	const [stored, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
+	// The channel refuses a blocked teammate's ask, stop, and kill too.
+	const blocked = shared === false && channel.owner !== user;
+	const mode = blocked ? "chat" : stored;
 	const [models, setModels] = useState<ModelOption[]>();
 	const [modelError, setModelError] = useState<string>();
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
@@ -135,6 +112,13 @@ export function Composer(
 		composer.current?.set(ACE.test(draft) ? draft : `@ace ${draft}`);
 		onDraftLoaded();
 	}, [draft, onDraftLoaded]);
+	// A saved Ace draft keeps its words as a message; its mention returns with access, from the mode.
+	useEffect(() => {
+		if (!blocked) return;
+		const doc = composer.current?.get();
+		const text = doc ? serialize(doc) : "";
+		if (ACE.test(text)) composer.current?.set(text.replace(/(^|\s)@ace\b\s*/gi, "$1").trim());
+	}, [blocked]);
 	// Each withdrawn message returns once, ahead of whatever the user has typed since.
 	const restored = useRef(new Set<number>());
 	useEffect(() => {
@@ -147,7 +131,7 @@ export function Composer(
 		// One leading mention invokes the whole draft; an empty Ace-mode composer holds only that.
 		const text = [...mine.map((message) => message.text), doc ? serialize(doc) : ""]
 			.map((part) => part.replace(LEADING, "").trim()).filter(Boolean).join("\n\n");
-		composer.current?.set(`@ace ${text}`);
+		composer.current?.set(blocked ? text : `@ace ${text}`);
 		const images = mine.flatMap((message) => message.images || []);
 		const files = mine.flatMap((message) => message.files || []);
 		if (images.length || files.length) {
@@ -171,7 +155,7 @@ export function Composer(
 				: `Stopped before ${mine.length} of your queued messages ran`,
 			{ description: `${mine.length === 1 ? "It's" : "They're"} back in the composer.` },
 		);
-	}, [returned, user]);
+	}, [returned, user, blocked]);
 	// An offline channel can't answer; the conversation already says so, so don't blame providers.
 	const offline = channel.state === "offline";
 	useEffect(() => {
@@ -223,27 +207,15 @@ export function Composer(
 	}
 	// Automatic stays offered so a chat whose model lost its key can hand the choice back.
 	choices.unshift({ id: "auto", name: "Automatic", vendor: "" });
-	const { blocked, refused, onText } = useInvocation(shared, channel.owner === user, mode);
-	// A mention invokes in Chat mode too, so sending as a message drops it from the draft.
-	const toChat = () => {
-		changeMode("chat");
-		const doc = composer.current?.get();
-		const text = doc ? serialize(doc) : "";
-		if (ACE.test(text)) composer.current?.set(text.replace(/(^|\s)@ace\b\s*/gi, "$1").trim());
-	};
 	// Formatting tools crowd a phone's composer; they stay one tap away.
 	const phone = useMedia("(width < 40rem)");
 
 	async function send(text: string, mode: string, attached: Attachment[]) {
 		if (sending.current) return;
-		const invoke = mode === "ace" || ACE.test(text);
+		// A blocked teammate's typed "@ace" is just text.
+		const invoke = !blocked && (mode === "ace" || ACE.test(text));
 		const body = text.trim();
 		if (!body && !attached.length) return;
-		if (invoke && blocked) {
-			return void toast.error("Could not invoke agent", {
-				description: "The owner has turned off teammate agent invocation.",
-			});
-		}
 		// The channel would refuse it for want of a key; setup keeps the draft for sending after.
 		if (mode === "ace" && models?.length === 0 && !modelError && onProviders) {
 			return onProviders();
@@ -301,8 +273,7 @@ export function Composer(
 				modes={blocked ? BLOCKED_MODES : MODES}
 				mode={mode}
 				onModeChange={changeMode}
-				onTextChange={onText}
-				mentions={MENTIONS}
+				mentions={blocked ? NO_MENTIONS : MENTIONS}
 				models={choices}
 				model={model}
 				onModelChange={(value) => changePick({ model: value })}
@@ -314,25 +285,23 @@ export function Composer(
 				busy={busy}
 				submitBusy={pending}
 				submitLabel={waiting}
-				canStop={busy}
-				onStop={() => void host.channel(channel.id, { op: "stop", chat: id })}
-				canSend={ready && status === "open" && !pending && !refused}
+				canStop={busy && !blocked}
+				onStop={() => void host.channel(channel.id, { op: "stop", chat: id, author: user })}
+				canSend={ready && status === "open" && !pending}
 				clearOnSend={false}
 				onSend={({ doc, mode, attachments }) => void send(serialize(doc), mode, attachments)}
 			/>
-			{refused
-				? <Refusal mode={mode} onChat={toChat} />
-				: mode === "ace" && !offline && models?.length === 0 && (
-					<Notice
-						action={onProviders && (
-							<Button size="sm" variant="outline" onClick={onProviders}>
-								{modelError ? "Provider settings" : "Set up a provider"}
-							</Button>
-						)}
-					>
-						{modelError || "Add a provider to use Ace. You can still send messages in Chat mode."}
-					</Notice>
-				)}
+			{mode === "ace" && !offline && models?.length === 0 && (
+				<Notice
+					action={onProviders && (
+						<Button size="sm" variant="outline" onClick={onProviders}>
+							{modelError ? "Provider settings" : "Set up a provider"}
+						</Button>
+					)}
+				>
+					{modelError || "Add a provider to use Ace. You can still send messages in Chat mode."}
+				</Notice>
+			)}
 		</>
 	);
 }

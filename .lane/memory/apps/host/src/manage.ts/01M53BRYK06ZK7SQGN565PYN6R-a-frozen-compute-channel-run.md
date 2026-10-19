@@ -4,8 +4,9 @@ anchor: function kill
 created: 2026-10-16T22:01:59Z
 norm: '1'
 sig: 513ab7051807bd68
-body_hash: c5c00bce00544277
-raw_hash: 8b791f6674195e35
+body_hash: 679a9e727fe00a07
+raw_hash: 0c7e17ee0991afa6
+vouched: 2026-10-19T20:55:06Z
 lines: 116-143
 ---
 

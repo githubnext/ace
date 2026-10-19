@@ -226,8 +226,9 @@ export type Request =
 	| { op: "delete"; chat?: ChatId; author: string; entry: EntryId }
 	/** Replace the text of the author's own human message, for people and later model context. */
 	| { op: "edit"; chat?: ChatId; author: string; entry: EntryId; text: string }
-	| { op: "stop"; chat?: ChatId }
-	| { op: "kill" }
+	/** Stop and kill are admitted like `ask`. Older clients omit `author`; gateways stamp it anyway. */
+	| { op: "stop"; chat?: ChatId; author: string }
+	| { op: "kill"; author: string }
 	| { op: "share"; author: string; shared: boolean }
 	| { op: "desktop"; author: string; enabled: boolean }
 	| { op: "rename"; author: string; name: string }
