@@ -8,7 +8,8 @@ Words in this document have the meanings in [terms](terms.md).
 
 Ace is open source software that teams clone, fork, and operate on their own machines and in
 their own infrastructure or cloud accounts. Ace will not operate a hosted service. The tailnet
-is the sole authority for team membership and collaboration access; see [the team](#the-team).
+is the sole authority for team membership, and each project is visible only to people with
+access to it; see [the team](#the-team).
 
 ## Layout
 
@@ -649,17 +650,36 @@ until the person opens it in a focused window. Stopped runs need no attention.
 
 ## The team
 
-The tailnet is the team and the sole authority for team membership and collaboration access.
-Its identities and access rules decide which people and machines can reach each other. Ace has
-no separate accounts, invitations, roles, or team access controls. Every human author is a
-Tailscale login, so a person is the same participant on every host.
+The tailnet is the team and the sole authority for team membership. Its identities and access
+rules decide which people and machines can reach each other. Ace has no separate accounts,
+invitations, or roles. Every human author is a Tailscale login, so a person is the same
+participant on every host.
+
+Within the team, a project is visible only to people with access to it
+([#506](https://github.com/githubnext/ace/issues/506), being built). A person has direct access
+to a GitHub-backed project whose repository their GitHub login can read, and to a local folder on
+their own host. A share gives the team or one person access to the whole project, including every
+person's channels in it. Shares live in the directory, so every host applies them to its own
+channels, and only people with direct access change them. Existing projects become private on
+upgrade. The host that runs a channel names each caller with `tailscale whois` and refuses
+callers without access, and each host shows its owner only the projects the owner can access.
+
+**Known limitation: project access is cooperative.** It holds between hosts running unmodified
+Ace, not against a teammate who tampers with theirs. The team services accept one credential
+derived from `ACE_SECRET`, which every host holds, so anyone with that secret can read every
+listing (names, summaries, absolute paths), join any lobby, watch and post in any hosted channel,
+and read and rewrite shares. Hosts report their owner's GitHub login from their own `gh` CLI
+unverified, so GitHub read access trusts that claim; shares name Tailscale logins, which `whois`
+verifies. Hosts from before project access serve their channels to every peer. Per-person
+credentials verified by the services would close this
+([#511](https://github.com/githubnext/ace/issues/511)).
 
 The channel owner can turn collaborator agent invocation on or off with `ace share <channel> on|off`
 or the channel header's agent-access toggle. New channels start unshared; channels created before
 that keep their stored setting, and those without one stay shared. Turning sharing on states that
 teammates can run commands as the owner on this host. Turning it off prevents new collaborator
-invocations; active work continues until stopped or killed, and teammates keep reading and posting
-human messages. The teammate composer holds an invoking draft instead of sending it while sharing
+invocations; active work continues until stopped or killed, and teammates with access to the
+project keep reading and posting human messages. The teammate composer holds an invoking draft instead of sending it while sharing
 is off. An agent's invoked message from another channel on the same host is not a collaborator
 invocation: that agent already runs as the owner's user, so it starts the target chat's agent with
 sharing off. Gateways rewrite every client's author, so only a local worker can send an agent author.
@@ -713,8 +733,8 @@ Keep the gateway on loopback or the tailnet; never expose it to the public inter
 Tailscale Funnel, port forwarding, or a public reverse proxy.
 `ace serve --loopback`, which `bun desktop dev` uses, has no tailnet listeners, peers, or directory
 entry, since another host on the same machine would publish under its tailnet name.
-Hosts find online, untagged peers through `tailscale status`. A host shows its app every peer's
-channels and proxies their requests; the peer that runs a channel stamps every author. Only a
+Hosts find online, untagged peers through `tailscale status`. A host shows its app the peer channels
+its owner can access and proxies their requests; the peer that runs a channel stamps every author. Only a
 channel's host creates it; only the host's owner, from any of their machines, archives, deletes,
 or kills.
 

@@ -6,8 +6,9 @@ differently, correct the usage or change this file first.
 ## Places
 
 **Team**:
-The people and machines on one tailnet. The tailnet is the sole authority for team membership
-and collaboration access. Ace has no separate accounts, invitations, or team access controls.
+The people and machines on one tailnet. The tailnet is the sole authority for team membership:
+Ace has no separate accounts or invitations. Being on the team does not give access to every
+project; see Access.
 _Avoid_: org, workspace
 
 **Host**:
@@ -32,6 +33,20 @@ A named set of one or more repositories or local folders that a team works on. M
 hold checkouts of the same project. Today a project is a single repository or folder; channels
 start in it once it is a Git repository with a commit.
 _Avoid_: repo (when you mean the project), workspace
+
+**Access**:
+Being able to see a project and its channels and to read and post in them. A person has direct
+access to a project backed by a GitHub repository their GitHub login can read, and to a local
+folder on their own host; anyone else needs a share. Access has one level; who may invoke a
+channel's agent is the channel's agent access setting.
+_Avoid_: permission, role
+
+**Share**:
+A grant of access to a whole project, to the team or to one person, covering every person's
+channels in it, now and later. Only people with direct access share or unshare a project, and
+access from a share cannot be passed on. Forking a channel into another project keeps work out
+of a share.
+_Avoid_: invite; share (for a channel's agent access)
 
 **Directory**:
 The team's shared cell listing its projects, hosts, and where each channel lives. It holds no
