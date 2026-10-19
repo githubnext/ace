@@ -709,6 +709,8 @@ with `tailscale whois` and accept peer hosts or the owner's browser from an allo
 host's own pages and the team's web app. The web app is the host's `ace web` setting, or else the
 `APP` the team's directory names when it is deployed, so joining the directory is the only setup.
 Teammates use their own host to reach shared channels. Local-only settings remain on loopback.
+Keep the gateway on loopback or the tailnet; never expose it to the public internet through
+Tailscale Funnel, port forwarding, or a public reverse proxy.
 `ace serve --loopback`, which `bun desktop dev` uses, has no tailnet listeners, peers, or directory
 entry, since another host on the same machine would publish under its tailnet name.
 Hosts find online, untagged peers through `tailscale status`. A host shows its app every peer's

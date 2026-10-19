@@ -20,18 +20,7 @@ your own machines.
 Ace has no separate accounts, invitations, or team access controls. Only allow people and machines
 you trust with access to your host to reach Ace over your tailnet.
 
-New channels start with collaborator agent invocation and native desktop tools off. Turning
-invocation on (`bun ace share <channel> on` or the channel header) lets teammates run commands as
-you on its host. Disabling desktop tools does not restrict shell access.
-
-Keep the host's gateway on loopback or your private tailnet. **Do not expose it to the public
-internet** through Tailscale Funnel, port forwarding, or a public reverse proxy. Protect local
-owner tokens and the team's `ACE_SECRET` as credentials: the team's services are reachable from the
-internet. Read [the trust model](docs/architecture.md#the-team) before running or sharing Ace.
-
-Ace is open source software for teams to clone, fork, and operate themselves. Any shared services
-are deployed by the team in its own infrastructure or cloud account. Ace will not operate a
-hosted service.
+Read [the trust model](docs/architecture.md#the-team) before running or sharing Ace.
 
 ## Run
 
