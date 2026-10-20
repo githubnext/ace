@@ -6,6 +6,9 @@ channel requests, which each channel admits by its own rules: an ask needs the c
 access on, as a real teammate's would. Only their identities are made up, and only in the owner's
 own app; the directory, lobbies and peers never see them.
 
+The installed app runs demo mode when its home holds `demo.json`, such as
+`~/.local/state/ace-canary/demo.json` for Canary; restart Ace after adding or removing it.
+
 Seed the channels first with `ace import` (see [channel data](data.md#seeds)).
 
 ```json

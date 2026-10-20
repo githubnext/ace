@@ -1,5 +1,5 @@
 import { Console } from "node:console";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 import { adoptLoginShell } from "./environment";
@@ -37,7 +37,9 @@ if (cli) {
 	console.log(`${new Date().toISOString()} Ace Helper starting`);
 	try {
 		const { serve } = await import("./gateway");
-		await serve(config.port);
+		// The installed app takes no flags, so a demo script in its home stands in for --demo.
+		const demo = join(config.home, "demo.json");
+		await serve(config.port, false, existsSync(demo) ? demo : undefined);
 	} catch (error) {
 		console.error(error);
 		log.end(() => process.exit(1));
