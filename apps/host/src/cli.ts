@@ -84,8 +84,10 @@ const HELP = `ace — channels on this host
   ace directory [<url> | off]                    the team's directory, which lists every host's channels;
                                                  a running host checks it with ACE_SECRET first
   ace web [<url> | off]                          the deployed web app your devices may use with this host
-  ace serve [--port 4140] [--loopback]            serve the app and its WebSocket gateway;
-                                                 --loopback stays off the tailnet and the directory
+  ace serve [--port 4140] [--loopback] [--demo <script>]
+                                                serve the app and its WebSocket gateway;
+                                                 --loopback stays off the tailnet and the directory;
+                                                 --demo runs scripted synthetic teammates
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
   ace open [--port 4140]                          open this host's authenticated app
@@ -122,6 +124,7 @@ const { values: flags, positionals } = parseArgs({
 		follow: { type: "boolean", short: "f" },
 		json: { type: "boolean" },
 		loopback: { type: "boolean" },
+		demo: { type: "string" },
 		help: { type: "boolean", short: "h" },
 	},
 });
@@ -488,7 +491,7 @@ async function main() {
 			return;
 		}
 		case "serve":
-			return serve(Number(flags.port || config.port), !!flags.loopback);
+			return serve(Number(flags.port || config.port), !!flags.loopback, flags.demo);
 		case "key": {
 			const name = rest[0];
 			if (!name || !/^[A-Z][A-Z0-9_]*$/.test(name)) {

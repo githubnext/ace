@@ -4,8 +4,9 @@ anchor: function websocket
 created: 2026-10-15T20:16:37Z
 norm: '1'
 sig: 1b462e5d3bc33728
-body_hash: aee7bf28626367fb
-raw_hash: 6675f75b614405d9
+body_hash: 39bbd535e37f47a0
+raw_hash: c1a585dfb617245a
+vouched: 2026-10-20T17:10:51Z
 lines: 673-737
 ---
 

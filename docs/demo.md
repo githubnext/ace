@@ -1,0 +1,37 @@
+# Demo mode
+
+`ace serve --demo <script.json>` runs scripted synthetic teammates on this host, for recordings.
+They are present in projects and channels, and they post, ask agents and react through ordinary
+channel requests, which each channel admits by its own rules: an ask needs the channel's agent
+access on, as a real teammate's would. Only their identities are made up, and only in the owner's
+own app; the directory, lobbies and peers never see them.
+
+Seed the channels first with `ace import` (see [channel data](data.md#seeds)).
+
+```json
+{
+	"people": {
+		"alex": { "login": "alex", "github": "octocat" }
+	},
+	"steps": [
+		{ "at": 0, "who": "alex", "open": true, "channel": "checkout" },
+		{ "at": 3, "who": "alex", "say": "pushed a fix, can someone check?", "channel": "checkout" },
+		{
+			"at": 6,
+			"who": "alex",
+			"ask": "does the fix handle a missing quantity?",
+			"channel": "checkout"
+		},
+		{ "at": 9, "who": "alex", "react": "👀", "channel": "checkout" },
+		{ "at": 30, "who": "alex", "away": true },
+		{ "at": 60, "who": "alex", "leave": true }
+	],
+	"loop": 30
+}
+```
+
+- `login` is the author their messages carry; `github` picks the avatar and name the app shows.
+- `at` is seconds from the start. `loop` restarts the script that many seconds after its last step.
+- Steps: `open`/`close` a channel (present there), `away` true or false, `leave`, `say`, `ask`, and
+  `react`, which reacts to the chat's newest message or reply. Acting opens the channel first.
+  `chat` targets a chat other than the root.

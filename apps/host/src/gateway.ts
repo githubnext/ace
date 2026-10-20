@@ -10,6 +10,7 @@ import * as catalog from "./catalog";
 import { Connection } from "./client";
 import * as compute from "./compute";
 import { config } from "./config";
+import * as demo from "./demo";
 import { diagnostics } from "./diagnostics";
 import * as directory from "./directory";
 import { retryLoginShell, shell } from "./environment";
@@ -296,6 +297,7 @@ function people(): People {
 	const known: People = {};
 	for (const host of directory.read().hosts) if (host.github) known[host.login] = host.github;
 	Object.assign(known, peers.people());
+	Object.assign(known, demo.people());
 	const own = github.login(loginChanged);
 	if (own) known[catalog.user] = own;
 	return known;
@@ -355,9 +357,18 @@ function lobbyChanged(): void {
 
 let presenceSent = "";
 
+/** Lobby presence, with demo mode's synthetic people beside the real ones. */
+function present(): Record<string, Presence[]> {
+	const found = { ...lobby.presence() };
+	for (const [project, people] of Object.entries(demo.presence())) {
+		found[project] = [...found[project] || [], ...people];
+	}
+	return found;
+}
+
 /** Lobby presence reaches only the owner's app; peers never see it. */
 function presenceChanged(): void {
-	const frame = JSON.stringify({ presence: lobby.presence() } satisfies HostFrame);
+	const frame = JSON.stringify({ presence: present() } satisfies HostFrame);
 	if (frame === presenceSent) return;
 	presenceSent = frame;
 	for (const socket of sockets) if (!socket.data.peer) socket.send(frame);
@@ -828,7 +839,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 			void queue(async () => {
 				socket.send(JSON.stringify({ projects: await projects.list() } satisfies HostFrame));
 				socket.send(JSON.stringify({ people: people() } satisfies HostFrame));
-				socket.send(JSON.stringify({ presence: lobby.presence() } satisfies HostFrame));
+				socket.send(JSON.stringify({ presence: present() } satisfies HostFrame));
 			});
 		},
 		async message(socket, raw) {
@@ -1022,7 +1033,7 @@ async function listen(port: number): Promise<Server<Client>> {
  * entry, or lobby presence. A second host on this machine would otherwise publish under the
  * machine's tailnet name.
  */
-export async function serve(port: number, loopback = false): Promise<never> {
+export async function serve(port: number, loopback = false, script?: string): Promise<never> {
 	config.port = port;
 	config.loopback = loopback;
 	// Channel workers and agent shells reach this listener for the owner's windows.
@@ -1119,6 +1130,15 @@ export async function serve(port: number, loopback = false): Promise<never> {
 		}
 	} else if (!loopback) {
 		console.log("Tailscale is not running; channels stay on this machine");
+	}
+	if (script) {
+		cleanup.push(demo.start(script, {
+			project: projectOfChannel,
+			changed: () => {
+				peopleChanged();
+				presenceChanged();
+			},
+		}));
 	}
 	mkdirSync(join(catalog.home, "channels"), { recursive: true });
 	// Workers create and remove their sockets; tell clients when a channel starts or retires.
