@@ -83,6 +83,7 @@ import type {
 } from "./protocol";
 import { queue, withdrawn } from "./queue";
 import * as room from "./room";
+import { exportSeed, importSeed, type Seed } from "./seed";
 import { type Tabs, tabs } from "./tabs";
 
 type Settings = { shared: boolean; desktop: boolean };
@@ -553,6 +554,16 @@ export class Channel {
 	}
 
 	/** Durably abort every chat's work, including background subagents, so reopening resumes none of it. */
+	/** The channel's chats as a seed another channel can import. */
+	export(): Promise<Seed> {
+		return exportSeed(this.#harness);
+	}
+
+	/** Fills a new channel from a seed, `shift` milliseconds later than its own times. */
+	import(value: Seed, shift?: number): Promise<void> {
+		return importSeed(this.#harness, value, shift);
+	}
+
 	async kill(): Promise<void> {
 		const { chats } = await this.info();
 		this.#log("warn", "channel.kill", {

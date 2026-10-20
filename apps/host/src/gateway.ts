@@ -44,6 +44,7 @@ import {
 	type People,
 	type Presence,
 	projectId,
+	type WorkerRequest,
 } from "./protocol";
 import { type Machine, self, whois } from "./tailnet";
 import {
@@ -464,6 +465,9 @@ const localOps = new Set<HostRequest["op"]>([
 
 type ChannelRequest = Extract<HostRequest, { op: "channel" }>["request"];
 
+/** Worker requests come from this host's own processes, never through the gateway. */
+const WORKER = new Set<string>(["worker", "freeze", "export"] satisfies WorkerRequest["op"][]);
+
 /** The verified person replaces any claimed author. Older clients send stop and kill without one. */
 function authored(request: ChannelRequest, user: string): ChannelRequest {
 	if (request.op === "stop" || request.op === "kill" || "author" in request) {
@@ -739,6 +743,7 @@ async function handle(
 			client.terminals.delete(request.terminal);
 			return terminals.close(request.terminal);
 		case "channel": {
+			if (WORKER.has(request.request.op)) throw new Error(`Unknown request ${request.request.op}`);
 			// Only a watch streams; other requests must not leave watchers behind in relays.
 			const watch: Watch | undefined = request.request.op === "watch"
 				? {

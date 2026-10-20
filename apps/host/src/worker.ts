@@ -158,6 +158,7 @@ function serve(socket: Socket) {
 				send({ id: frame, ok: true, value: null });
 				return exit(false, "move");
 			}
+			if (body.op === "export") return send({ id: frame, ok: true, value: await channel.export() });
 			if (catalog.read(id).archived && ARCHIVED.has(body.op)) {
 				throw new Error("The channel is archived");
 			}
