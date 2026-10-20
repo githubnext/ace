@@ -35,7 +35,8 @@ export type MoveTarget = { target: string; label: string; place: "local" | "host
 
 export type WorkerInfo = { id: string; pid: number };
 /** `freeze` drains admitted requests and exits the worker for a move, or fails if work remains. */
-export type WorkerRequest = { op: "worker" } | { op: "freeze" };
+/** Only this host's own processes send these; the gateway refuses them from clients. */
+export type WorkerRequest = { op: "worker" } | { op: "freeze" } | { op: "export" };
 
 export type Diagnostics = {
 	tools: { name: string; path?: string; version?: string; error?: string }[];

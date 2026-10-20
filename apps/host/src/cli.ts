@@ -7,6 +7,7 @@ import type { ChannelInfo, ChatId, Event, Request } from "@ace/channel/protocol"
 
 import { appUrl, token } from "./auth";
 import { backup, restore } from "./backup";
+import { exportSeed, importSeed } from "./seed";
 import * as catalog from "./catalog";
 import { Connection, request } from "./client";
 import { config } from "./config";
@@ -58,6 +59,10 @@ const HELP = `ace — channels on this host
   ace tab rename <window> <channel> <tab> <name>  rename one tab; an empty name restores its default
   ace backup <channel> <directory>              snapshot a local or hosted channel's data into a new directory
   ace restore <directory> [--project <dir>]      restore a backup as a new local channel
+  ace export <channel> <file>                    save a channel's chats as an editable seed file
+  ace import <file> [--project <dir>] [--name <name>] [--now]
+                                                add a seed as a new local channel; --now moves its
+                                                newest message to now
   ace say <channel> [--chat <id>] <text…>        post without invoking the agent
   ace ask <channel> [--chat <id>] [--model <provider/id>] [--detach] <text…>
   ace watch <channel> [--chat <id>]
@@ -107,6 +112,7 @@ const { values: flags, positionals } = parseArgs({
 		all: { type: "boolean" },
 		team: { type: "boolean" },
 		detach: { type: "boolean" },
+		now: { type: "boolean" },
 		channel: { type: "string" },
 		trace: { type: "string" },
 		level: { type: "string" },
@@ -243,6 +249,7 @@ function printAccess(access: ProjectAccess) {
 
 const owned: Record<string, string> = {
 	backup: "back it up",
+	export: "export it",
 	rename: "rename it",
 	fork: "fork it",
 	kill: "kill it",
@@ -408,6 +415,17 @@ async function main() {
 			const record = await restore(ref!, flags.project);
 			return console.log(`${record.name}\t${record.id}`);
 		}
+		case "import": {
+			if (positionals.length !== 2) {
+				throw new Error("ace import <seed-file> [--project <dir>] [--name <name>] [--now]");
+			}
+			const record = await importSeed(ref!, {
+				dir: flags.project || process.cwd(),
+				name: flags.name,
+				now: flags.now,
+			});
+			return console.log(`${record.name}\t${record.id}`);
+		}
 		case "models": {
 			for (const m of await models()) console.log(`${m.provider}/${m.modelId}`);
 			return;
@@ -554,6 +572,9 @@ async function main() {
 			console.log(await backup(record, rest[0]!));
 			console.log("Channel data saved. Back up project files and lane worktrees separately.");
 			return;
+		case "export":
+			if (rest.length !== 1) throw new Error("ace export <channel> <file>");
+			return console.log(await exportSeed(record, rest[0]!));
 		case "rename":
 			if (rest.length !== 1) throw new Error("ace rename <channel> <name>");
 			await request(record.id, { op: "rename", author: catalog.user, name: rest[0]! });

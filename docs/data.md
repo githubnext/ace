@@ -88,6 +88,21 @@ The restored chats keep the original working-directory and lane paths. If the ba
 during a run, the copy resumes that run when it first opens, and pi reports interrupted tools that
 cannot safely be rerun. Stop the original channel's work first if both would use the same lanes.
 
+## Seeds
+
+A seed is a channel's chats as editable JSON, for demos and fixtures rather than recovery.
+`ace export <channel> <file>` writes a local channel's ownerless chats: people's messages by author
+and ISO time, as they read now, and agents' replies and tool results as the pi messages their runs
+committed, with reactions, captions, recaps, and each chat's model. Subagent chats, deleted
+messages, run bookkeeping, and lanes stay behind.
+
+`ace import <file> [--project <dir>] [--name <name>] [--now]` adds a seed as a new local channel in
+the current directory's project or `--project`. It appends every item through pi, so the channel is
+ordinary: its agents read the imported history as context, and later runs continue it. Authors are
+any valid participant names, and `--now` moves every time so the newest message lands at import.
+The first chat is the root chat. Agent items must be `pi.assistant` or `pi.tool-result` entries,
+and tool calls and results must still pair up. A failed import removes the new channel's directory.
+
 ## Recover in place on the same machine
 
 To return a local channel to a snapshot under its original ID:
