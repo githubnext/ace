@@ -57,6 +57,8 @@ export type Diagnostics = {
 		error?: string;
 		failed?: number;
 		secret: CredentialStatus;
+		/** The team services the directory named in its last answer; an unnamed one is not set up. */
+		services: { hosted?: string; app?: string; compute?: string };
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };

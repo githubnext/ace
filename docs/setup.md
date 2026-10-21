@@ -69,7 +69,7 @@ for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf
 ```
 
 Then name the other services in the directory, from `services/directory`, so every host that joins
-picks them up:
+picks them up. `Settings → Team → Team services` shows which ones a host's directory names:
 
 - `HOSTED`: the channel service (`https://ace-channel.<your-subdomain>.workers.dev`), offered in a
   channel's `Move to` menu.

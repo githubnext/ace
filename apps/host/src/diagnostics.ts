@@ -49,10 +49,11 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(),
 	]);
+	const { hosted, app, compute } = directory.read();
 	return {
 		tools,
 		tailscale: config.loopback ? { ...tailscale, loopback: true } : tailscale,
-		directory: { ...directory.status(), secret: await secret },
+		directory: { ...directory.status(), secret: await secret, services: { hosted, app, compute } },
 		shell: { ...environment },
 	};
 }
