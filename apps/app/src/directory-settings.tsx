@@ -7,8 +7,6 @@ import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
-const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
-
 const secrets = {
 	keychain: "Saved in Keychain",
 	environment: "From the environment",
@@ -128,14 +126,13 @@ function TeamDirectory(
 				description={directory.url || (
 					<>
 						Not joined.{" "}
-						<a
-							href={SETUP}
-							target="_blank"
-							rel="noopener noreferrer"
+						<button
+							type="button"
+							onClick={() => window.dispatchEvent(new Event("ace:team-setup"))}
 							className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
 						>
-							Set up a directory
-						</a>
+							Set up your team
+						</button>
 					</>
 				)}
 				footer={
