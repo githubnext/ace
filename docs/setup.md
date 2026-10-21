@@ -82,6 +82,29 @@ picks them up:
 printf %s https://ace-channel.<your-subdomain>.workers.dev | bunx wrangler secret put HOSTED
 ```
 
+### From the app
+
+**Get your team started** (also under `Settings → Team`) can deploy to Cloudflare for you, with
+no checkout. **Deploy** does this, and nothing else:
+
+- Signs in with your own `wrangler login`. If you aren't signed in, it opens Cloudflare's sign-in
+  page in your browser. Ace never sees a Cloudflare password or token.
+- Creates `ace-directory-<tailnet>` in that account, named for the first label of your tailnet's
+  MagicDNS name (`tail1234` in `tail1234.ts.net`). With hosted channels on, it also creates
+  `ace-channel-<tailnet>`. Each is a Worker with SQLite-backed Durable Objects, served at
+  `https://<name>.<your-subdomain>.workers.dev`, with Workers Logs on.
+- Gives each Worker a new random team secret and your tailnet's name. The channel service also gets
+  the model keys saved in this Mac's Keychain.
+- Saves the secret in this Mac's Keychain and joins the directory. It shows the URL and the secret
+  once, for you to send teammates privately.
+
+The Workers answer only hosts on your tailnet that hold the secret. Ace changes nothing else in the
+account. To undo it, leave the directory in `Settings → Team`, then delete the Workers:
+
+```sh
+bunx wrangler delete --name ace-directory-<tailnet>   # and ace-channel-<tailnet>
+```
+
 ### On celld
 
 celld runs the same services on any machine with an S3, R2, GCS, Tigris, or Azure Blob bucket.

@@ -330,7 +330,16 @@ function Deploy({ hosted, command, back, onJoined }: {
 		<>
 			<Header
 				title="Deploy to Cloudflare"
-				description="Ace deploys your tailnet's services to your Cloudflare account, makes a new team secret, and joins this Mac. You'll sign in to Cloudflare in your browser if you haven't before."
+				description={
+					<>
+						Ace deploys your tailnet's services to your Cloudflare account, makes a new team secret,
+						and joins this Mac. You'll sign in to Cloudflare in your browser if you haven't before.
+						{" "}
+						<Link href={`${DOCS}#from-the-app`}>
+							What this creates <IconArrowUpRight className="inline size-3" aria-hidden />
+						</Link>
+					</>
+				}
 			/>
 			<ol className="flex flex-col gap-1.5 text-sm">
 				{stages.map(({ label }, index) => (
