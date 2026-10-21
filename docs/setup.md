@@ -56,9 +56,9 @@ Whoever sets up the team deploys the services once from a checkout; everyone els
 privately. `Troubleshooting → Refresh status` syncs at once. From a checkout,
 `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
 
-The services are cells, so they run on Cloudflare Workers or on [celld](#on-celld) on machines the
-team runs. To deploy them to your Cloudflare account, give the Workers the same secret and your
-tailnet's MagicDNS suffix. The services then serve only that tailnet; see
+The services are cells, so they run on Cloudflare Workers, or on [celld](#on-celld) on machines the
+team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, give the Workers the
+same secret and your tailnet's MagicDNS suffix. The services then serve only that tailnet; see
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
 
 ```sh
@@ -109,6 +109,35 @@ tailscale serve --bg --https 443 http://127.0.0.1:8787
 Hosts then use `https://<machine>.<tailnet>.ts.net` as the directory and
 `https://<machine>.<tailnet>.ts.net:8443` as `HOSTED`. Redeploying updates running nodes without a
 restart. Compute still needs Cloudflare.
+
+### On Fly.io
+
+[`services/fly.toml`](../services/fly.toml) runs one celld node per service on Fly.io, with a
+Tigris bucket each. Tigris needs a card on the Fly account. Pick app names (`ace-directory-<team>`
+and `ace-channel-<team>` below), then create the apps and buckets. `fly storage create` prints the
+bucket's keys once; keep them to deploy from a checkout.
+
+```sh
+for s in directory channel; do
+	fly apps create ace-$s-<team>
+	fly storage create -a ace-$s-<team> -n ace-$s-<team>
+	fly secrets set -a ace-$s-<team> --stage CELLD_BUCKET=s3://ace-$s-<team>
+done
+```
+
+Deploy each service's code to its bucket with that bucket's keys, then start its node. Set `HOSTED`
+in `directory.env` to `https://ace-channel-<team>.fly.dev`.
+
+```sh
+export S3_ENDPOINT=https://fly.storage.tigris.dev AWS_REGION=auto
+AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… bun services/celld.ts channel deploy channel.env --bucket s3://ace-channel-<team>
+AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… bun services/celld.ts directory deploy directory.env --bucket s3://ace-directory-<team>
+fly deploy -c services/fly.toml -a ace-channel-<team> --ha=false
+fly deploy -c services/fly.toml -a ace-directory-<team> --ha=false
+```
+
+Hosts then use `https://ace-directory-<team>.fly.dev` as the directory. The URLs are public, like
+`workers.dev`, and refuse requests without the team's credential.
 
 To try the services locally, put `ACE_SECRET`, `TAILNET`, and a model key in
 `services/channel/.dev.vars`, then:
