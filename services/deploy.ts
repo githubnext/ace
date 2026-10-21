@@ -2,10 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const USAGE = "bun services/deploy.ts <cloudflare|fly> <team>";
+const USAGE = "bun services/deploy.ts <cloudflare|fly> <team> [--hosted]";
 const MODEL_KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
 
-const [provider, team] = process.argv.slice(2);
+const [provider, team, ...options] = process.argv.slice(2);
+const withHosted = options.includes("--hosted");
 if (provider !== "cloudflare" && provider !== "fly") throw new Error(USAGE);
 // App and Worker names: ace-directory-<team> and ace-channel-<team>.
 if (!team || !/^[a-z0-9][a-z0-9-]{0,30}$/.test(team)) {
@@ -14,17 +15,11 @@ if (!team || !/^[a-z0-9][a-z0-9-]{0,30}$/.test(team)) {
 
 const tailnet = await magicDNS();
 const secret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
-const models: Record<string, string> = {};
-for (const name of MODEL_KEYS) if (process.env[name]) models[name] = process.env[name]!;
-if (!Object.keys(models).length) {
-	const names = MODEL_KEYS.join(" or ");
-	console.warn(`No ${names} in the environment: hosted channels can't run agents without one.`);
-}
-
 const shared = { ACE_SECRET: secret, TAILNET: tailnet };
 const deploy = provider === "cloudflare" ? cloudflare : fly;
-const hosted = await deploy("channel", { ...shared, ...models });
-const directory = await deploy("directory", { ...shared, HOSTED: hosted });
+// Hosted channels are opt-in: without the channel service, the directory offers no Move to cloud.
+const hosted = withHosted ? { HOSTED: await deploy("channel", { ...shared, ...models() }) } : {};
+const directory = await deploy("directory", { ...shared, ...hosted });
 
 console.log(`
 Deployed for ${tailnet}.
@@ -34,6 +29,16 @@ Deployed for ${tailnet}.
 
 Join in Ace with both, then send them to teammates privately. This is the only time the secret is shown.
 The services can take a minute to accept the new secret.`);
+
+function models(): Record<string, string> {
+	const found: Record<string, string> = {};
+	for (const name of MODEL_KEYS) if (process.env[name]) found[name] = process.env[name]!;
+	if (!Object.keys(found).length) {
+		const names = MODEL_KEYS.join(" or ");
+		console.warn(`No ${names} in the environment: hosted channels can't run agents without one.`);
+	}
+	return found;
+}
 
 async function cloudflare(service: string, vars: Record<string, string>): Promise<string> {
 	const name = `ace-${service}-${team}`;
