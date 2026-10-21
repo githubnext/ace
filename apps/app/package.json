@@ -21,7 +21,8 @@
 		"electrobun": "catalog:desktop",
 		"pdfjs-dist": "catalog:ui",
 		"react": "catalog:ui",
-		"react-dom": "catalog:ui"
+		"react-dom": "catalog:ui",
+		"uqr": "catalog:ui"
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "catalog:ui",

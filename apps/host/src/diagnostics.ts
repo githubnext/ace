@@ -7,6 +7,7 @@ import { shell as environment } from "./environment";
 import { latest } from "./keys";
 import type { Diagnostics } from "./protocol";
 import * as tailnet from "./tailnet";
+import * as web from "./web";
 
 async function git(): Promise<Diagnostics["tools"][number]> {
 	const path = Bun.which("git", { PATH: process.env.PATH }) || undefined;
@@ -54,5 +55,6 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 		tailscale: config.loopback ? { ...tailscale, loopback: true } : tailscale,
 		directory: { ...directory.status(), secret: await secret },
 		shell: { ...environment },
+		web: web.address,
 	};
 }

@@ -44,6 +44,13 @@ export async function tls(machine: Machine): Promise<{ cert: string; key: string
 
 export type Listener = { port: number; secure: boolean };
 
+/** The HTTPS address the owner's phone opens, once that listener is up. */
+export let address: string | undefined;
+
+export function served(machine: Machine, listener: Listener): void {
+	address = `https://${machine.dns}:${listener.port}`;
+}
+
 /** Names this host answers to on the tailnet; anything else is DNS rebinding. */
 export function hosts(machine: Machine, listener: Listener): Set<string> {
 	const names = listener.secure ? [machine.dns] : [machine.dns, machine.name, machine.address];
