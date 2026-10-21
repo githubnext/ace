@@ -12,15 +12,15 @@ import {
 	Input,
 	Switch,
 } from "@ace/ui";
-import { IconArrowUpRight, IconCheck, IconCopy } from "@ace/ui/icons";
+import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons";
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 
 const DOCS = "https://github.com/githubnext/ace/blob/main/docs/setup.md";
 const PROVIDERS = {
-	cloudflare: { label: "Cloudflare", cli: "wrangler" },
-	fly: { label: "Fly.io", cli: "fly" },
+	cloudflare: { label: "Cloudflare" },
+	fly: { label: "Fly.io" },
 };
 
 // Names, URLs, and secrets are typed exactly; macOS would otherwise capitalize and correct them.
@@ -267,30 +267,106 @@ function Setup({ provider, hosted, back, onJoined }: {
 	back: () => void;
 	onJoined: (url: string, secret: string) => void;
 }) {
-	const [team, setTeam] = useState("");
-	const name = team.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-") || "<team>";
-	const command = `bun services/deploy.ts ${provider} ${name}${hosted ? " --hosted" : ""}`;
+	const command = `bun services/deploy.ts ${provider}${hosted ? " --hosted" : ""}`;
+	// Ace deploys Cloudflare's bundled services itself; Fly.io still needs a checkout and flyctl.
+	if (provider === "cloudflare") {
+		return <Deploy hosted={hosted} command={command} back={back} onJoined={onJoined} />;
+	}
 	return (
 		<>
 			<Header
-				title={`Deploy to ${PROVIDERS[provider].label}`}
+				title="Deploy to Fly.io"
 				description={
 					<>
-						From an Ace checkout, signed in to{" "}
-						<code>{PROVIDERS[provider].cli}</code>, run this script. It makes a new team secret and
-						prints it with the directory's URL.
+						Ace deploys to Cloudflare for you. For Fly.io, run this from an Ace checkout signed in
+						to <code>fly</code>, then enter what it prints.
 					</>
 				}
 			/>
-			<Input
-				{...RAW}
-				aria-label="Team name"
-				placeholder="Team name, used in the services' names"
-				value={team}
-				onChange={(event) => setTeam(event.target.value)}
-			/>
 			<Copyable value={command} />
 			<Join onJoined={onJoined} back={back} />
+		</>
+	);
+}
+
+function Deploy({ hosted, command, back, onJoined }: {
+	hosted: boolean;
+	command: string;
+	back: () => void;
+	onJoined: (url: string, secret: string) => void;
+}) {
+	const [waiting, setWaiting] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const [commands, setCommands] = useState(false);
+	const stages = [
+		{ label: "Sign in to Cloudflare", from: "Checking your Cloudflare" },
+		...hosted ? [{ label: "Deploy hosted channels", from: "Deploying hosted" }] : [],
+		{ label: "Deploy the directory", from: "Deploying the directory" },
+		{ label: "Join this Mac", from: "Joining" },
+	];
+	const [stage, setStage] = useState(-1);
+
+	async function deploy() {
+		setBusy(true);
+		setError("");
+		setStage(0);
+		try {
+			const { url, secret } = await host.deployTeam(hosted, (text) => {
+				setWaiting(text);
+				const next = stages.findIndex(({ from }) => text?.startsWith(from));
+				if (next >= 0) setStage(next);
+			});
+			onJoined(url, secret);
+		} catch (error) {
+			setError((error as Error).message);
+		} finally {
+			setBusy(false);
+			setWaiting(null);
+		}
+	}
+
+	return (
+		<>
+			<Header
+				title="Deploy to Cloudflare"
+				description="Ace deploys your tailnet's services to your Cloudflare account, makes a new team secret, and joins this Mac. You'll sign in to Cloudflare in your browser if you haven't before."
+			/>
+			<ol className="flex flex-col gap-1.5 text-sm">
+				{stages.map(({ label }, index) => (
+					<li key={label} className="flex items-center gap-2">
+						{index < stage
+							? <IconCheck className="size-3.5 text-primary" aria-hidden />
+							: index === stage && busy
+							? <IconLoader className="size-3.5 animate-spin" aria-hidden />
+							: <span className="size-3.5 text-center text-muted-foreground">·</span>}
+						<span
+							className={index > stage || (index === stage && !busy)
+								? "text-muted-foreground"
+								: ""}
+						>
+							{index === stage && waiting || label}
+						</span>
+					</li>
+				))}
+			</ol>
+			{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+			{commands && <Copyable value={command} />}
+			<Footer
+				back={
+					<>
+						<Button variant="ghost" disabled={busy} onClick={back}>Back</Button>
+						<Button variant="link" onClick={() => setCommands(!commands)}>
+							{commands ? "Hide the command" : "Show the command"}
+						</Button>
+					</>
+				}
+				next={
+					<Button disabled={busy} onClick={() => void deploy()}>
+						{busy ? "Deploying…" : error ? "Try again" : "Deploy"}
+					</Button>
+				}
+			/>
 		</>
 	);
 }

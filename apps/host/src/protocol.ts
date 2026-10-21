@@ -302,6 +302,11 @@ export type HostRequest =
 	| { op: "key-forget"; name: string }
 	/** Join after the directory accepts the URL and secret, or keep the saved secret; null leaves. */
 	| { op: "directory-set"; url: string | null; secret?: string }
+	/**
+	 * Deploy the tailnet's directory, and hosted channels with `hosted`, to the owner's Cloudflare
+	 * account, then join it. Answers with the directory URL and the secret to send teammates.
+	 */
+	| { op: "team-deploy"; hosted: boolean }
 	/** Quiesce this helper before replacing its application, or recover a canceled update. */
 	| { op: "update-prepare" }
 	| { op: "update-cancel" }

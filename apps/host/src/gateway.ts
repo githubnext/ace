@@ -61,6 +61,7 @@ import {
 	storeKey,
 } from "./settings";
 import { resume, shutdown } from "./shutdown";
+import { deploy as deployTeam } from "./team";
 import * as terminals from "./terminals";
 import * as web from "./web";
 import * as windows from "./windows";
@@ -443,7 +444,12 @@ async function lifecycle(
 const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete", "fork"]);
 const windowOps = new Set<HostRequest["op"]>(["window", "windows", "tab-rename", "tab-result"]);
 const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
-const keychainOps = new Set<HostRequest["op"]>(["key-store", "key-forget", "directory-set"]);
+const keychainOps = new Set<HostRequest["op"]>([
+	"key-store",
+	"key-forget",
+	"directory-set",
+	"team-deploy",
+]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
 	"project-access",
@@ -657,6 +663,8 @@ async function handle(
 		}
 		case "directory-set":
 			return setDirectory(request.url, request.secret);
+		case "team-deploy":
+			return deployTeam(request.hosted, (waiting) => send({ id, waiting }));
 		case "models":
 			if (request.host && request.host !== name && !client.peer) {
 				return (await remote(client, request.host)).request({ op: "models" });

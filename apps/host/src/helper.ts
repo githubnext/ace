@@ -22,6 +22,7 @@ desktop(ACE_IDENTIFIER, ACE_PROFILE);
 config.helper = !cli;
 config.version = ACE_VERSION;
 config.app = join(dirname(process.execPath), "..", "Resources", "app", "web");
+config.services = join(dirname(process.execPath), "..", "Resources", "services");
 config.worker = [process.execPath, "--worker"];
 
 if (cli) {
