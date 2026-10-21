@@ -61,6 +61,17 @@ team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, 
 same secret and your tailnet's MagicDNS suffix. The services then serve only that tailnet; see
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
 
+One command does every step below for Cloudflare or Fly.io, signed in to `wrangler` or `fly`,
+with Tailscale on. It names the services `ace-directory-<team>` and `ace-channel-<team>`, makes a
+new team secret, gives the hosted channels `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` from your
+environment or the checkout's `.env`, and prints the directory's URL and the secret to join with.
+
+```sh
+bun services/deploy.ts <cloudflare|fly> <team>
+```
+
+By hand, on Cloudflare:
+
 ```sh
 SECRET=$(openssl rand -hex 32)
 TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
