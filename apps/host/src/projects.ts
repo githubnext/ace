@@ -199,7 +199,7 @@ export async function init(path: string): Promise<Project> {
 	if (!paths().includes(path)) throw new Error("Open this folder in Ace first");
 	const run = async (args: string[]) => {
 		const result = await git(path, args);
-		if (result.status === null) throw new Error("Git is unavailable. Check This Mac in Settings.");
+		if (result.status === null) throw new Error("Git is unavailable. Check Settings → Ace Helper.");
 		if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
 	};
 	if ((await checkout(path)).commit) return project(path);
