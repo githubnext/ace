@@ -21,7 +21,7 @@ import {
 	Sidebar,
 	useLayoutRight,
 } from "@ace/ui";
-import { IconCloud, IconHash } from "@ace/ui/icons";
+import { IconCloud, IconGlobe, IconHash } from "@ace/ui/icons";
 
 import { ChannelAccess } from "./channel-access";
 import { EFFORTS } from "./composer";
@@ -323,7 +323,11 @@ export function Channel(
 				: remote
 				? `${channel.name} · ${channel.host}`
 				: channel.name}
-			icon={place.kind === "cloud" ? place.stopped ? StoppedCloud : IconCloud : IconHash}
+			icon={place.kind === "cloud"
+				? place.stopped ? StoppedCloud : IconCloud
+				: place.kind === "hosted"
+				? IconGlobe
+				: IconHash}
 			chat={chat}
 			changed={changed}
 			opener={opener}
