@@ -57,8 +57,8 @@ privately. `Troubleshooting → Refresh status` syncs at once. From a checkout,
 `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
 
 The services are cells, so they run on Cloudflare Workers, or on [celld](#on-celld) on machines the
-team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, give the Workers the same secret and your
-tailnet's MagicDNS suffix. The services then serve only that tailnet; see
+team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, give the Workers the
+same secret and your tailnet's MagicDNS suffix. The services then serve only that tailnet; see
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
 
 ```sh
