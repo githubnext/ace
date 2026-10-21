@@ -2,18 +2,16 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const USAGE = "bun services/deploy.ts <cloudflare|fly> <team> [--hosted]";
+const USAGE = "bun services/deploy.ts <cloudflare|fly> [--hosted]";
 const MODEL_KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
 
-const [provider, team, ...options] = process.argv.slice(2);
+const [provider, ...options] = process.argv.slice(2);
 const withHosted = options.includes("--hosted");
 if (provider !== "cloudflare" && provider !== "fly") throw new Error(USAGE);
-// App and Worker names: ace-directory-<team> and ace-channel-<team>.
-if (!team || !/^[a-z0-9][a-z0-9-]{0,30}$/.test(team)) {
-	throw new Error(`${USAGE}\n<team> is lowercase letters, digits, and dashes`);
-}
 
 const tailnet = await magicDNS();
+// The services serve one tailnet, so its name names them: ace-directory-tail1234 for tail1234.ts.net.
+const team = tailnet.split(".")[0]!.toLowerCase();
 const secret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
 const shared = { ACE_SECRET: secret, TAILNET: tailnet };
 const deploy = provider === "cloudflare" ? cloudflare : fly;

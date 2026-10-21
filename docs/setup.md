@@ -62,13 +62,13 @@ same secret and your tailnet's MagicDNS suffix. The services then serve only tha
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
 
 One command does every step below for Cloudflare or Fly.io, signed in to `wrangler` or `fly`,
-with Tailscale on. It deploys `ace-directory-<team>` with a new team secret and prints the
-directory's URL and the secret to join with. `--hosted` adds hosted channels as
-`ace-channel-<team>`, with `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` from your environment or the
-checkout's `.env`.
+with Tailscale on. It names the services for your tailnet (`ace-directory-tail1234` for
+`tail1234.ts.net`), deploys the directory with a new team secret, and prints the directory's URL
+and the secret to join with. `--hosted` adds hosted channels, with `ANTHROPIC_API_KEY` and
+`OPENAI_API_KEY` from your environment or the checkout's `.env`.
 
 ```sh
-bun services/deploy.ts <cloudflare|fly> <team> [--hosted]
+bun services/deploy.ts <cloudflare|fly> [--hosted]
 ```
 
 By hand, on Cloudflare:
@@ -126,7 +126,7 @@ restart. Compute still needs Cloudflare.
 
 [`services/fly.toml`](../services/fly.toml) runs one celld node per service on Fly.io, with a
 Tigris bucket each. Tigris needs a card on the Fly account. Pick app names (`ace-directory-<team>`
-and `ace-channel-<team>` below), then create the apps and buckets. `fly storage create` prints the
+and `ace-channel-<tailnet>` below), then create the apps and buckets. `fly storage create` prints the
 bucket's keys once; keep them to deploy from a checkout.
 
 ```sh
