@@ -16,7 +16,7 @@ import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
-import { type Invite as Team, link, parse } from "./invite";
+import { type Invite as Team, link, page, parse } from "./invite";
 
 const DOCS = "https://github.com/githubnext/ace/blob/main/docs/setup.md";
 const PROVIDERS = {
@@ -385,7 +385,7 @@ function Deploy({ hosted, command, back, onJoined }: {
 	);
 }
 
-/** The invite link, with its two values for teammates whose chat won't open an `ace://` link. */
+/** The invite link, with its two values for anyone who joins by hand. */
 function Members({ team }: { team: Team }) {
 	const [separate, setSeparate] = useState(false);
 	return (
@@ -401,7 +401,10 @@ function Members({ team }: { team: Team }) {
 				<li>
 					Open the invite link, or paste it into Join your team
 					<div className="mt-2 flex flex-col gap-1.5">
-						<Copyable value={link(team)} label={`ace://join · ${new URL(team.url).host}`} />
+						<Copyable
+							value={link(team)}
+							label={`${page.replace("https://", "")} · ${new URL(team.url).host}`}
+						/>
 						{separate && (
 							<>
 								<Copyable value={team.url} />

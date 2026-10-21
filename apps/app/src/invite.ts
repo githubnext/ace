@@ -4,12 +4,17 @@
  */
 export type Invite = { url: string; secret: string };
 
-/** Stable's scheme: teammates run the stable app. Canary and dev builds register their own. */
+/**
+ * An https page, because chat apps linkify it and not `ace://`; it offers the download, then hands
+ * off to stable's `ace://join`. The invite rides in the fragment, which browsers never send.
+ */
+export const page = "https://ace.githubnext.com/join";
+
 export function link({ url, secret }: Invite): string {
-	return `ace://join?${new URLSearchParams({ directory: url, secret })}`;
+	return `${page}#${new URLSearchParams({ directory: url, secret })}`;
 }
 
-/** Reads a link from any build's scheme (ace, ace-canary, ace-dev). */
+/** Reads the page's link, or a handoff in any build's scheme (ace, ace-canary, ace-dev). */
 export function parse(text: string): Invite | undefined {
 	let value: URL;
 	try {
@@ -17,8 +22,12 @@ export function parse(text: string): Invite | undefined {
 	} catch {
 		return;
 	}
-	if (!/^ace(-[a-z]+)?:$/.test(value.protocol) || value.host !== "join") return;
-	const url = value.searchParams.get("directory");
-	const secret = value.searchParams.get("secret");
+	const params = `${value.origin}${value.pathname}`.replace(/\/$/, "") === page
+		? new URLSearchParams(value.hash.slice(1))
+		: /^ace(-[a-z]+)?:$/.test(value.protocol) && value.host === "join"
+		? value.searchParams
+		: undefined;
+	const url = params?.get("directory");
+	const secret = params?.get("secret");
 	if (url && secret) return { url, secret };
 }
