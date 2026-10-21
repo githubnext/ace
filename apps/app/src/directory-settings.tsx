@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Input } from "@ace/ui";
 import type { Diagnostics } from "@ace/host/protocol";
 
+import { desktop } from "./desktop";
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
@@ -26,6 +27,20 @@ const tailnet = {
 export function TeamSettings({ active }: { active: boolean }) {
 	const checks = useDiagnostics(active);
 	const checked = checks.value;
+	const [restart, setRestart] = useState<{ busy?: boolean; error?: string }>({});
+
+	async function restartHelper() {
+		if (!desktop) return;
+		setRestart({ busy: true });
+		try {
+			await desktop.helper("restart");
+			setRestart({});
+		} catch (error) {
+			setRestart({ error: (error as Error).message });
+		}
+		checks.refresh();
+	}
+
 	return (
 		<Page>
 			<Group
@@ -46,10 +61,29 @@ export function TeamSettings({ active }: { active: boolean }) {
 							label="Tailscale"
 							description={checked.tailscale.loopback
 								? "Loopback only, so teammates can't reach this host"
+								: checked.tailscale.restart
+								? `${checked.tailscale.name}. Ace Helper started before this tailnet was connected; restart it to use the tailnet.`
 								: checked.tailscale.name}
-							footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
+							footer={
+								<>
+									{checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
+									{restart.busy && <Status>Restarting Ace Helper…</Status>}
+									{restart.error && <Problem>{restart.error}</Problem>}
+								</>
+							}
 						>
-							<Value>{tailnet[checked.tailscale.state]}</Value>
+							<Value>
+								{checked.tailscale.restart ? "Restart needed" : tailnet[checked.tailscale.state]}
+							</Value>
+							{checked.tailscale.restart && desktop && (
+								<Button
+									variant="outline"
+									disabled={restart.busy}
+									onClick={() => void restartHelper()}
+								>
+									Restart
+								</Button>
+							)}
 						</Row>
 						<TeamDirectory directory={checked.directory} onChange={() => checks.refresh()} />
 					</>
