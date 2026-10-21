@@ -4,8 +4,9 @@ anchor: function refusal
 created: 2026-10-15T06:35:39Z
 norm: '1'
 sig: 78f3b0d364527f79
-body_hash: c9ba4b0665155aa0
-raw_hash: 579f783033937f07
+body_hash: 58340303b3254b16
+raw_hash: 95b03b2c5b254c98
+vouched: 2026-10-21T21:58:19Z
 lines: 11-20
 ---
 
