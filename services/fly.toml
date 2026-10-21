@@ -1,0 +1,37 @@
+# One celld node for the directory or hosted channels on Fly.io, with a Tigris bucket:
+# fly deploy -c services/fly.toml -a <app> --ha=false (see docs/setup.md).
+
+kill_signal = "SIGTERM"
+# Above CELLD_SHUTDOWN_TOTAL_MS (40 s), so a stop can hand cells off before SIGKILL.
+kill_timeout = 60
+
+[build]
+# The githubnext/celld fork carries the fix for denoland/celld#277.
+image = "ghcr.io/githubnext/celld:0.6.2-ace.1"
+
+[env]
+CELLD_ADDR = "0.0.0.0:8080"
+# A public listener needs an explicit internal one; a single node has no peers to reach it.
+CELLD_INTERNAL_ADDR = "127.0.0.1:8081"
+# The bucket is the only copy of each write, as there is no peer to hold it.
+CELLD_DURABILITY = "bucket"
+S3_ENDPOINT = "https://fly.storage.tigris.dev"
+AWS_REGION = "auto"
+
+[http_service]
+internal_port = 8080
+force_https = true
+# Alarms and hibernated sockets need a running node.
+auto_stop_machines = "off"
+auto_start_machines = true
+min_machines_running = 1
+
+[[http_service.checks]]
+path = "/.well-known/celld/health"
+interval = "15s"
+timeout = "5s"
+grace_period = "30s"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "1gb"
