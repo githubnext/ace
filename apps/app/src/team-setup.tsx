@@ -23,6 +23,9 @@ const PROVIDERS = {
 	fly: { label: "Fly.io", cli: "fly" },
 };
 
+// Names, URLs, and secrets are typed exactly; macOS would otherwise capitalize and correct them.
+const RAW = { autoCorrect: "off", autoCapitalize: "off", spellCheck: false } as const;
+
 type Provider = keyof typeof PROVIDERS;
 type Step = "fork" | "join" | "directory" | "remote" | "setup" | "invite" | "solo";
 const STEPS: Partial<Record<Step, string>> = {
@@ -280,6 +283,7 @@ function Setup({ provider, hosted, back, onJoined }: {
 				}
 			/>
 			<Input
+				{...RAW}
 				aria-label="Team name"
 				placeholder="Team name, used in the services' names"
 				value={team}
@@ -325,8 +329,8 @@ function Join(
 				}}
 			>
 				<Input
+					{...RAW}
 					type="url"
-					spellCheck={false}
 					aria-label="Directory URL"
 					placeholder="Directory URL"
 					value={url}
@@ -334,9 +338,9 @@ function Join(
 					onChange={(event) => setUrl(event.target.value)}
 				/>
 				<Input
+					{...RAW}
 					type="password"
 					autoComplete="new-password"
-					spellCheck={false}
 					aria-label="Team secret"
 					placeholder="Team secret"
 					value={secret}
