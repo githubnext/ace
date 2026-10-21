@@ -56,8 +56,9 @@ Whoever sets up the team deploys the services once from a checkout; everyone els
 privately. `Troubleshooting → Refresh status` syncs at once. From a checkout,
 `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
 
-To deploy the channel and directory services to your Cloudflare account, give the Workers the same
-secret and your tailnet's MagicDNS suffix. The services then serve only that tailnet; see
+The services are cells, so they run on Cloudflare Workers or on [celld](#on-celld) on machines the
+team runs. To deploy them to your Cloudflare account, give the Workers the same secret and your
+tailnet's MagicDNS suffix. The services then serve only that tailnet; see
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
 
 ```sh
@@ -81,6 +82,34 @@ picks them up:
 printf %s https://ace-channel.<your-subdomain>.workers.dev | bunx wrangler secret put HOSTED
 ```
 
+### On celld
+
+celld runs the same services on any machine with an S3, R2, GCS, Tigris, or Azure Blob bucket.
+Until [denoland/celld#277](https://github.com/denoland/celld/issues/277) lands, install the
+[githubnext/celld](https://github.com/githubnext/celld) build, which fixes runs failing with
+"Session is poisoned":
+
+```sh
+curl -fsSL https://celld.dev/install.sh | CELLD_RELEASES_URL=https://github.com/githubnext/celld/releases sh
+```
+
+Put each service's vars in a file (`ACE_SECRET`, `TAILNET`, model keys for `channel`, and `HOSTED`,
+`APP`, or `COMPUTE` for `directory`), deploy each under its own prefix, and run a node per prefix.
+celld has no secret store: the vars sit in the bucket as plain text, so restrict who can read it.
+
+```sh
+bun services/celld.ts channel deploy channel.env --bucket s3://my-bucket/channel
+bun services/celld.ts directory deploy directory.env --bucket s3://my-bucket/directory
+celld --bucket s3://my-bucket/channel --listen 127.0.0.1:8788      # one node per service
+celld --bucket s3://my-bucket/directory --listen 127.0.0.1:8787
+tailscale serve --bg --https 8443 http://127.0.0.1:8788            # celld serves no TLS
+tailscale serve --bg --https 443 http://127.0.0.1:8787
+```
+
+Hosts then use `https://<machine>.<tailnet>.ts.net` as the directory and
+`https://<machine>.<tailnet>.ts.net:8443` as `HOSTED`. Redeploying updates running nodes without a
+restart. Compute still needs Cloudflare.
+
 To try the services locally, put `ACE_SECRET`, `TAILNET`, and a model key in
 `services/channel/.dev.vars`, then:
 
@@ -90,3 +119,6 @@ bun --filter @ace/directory dev --port 8788               # point hosts at http:
 printf %s "$SECRET" | bun ace key set ACE_SECRET          # the value in .dev.vars
 bun ace new --hosted http://localhost:8787 --project ~/code/my-repo
 ```
+
+`bun services/celld.ts <channel|directory> dev --port <port>` runs a service on celld instead, reading
+its `.dev.vars`.

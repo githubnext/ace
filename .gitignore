@@ -12,3 +12,5 @@ artifacts/
 dist-web/
 apps/desktop/native/.build*/
 apps/desktop/native/.swiftpm/
+celld.json
+.celld/
