@@ -51,6 +51,7 @@ import { type Machine, self, whois } from "./tailnet";
 import {
 	checkKey,
 	forgetKey,
+	invite,
 	removeKey,
 	setCompute,
 	setDirectory,
@@ -449,6 +450,7 @@ const keychainOps = new Set<HostRequest["op"]>([
 	"key-forget",
 	"directory-set",
 	"team-deploy",
+	"team-invite",
 ]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
@@ -665,6 +667,8 @@ async function handle(
 			return setDirectory(request.url, request.secret);
 		case "team-deploy":
 			return deployTeam(request.hosted, (waiting) => send({ id, waiting }));
+		case "team-invite":
+			return invite();
 		case "models":
 			if (request.host && request.host !== name && !client.peer) {
 				return (await remote(client, request.host)).request({ op: "models" });

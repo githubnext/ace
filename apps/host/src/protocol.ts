@@ -307,6 +307,8 @@ export type HostRequest =
 	 * account, then join it. Answers with the directory URL and the secret to send teammates.
 	 */
 	| { op: "team-deploy"; hosted: boolean }
+	/** The joined directory's URL and the saved team secret, for the owner to invite a teammate. */
+	| { op: "team-invite" }
 	/** Quiesce this helper before replacing its application, or recover a canceled update. */
 	| { op: "update-prepare" }
 	| { op: "update-cancel" }

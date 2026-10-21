@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 
 import {
 	Button,
@@ -16,6 +16,7 @@ import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
+import { type Invite as Team, link, parse } from "./invite";
 
 const DOCS = "https://github.com/githubnext/ace/blob/main/docs/setup.md";
 const PROVIDERS = {
@@ -38,19 +39,34 @@ const STEPS: Partial<Record<Step, string>> = {
 /**
  * First-run setup for the first person on a tailnet, or a way into the team for everyone after.
  * Membership stays the tailnet's: this only decides where the team's channels are listed.
+ * `invite` opens on joining with an invite link's values; `inviting` opens on this team's invite.
  */
-export function TeamSetup({ github, onClose }: { github?: string; onClose: () => void }) {
-	const [step, setStep] = useState<Step>("fork");
+export function TeamSetup({ github, invite, inviting, onClose }: {
+	github?: string;
+	invite?: Team;
+	inviting?: boolean;
+	onClose: () => void;
+}) {
+	const [step, setStep] = useState<Step>(invite ? "join" : inviting ? "invite" : "fork");
 	const [starting, setStarting] = useState(true);
 	const [listed, setListed] = useState<"hosted" | "peers">("hosted");
 	const [provider, setProvider] = useState<Provider>("cloudflare");
 	const [hosted, setHosted] = useState(false);
-	const [joined, setJoined] = useState<{ url: string; secret: string }>();
+	const [joined, setJoined] = useState<Team>();
+	const [error, setError] = useState("");
+
+	useEffect(() => {
+		if (!inviting) return;
+		host.request<Team>({ op: "team-invite" }).then(
+			setJoined,
+			(error: Error) => setError(error.message),
+		);
+	}, [inviting]);
 
 	return (
 		<Dialog open onOpenChange={next => next || onClose()}>
 			<DialogContent className="gap-4 sm:max-w-[34rem]">
-				{STEPS[step] && <Steps current={step} />}
+				{STEPS[step] && !inviting && <Steps current={step} />}
 				{step === "fork" && (
 					<>
 						<Checks github={github} />
@@ -72,7 +88,7 @@ export function TeamSetup({ github, onClose }: { github?: string; onClose: () =>
 								onSelect={() => setStarting(false)}
 								title="Join your team"
 							>
-								Someone already set Ace up. Use the directory URL and team secret they sent you.
+								Someone already set Ace up. Use the invite link they sent you.
 							</Choice>
 						</div>
 						<Footer
@@ -87,9 +103,11 @@ export function TeamSetup({ github, onClose }: { github?: string; onClose: () =>
 					<>
 						<Header
 							title="Join your team"
-							description="Enter the directory URL and team secret your teammate sent you."
+							description={invite
+								? "Check the directory before you join: it lists your channels for everyone who has this link."
+								: "Paste the invite link your teammate sent you, or enter the directory URL and team secret."}
 						/>
-						<Join onJoined={onClose} back={() => setStep("fork")} />
+						<Join initial={invite} onJoined={onClose} back={() => setStep("fork")} />
 					</>
 				)}
 				{step === "directory" && (
@@ -204,30 +222,17 @@ export function TeamSetup({ github, onClose }: { github?: string; onClose: () =>
 						}}
 					/>
 				)}
-				{step === "invite" && joined && (
+				{step === "invite" && (
 					<>
-						<Header title="Your team is ready" description="Send teammates these steps." />
-						<Invite>
-							<li>
-								Download Ace from <Link href="https://ace.githubnext.com">ace.githubnext.com</Link>
-							</li>
-							<li>
-								Get on your tailnet:{" "}
-								<Link href="https://login.tailscale.com/admin/users">invite them in Tailscale</Link>
-							</li>
-							<li>
-								Join with the directory URL and team secret
-								<div className="mt-2 flex flex-col gap-1.5">
-									<Copyable value={joined.url} />
-									<Copyable value={joined.secret} secret />
-								</div>
-							</li>
-						</Invite>
-						<p className="rounded-md bg-muted px-3 py-2 text-xs leading-5">
-							<b className="font-medium">Send them privately.</b>{" "}
-							Anyone with both can read every channel's name and summary and post in hosted
-							channels.
-						</p>
+						<Header
+							title={inviting ? "Invite your team" : "Your team is ready"}
+							description="Send teammates these steps."
+						/>
+						{joined
+							? <Members team={joined} />
+							: error
+							? <p role="alert" className="text-xs text-destructive">{error}</p>
+							: <p className="text-xs text-muted-foreground">Reading the invite…</p>}
 						<Footer next={<Button onClick={onClose}>Done</Button>} />
 					</>
 				)}
@@ -380,13 +385,58 @@ function Deploy({ hosted, command, back, onJoined }: {
 	);
 }
 
+/** The invite link, with its two values for teammates whose chat won't open an `ace://` link. */
+function Members({ team }: { team: Team }) {
+	const [separate, setSeparate] = useState(false);
+	return (
+		<>
+			<Invite>
+				<li>
+					Download Ace from <Link href="https://ace.githubnext.com">ace.githubnext.com</Link>
+				</li>
+				<li>
+					Get on your tailnet:{" "}
+					<Link href="https://login.tailscale.com/admin/users">invite them in Tailscale</Link>
+				</li>
+				<li>
+					Open the invite link, or paste it into Join your team
+					<div className="mt-2 flex flex-col gap-1.5">
+						<Copyable value={link(team)} label={`ace://join · ${new URL(team.url).host}`} />
+						{separate && (
+							<>
+								<Copyable value={team.url} />
+								<Copyable value={team.secret} secret />
+							</>
+						)}
+					</div>
+					<Button
+						variant="link"
+						size="sm"
+						className="h-auto px-0 text-xs"
+						onClick={() => setSeparate(!separate)}
+					>
+						{separate ? "Hide the URL and secret" : "Copy the URL and secret separately"}
+					</Button>
+				</li>
+			</Invite>
+			<p className="rounded-md bg-muted px-3 py-2 text-xs leading-5">
+				<b className="font-medium">Send it privately.</b>{" "}
+				The link holds the team secret: anyone with it can read every channel's name and summary and
+				post in hosted channels.
+			</p>
+		</>
+	);
+}
+
 /** Today's Settings → Team join: the directory checks the secret before either is saved. */
-function Join(
-	{ onJoined, back }: { onJoined: (url: string, secret: string) => void; back: () => void },
-) {
+function Join({ initial, onJoined, back }: {
+	initial?: Team;
+	onJoined: (url: string, secret: string) => void;
+	back: () => void;
+}) {
 	const id = useId();
-	const [url, setUrl] = useState("");
-	const [secret, setSecret] = useState("");
+	const [url, setUrl] = useState(initial?.url || "");
+	const [secret, setSecret] = useState(initial?.secret || "");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 
@@ -416,11 +466,15 @@ function Join(
 				<Input
 					{...RAW}
 					type="url"
-					aria-label="Directory URL"
-					placeholder="Directory URL"
+					aria-label="Invite link or directory URL"
+					placeholder="Invite link or directory URL"
 					value={url}
 					disabled={busy}
-					onChange={(event) => setUrl(event.target.value)}
+					onChange={(event) => {
+						const invite = parse(event.target.value);
+						setUrl(invite?.url || event.target.value);
+						if (invite) setSecret(invite.secret);
+					}}
 				/>
 				<Input
 					{...RAW}
@@ -602,15 +656,16 @@ function Link({ href, children }: { href: string; children: ReactNode }) {
 	);
 }
 
-function Copyable({ value, secret }: { value: string; secret?: boolean }) {
+/** `label` shows in place of a value that carries a secret. */
+function Copyable({ value, secret, label }: { value: string; secret?: boolean; label?: string }) {
 	const [copied, setCopied] = useState(false);
 	return (
 		<div className="flex min-w-0 items-center gap-2 rounded-md border bg-card py-1 pr-1 pl-3 font-mono text-xs">
-			<span className="min-w-0 flex-1 truncate">{secret ? "•".repeat(24) : value}</span>
+			<span className="min-w-0 flex-1 truncate">{secret ? "•".repeat(24) : label || value}</span>
 			<Button
 				size="sm"
 				variant="ghost"
-				aria-label={secret ? "Copy team secret" : "Copy"}
+				aria-label={secret ? "Copy team secret" : label ? "Copy invite link" : "Copy"}
 				onClick={() =>
 					void navigator.clipboard.writeText(value).then(() => {
 						setCopied(true);

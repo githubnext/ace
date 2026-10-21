@@ -175,6 +175,14 @@ export async function forgetKey(name: string): Promise<boolean> {
 	}
 }
 
+/** What a teammate needs to join: this host's directory and the secret it was joined with. */
+export async function invite(): Promise<{ url: string; secret: string }> {
+	const url = directory.url();
+	const secret = await key("ACE_SECRET");
+	if (!url || !secret) throw new Error("Join the team's directory first");
+	return { url, secret };
+}
+
 /**
  * Join the team's directory, or leave it when `url` is null. A new secret replaces the saved
  * ACE_SECRET only after the directory accepts it; without one, the saved secret must work.

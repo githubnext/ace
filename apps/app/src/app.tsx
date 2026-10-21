@@ -44,6 +44,7 @@ import { Github, GithubSidebar } from "./github";
 import { useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
 import { host } from "./host";
+import { type Invite, parse } from "./invite";
 import { Rename } from "./layout/rename";
 import { MoveChannel } from "./move-channel";
 import { Navigation, type Page, WindowControls } from "./navigation";
@@ -300,7 +301,7 @@ export function App() {
 	const [pins, setPins] = useLocalStorage<string[]>("ace:pinned-channels", []);
 	// Offered once on first run; Settings → Team opens it again.
 	const [offered, setOffered] = useLocalStorage("ace:team-setup", false);
-	const [teaming, setTeaming] = useState(false);
+	const [teaming, setTeaming] = useState<boolean | "inviting" | Invite>(false);
 	const [collapsed, setCollapsed] = useState<Record<SessionSidebarGroupId, boolean>>({
 		pinned: false,
 		mine: false,
@@ -325,8 +326,32 @@ export function App() {
 			setSettings(false);
 			setTeaming(true);
 		};
+		const invite = () => {
+			setSettings(false);
+			setTeaming("inviting");
+		};
+		// The desktop app hands over an invite link it was opened with, as an event or, for a new
+		// window, in the hash.
+		const join = (link: string) => {
+			const invite = parse(link);
+			if (!invite) return;
+			setSettings(false);
+			setTeaming(invite);
+		};
+		const joining = (event: Event) => join((event as CustomEvent<string>).detail);
 		window.addEventListener("ace:team-setup", open);
-		return () => window.removeEventListener("ace:team-setup", open);
+		window.addEventListener("ace:team-invite", invite);
+		window.addEventListener("ace:join", joining);
+		const fragment = new URLSearchParams(location.hash.slice(1)).get("join");
+		if (fragment) {
+			history.replaceState(null, "", location.pathname + location.search);
+			join(fragment);
+		}
+		return () => {
+			window.removeEventListener("ace:team-setup", open);
+			window.removeEventListener("ace:team-invite", invite);
+			window.removeEventListener("ace:join", joining);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -1041,7 +1066,10 @@ export function App() {
 				)}
 				{(teaming || (!offered && connected && !current)) && (
 					<TeamSetup
+						key={typeof teaming === "object" ? teaming.url : String(teaming)}
 						github={hello.github}
+						invite={typeof teaming === "object" ? teaming : undefined}
+						inviting={teaming === "inviting"}
 						onClose={() => {
 							setOffered(true);
 							setTeaming(false);

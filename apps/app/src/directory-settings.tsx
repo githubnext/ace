@@ -5,6 +5,7 @@ import type { Diagnostics } from "@ace/host/protocol";
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
+import { parse } from "./invite";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
 const secrets = {
@@ -165,11 +166,15 @@ function TeamDirectory(
 									autoFocus
 									type="url"
 									spellCheck={false}
-									aria-label="Directory URL"
-									placeholder="https://ace-directory.example.workers.dev"
+									aria-label="Invite link or directory URL"
+									placeholder="Invite link or https://ace-directory.example.workers.dev"
 									value={url}
 									disabled={!!action.busy}
-									onChange={(event) => setUrl(event.target.value)}
+									onChange={(event) => {
+										const invite = parse(event.target.value);
+										setUrl(invite?.url || event.target.value);
+										if (invite) setSecret(invite.secret);
+									}}
 								/>
 								<Input
 									type="password"
@@ -231,6 +236,15 @@ function TeamDirectory(
 							? "Not synced"
 							: "Syncing…"}
 					</Value>
+				)}
+				{directory.url && saved && !editing && (
+					<Button
+						variant="outline"
+						disabled={!!action.busy}
+						onClick={() => window.dispatchEvent(new Event("ace:team-invite"))}
+					>
+						Invite…
+					</Button>
 				)}
 				{!editing && (
 					<Button
