@@ -18,8 +18,8 @@ access to it; see [the team](#the-team).
 | `packages/channel`   | inside a channel worker | The channel: chats, agents, lanes, and the client protocol types     |
 | `apps/host`          | on every machine (Bun)  | The `ace` CLI, channel workers, the channel catalog, local transport |
 | `apps/desktop`       | on macOS                | The desktop client and packaging for Ace Helper                      |
-| `services/channel`   | Cloudflare Workers      | Hosted channels: one Durable Object per channel                      |
-| `services/directory` | Cloudflare Workers      | The team's list of hosts and where each channel lives, and lobbies   |
+| `services/channel`   | Cloudflare or celld     | Hosted channels: one Durable Object per channel                      |
+| `services/directory` | Cloudflare or celld     | The team's list of hosts and where each channel lives, and lobbies   |
 
 Clients (the CLI and desktop app) attach to channels; a channel is not a client.
 
@@ -317,7 +317,7 @@ its outcome, and `task` and `call` on model responses and tool calls. Channels l
 responses with usage and provider errors, and tool calls with durations; message text is not
 logged, but tool arguments are, clipped to 2,000 characters. `debug` lines (listings, watches,
 directory syncs, workspace calls) are written only with `ACE_DEBUG=1`. Hosted services log the same
-records to Workers Logs.
+records to Workers Logs on Cloudflare, or to the node's output on celld.
 
 ## Desktop
 
