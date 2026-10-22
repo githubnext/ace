@@ -476,6 +476,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"project-access",
 	"project-share",
 	"project-open",
+	"project-remove",
 	"project-init",
 	"project-clone",
 	"github-list",
