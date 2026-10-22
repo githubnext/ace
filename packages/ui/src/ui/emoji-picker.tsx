@@ -22,11 +22,16 @@ const TONES = [
 	{ emoji: "👋🏿", label: "Dark skin tone" },
 ] as const;
 
-/** Converts a CSS color value to an "R, G, B" triplet string for emoji-mart's --rgb-* vars. */
-function toRGB(color: string) {
+/**
+ * Paints CSS colors over each other into an "R, G, B" triplet for emoji-mart's --rgb-* vars, which
+ * take no alpha: a translucent token alone would read as its opaque base color.
+ */
+function toRGB(...colors: string[]) {
 	let ctx = document.createElement("canvas").getContext("2d")!;
-	ctx.fillStyle = color;
-	ctx.fillRect(0, 0, 1, 1);
+	for (let color of colors) {
+		ctx.fillStyle = color;
+		ctx.fillRect(0, 0, 1, 1);
+	}
 	let [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
 	return `${r}, ${g}, ${b}`;
 }
@@ -37,7 +42,7 @@ function resolveVars(el: HTMLElement) {
 	let get = (name: string) => s.getPropertyValue(name).trim();
 	return {
 		"--rgb-background": toRGB(get("--popover")),
-		"--rgb-input": toRGB(get("--input")),
+		"--rgb-input": toRGB(get("--popover"), get("--input")),
 		"--rgb-color": toRGB(get("--popover-foreground")),
 		"--rgb-accent": toRGB(get("--accent")),
 		"--color-border": get("--border"),
