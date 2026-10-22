@@ -685,7 +685,7 @@ async function handle(
 			await setKey(request.provider, request.value);
 			return settingsChanged();
 		case "key-check":
-			return checkKey(request.provider);
+			return checkKey(request.provider, settingsChanged);
 		case "key-remove":
 			await removeKey(request.provider);
 			return settingsChanged();

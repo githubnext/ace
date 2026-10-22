@@ -289,7 +289,12 @@ export type CredentialStatus = {
 	waiting?: string;
 };
 
-export type ProviderSettings = CredentialStatus & { id: ProviderId; name: string };
+export type ProviderSettings = CredentialStatus & {
+	id: ProviderId;
+	name: string;
+	/** The provider rejected the key at its last check, and the key hasn't changed since. */
+	rejected?: true;
+};
 
 export type Settings = {
 	providers: ProviderSettings[];

@@ -4,7 +4,17 @@ import { available } from "@ace/channel/models";
 import { config } from "./config";
 import * as directory from "./directory";
 import { rejection } from "./http";
-import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } from "./keys";
+import {
+	forget,
+	isRejected,
+	judge,
+	key,
+	KEYCHAIN_WAITING,
+	latest,
+	overriding,
+	settled,
+	store,
+} from "./keys";
 import { models, parseModel } from "./manage";
 import { canonical } from "./move";
 import {
@@ -41,7 +51,11 @@ export async function settings(fresh?: boolean): Promise<Settings> {
 	const [statuses, usable] = await Promise.all([
 		Promise.all(
 			[...providers].map(async ([id, { name, key }]) =>
-				Object.assign(await latest(key, fresh), { id, name })
+				Object.assign(
+					await latest(key, fresh),
+					{ id, name },
+					isRejected(key) ? { rejected: true as const } : {},
+				)
 			),
 		),
 		available(catalog.models).catch((error: Error) => error),
@@ -55,6 +69,8 @@ export async function settings(fresh?: boolean): Promise<Settings> {
 		error: usable instanceof Error ? usable.message : undefined,
 	};
 }
+
+class Rejected extends Error {}
 
 async function check(id: ProviderId, value: string): Promise<void> {
 	const selected = provider(id);
@@ -74,7 +90,7 @@ async function check(id: ProviderId, value: string): Promise<void> {
 	// Provider errors can echo credentials. Only status codes leave the host.
 	await response.body?.cancel();
 	if (response.ok) return;
-	if (response.status === 401) throw new Error(`${selected.name} rejected this API key.`);
+	if (response.status === 401) throw new Rejected(`${selected.name} rejected this API key.`);
 	if (response.status === 403) {
 		throw new Error(
 			`${selected.name} denied access. Check this key's permissions for listing models.`,
@@ -105,11 +121,18 @@ export async function setKey(id: ProviderId, value: string): Promise<void> {
 	}
 }
 
-export async function checkKey(id: ProviderId): Promise<void> {
+/** `changed` runs when the verdict changes what Settings shows for the key. */
+export async function checkKey(id: ProviderId, changed: () => void): Promise<void> {
 	const selected = provider(id);
 	const value = await key(selected.key);
 	if (!value) throw new Error(`Add a ${selected.name} API key first.`);
-	await check(id, value);
+	try {
+		await check(id, value);
+	} catch (error) {
+		if (error instanceof Rejected && judge(selected.key, false)) changed();
+		throw error;
+	}
+	if (judge(selected.key, true)) changed();
 }
 
 export async function removeKey(id: ProviderId): Promise<void> {
