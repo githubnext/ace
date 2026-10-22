@@ -18,6 +18,7 @@ import {
 	IconCloud,
 	IconExternal,
 	IconGlobe,
+	IconHand,
 	IconHash,
 	IconLaptop,
 	IconPlus,
@@ -26,6 +27,7 @@ import {
 import type { GithubList, ModelRef } from "@ace/channel/protocol";
 import type { Listing, People, Presence } from "@ace/host/protocol";
 
+import type { Attention } from "./attention";
 import { Notice } from "./composer";
 import { desktop, here } from "./desktop";
 import { prompt, StateIcon } from "./github";
@@ -248,6 +250,30 @@ function TeammateRow({ teammate, onChannel }: {
 	);
 }
 
+/** The sidebar row's marks: a raised hand for a run that needs you, mentions, then unread. */
+function Marks({ attention }: { attention?: Attention }) {
+	if (!attention) return null;
+	const { mark, mentions } = attention;
+	return (
+		<span className="flex shrink-0 items-center gap-2">
+			{(mark === "failed" || mark === "question") && (
+				<IconHand className="size-4 text-muted-foreground" aria-label="Needs you" role="img" />
+			)}
+			{mentions > 0 && (
+				<span
+					aria-label={`${mentions} ${mentions === 1 ? "mention" : "mentions"}`}
+					className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-2xs leading-none font-semibold text-accent-foreground"
+				>
+					{mentions}
+				</span>
+			)}
+			{(mark === "done" || mark === "message") && (
+				<span aria-label="Unread" role="img" className="size-2 rounded-full bg-primary" />
+			)}
+		</span>
+	);
+}
+
 export function Dashboard(
 	{
 		project,
@@ -256,6 +282,7 @@ export function Dashboard(
 		user,
 		people,
 		presence,
+		attention,
 		local,
 		connected,
 		onSetup,
@@ -275,6 +302,7 @@ export function Dashboard(
 		user: string;
 		people: People;
 		presence: Presence[] | undefined;
+		attention: Map<string, Attention>;
 		local: boolean;
 		connected: boolean;
 		/** Offered for a GitHub project with no checkout on this host. */
@@ -547,6 +575,7 @@ export function Dashboard(
 											</span>
 										)}
 									</span>
+									<Marks attention={attention.get(channel.id)} />
 									{channel.state === "offline" && (
 										<Tooltip>
 											<TooltipTrigger

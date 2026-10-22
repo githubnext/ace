@@ -8,7 +8,7 @@ import {
 } from "@ace/ui";
 import { channelProject, type Listing, type WindowState } from "@ace/host/protocol";
 
-import type { Outcome } from "./attention";
+import type { Attention } from "./attention";
 import { desktop } from "./desktop";
 import { switcher } from "./layout/layout";
 import { type AppProject, label } from "./projects";
@@ -47,12 +47,12 @@ function channelItems(
 	projects: AppProject[],
 	host: string,
 	current: string | undefined,
-	attention: Map<string, Outcome>,
+	attention: Map<string, Attention>,
 ): CommandPaletteItem[] {
 	const names = new Map(projects.map((project) => [project.id, label(project, host)]));
 	return channels.map((channel) => {
 		const project = channelProject(channel);
-		const outcome = attention.get(channel.id);
+		const { mark, mentions } = attention.get(channel.id) || { mentions: 0 };
 		return {
 			kind: "session",
 			id: `channel:${channel.id}`,
@@ -63,11 +63,13 @@ function channelItems(
 			// Other projects' channels wait for a search so the current project's stay in reach.
 			hiddenUntilSearch: project !== current,
 			// A run waiting on a question is still busy, but it waits on them, as in the sidebar.
-			status: outcome === "question" || outcome === "failed"
+			status: mark === "question" || mark === "failed"
 				? "attention"
+				: mentions
+				? "mention"
 				: channel.state === "running" && channel.busy
 				? "busy"
-				: outcome === "done"
+				: mark
 				? "unread"
 				: undefined,
 		};
@@ -91,7 +93,7 @@ export function Palette({ channels, projects, host, project, attention, onChanne
 	host: string;
 	/** The current project's id. */
 	project?: string;
-	attention: Map<string, Outcome>;
+	attention: Map<string, Attention>;
 	onChannel: (channel: Listing) => void;
 	/** Starts a channel in the current project, when one can start there. */
 	onCreate?: { name: string; run: () => void };

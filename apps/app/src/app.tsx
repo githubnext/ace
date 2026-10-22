@@ -35,7 +35,7 @@ import {
 } from "@ace/host/protocol";
 
 import { chosen, deployed, remember } from "./address";
-import { glow, type Outcome, useAttention } from "./attention";
+import { type Attention, glow, useAttention } from "./attention";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
@@ -135,8 +135,9 @@ function row(
 	user: string,
 	host: string,
 	online: SidebarRow["online"],
-	outcome?: Outcome,
+	attention?: Attention,
 ): SidebarRow {
+	const outcome = attention?.mark;
 	const place = placement(channel);
 	// A host's channels are all its owner's, so this is also the host's owner-only check.
 	const own = channel.owner === user && channel.host === host;
@@ -175,9 +176,9 @@ function row(
 		agent: channel.state === "running" && channel.busy && outcome !== "question"
 			? "thinking"
 			: "idle",
-		unreadCount: outcome === "done" ? 1 : 0,
+		unreadCount: outcome === "done" || outcome === "message" ? 1 : 0,
 		needsAttention: outcome === "failed" || outcome === "question",
-		mentionCount: 0,
+		mentionCount: attention?.mentions || 0,
 		lastActivityAt: Math.floor((channel.active || channel.created) / 1000),
 		online,
 	};
@@ -199,7 +200,7 @@ function pinnedGroup(
 	pins: string[],
 	hello: Hello,
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
-	attention: Map<string, Outcome>,
+	attention: Map<string, Attention>,
 	online: (channel: Listing) => SidebarRow["online"],
 ): SessionSidebarGroup {
 	const rows = pins.flatMap((id) => {
@@ -228,7 +229,7 @@ function projectGroups(
 	people: People,
 	now: number,
 	collapsed: Partial<Record<SessionSidebarGroupId, boolean>>,
-	attention: Map<string, Outcome>,
+	attention: Map<string, Attention>,
 	pins: string[],
 	online: (channel: Listing) => SidebarRow["online"],
 ): SessionSidebarGroup[] {
@@ -447,9 +448,12 @@ export function App() {
 			removable: removable(value),
 		})),
 	];
+	const github = people[hello.user];
+	const names = useMemo(() => github ? [github.toLowerCase()] : [], [github]);
 	const { attention, pulse } = useAttention(
 		channels,
 		hello.user,
+		names,
 		page === "channels" ? channel?.id : undefined,
 	);
 	const online = (channel: Listing) =>
@@ -955,6 +959,7 @@ export function App() {
 									user={hello.user}
 									people={people}
 									presence={presence[current.id]}
+									attention={attention}
 									local={local}
 									connected={connected}
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}

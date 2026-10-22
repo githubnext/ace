@@ -121,6 +121,8 @@ async function local(): Promise<Listing[]> {
 			created,
 			active,
 			ran,
+			said,
+			mentions,
 			hosted,
 		} = record;
 		const listing: Listing = {
@@ -139,6 +141,8 @@ async function local(): Promise<Listing[]> {
 		};
 		if (active) listing.active = active;
 		if (ran) listing.ran = ran;
+		if (said) listing.said = said;
+		if (mentions) listing.mentions = mentions;
 		const { root, repo } = checkouts[index]!;
 		listing.root = root;
 		if (repo) listing.repo = repo;

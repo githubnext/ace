@@ -61,6 +61,7 @@ const channel = await Channel.open({
 	onActivity: (at) => catalog.activity(id, at),
 	onBusy: (busy) => catalog.busy(id, busy),
 	onRun: (ran) => catalog.ran(id, ran),
+	onSaid: (said) => catalog.said(id, said),
 	owner: record.owner,
 	project: record.project,
 	model: record.model,

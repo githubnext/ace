@@ -36,6 +36,15 @@ export type RunEnd = {
 	author: string;
 };
 
+/**
+ * A message a person or another channel's agent wrote, published for teammates' attention.
+ * `mentions` are the lowercased names it @mentions, which people write as GitHub logins.
+ */
+export type Said = { chat: ChatId; at: number; author: string; mentions?: string[] };
+
+/** An @mention in message text; the channel counts what the app links, so both use this one. */
+export const MENTION = /(?<=^|\s)@([a-zA-Z0-9_-]+)/g;
+
 export type ChannelInfo = Metadata & {
 	id: string;
 	/** Directory of the project checkout lanes are created from. */

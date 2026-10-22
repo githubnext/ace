@@ -79,8 +79,10 @@ import type {
 	ModelRef,
 	Request,
 	RunEnd,
+	Said,
 	Usage,
 } from "./protocol";
+import { MENTION } from "./protocol";
 import { queue, withdrawn } from "./queue";
 import * as room from "./room";
 import { exportSeed, importSeed, type Seed } from "./seed";
@@ -141,6 +143,8 @@ export type Options = {
 	onBusy?(busy: boolean): void;
 	/** Publish each run a person invoked as it ends, for their attention. */
 	onRun?(run: RunEnd): void;
+	/** Publish each message people and other channels' agents write, for teammates' attention. */
+	onSaid?(said: Said): void;
 	log: Log;
 };
 
@@ -269,6 +273,7 @@ export class Channel {
 				if (change.type === "entry" && change.value.model?.[0]?.role === "assistant") {
 					channel.#caption(change.value.conversationId);
 				}
+				if (change.type === "entry") channel.#said(change.value);
 				if (change.type !== "document") continue;
 				// Commit order, not request completion order, decides the state clients see.
 				if (change.record.kind === SettingsDoc.definition.kind) {
@@ -796,6 +801,23 @@ export class Channel {
 
 	#event(chat: ChatId): Event {
 		return { kind: "metadata", chat, ...this.#metadata, ...this.#settings };
+	}
+
+	#said(entry: EntryRecord): void {
+		const human = room.human(entry);
+		if (!human) return;
+		const names = [...human.text.matchAll(MENTION)].map((match) => match[1]!.toLowerCase());
+		const mentions = [...new Set(names)];
+		try {
+			this.#options.onSaid?.({
+				chat: entry.conversationId,
+				at: human.at,
+				author: human.author,
+				...(mentions.length ? { mentions } : {}),
+			});
+		} catch (error) {
+			this.#log("warn", "said.publish", failure(error));
+		}
 	}
 
 	#activity(): void {

@@ -106,6 +106,10 @@ export type Listing = {
 	busy?: boolean;
 	/** The latest invoked run's end; absent on older hosts and before a channel's first one. */
 	ran?: RunEnd;
+	/** The latest message a person or another channel's agent wrote; absent on older hosts. */
+	said?: { at: number; author: string };
+	/** How many messages have @mentioned each lowercased name; absent on older hosts. */
+	mentions?: Record<string, number>;
 	state: ChannelState;
 	/** The hosting service's base URL, for a hosted channel; `host` is then its workspace. */
 	hosted?: string;
