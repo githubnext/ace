@@ -12,7 +12,7 @@ import {
 import { userInfo } from "node:os";
 import { join } from "node:path";
 
-import { type Metadata, type ModelRef, type RunEnd, validateName } from "@ace/channel";
+import { type Metadata, type ModelRef, type RunEnd, type Said, validateName } from "@ace/channel";
 
 import { config } from "./config";
 import { identity } from "./tailnet";
@@ -45,6 +45,10 @@ export type Listing = {
 	busy?: boolean;
 	/** The latest invoked run's end, a hint for its author's attention; pi keeps the run itself. */
 	ran?: RunEnd;
+	/** The latest message, a hint for teammates' attention like `ran`. */
+	said?: { at: number; author: string };
+	/** Messages that @mentioned each name since this record began counting; never reset. */
+	mentions?: Record<string, number>;
 	archived?: boolean;
 	/** Base URL of the service hosting the channel; this host serves its workspace unless `compute`. */
 	hosted?: string;
@@ -276,6 +280,13 @@ export function busy(id: string, busy: boolean): void {
 
 export function ran(id: string, ran: RunEnd): void {
 	write({ ...read(id), ran });
+}
+
+export function said(id: string, { at, author, mentions }: Said): void {
+	const record = read(id);
+	const counts = { ...record.mentions };
+	for (const name of mentions || []) counts[name] = (counts[name] || 0) + 1;
+	write({ ...record, said: { at, author }, ...(mentions ? { mentions: counts } : {}) });
 }
 
 function isListed(record: Listing): boolean {

@@ -1,11 +1,10 @@
-import type { QueuedMessage, Reactions } from "@ace/channel/protocol";
+import { MENTION, type QueuedMessage, type Reactions } from "@ace/channel/protocol";
 import type { Listing, People } from "@ace/host/protocol";
 import type { Event } from "@ace/ui";
 
 import type { Item, Tool } from "./transcript";
 
 const AGENT = "ace:agent";
-const MENTION = /(?<=^|\s)@([a-zA-Z0-9_-]+)/g;
 
 /**
  * Channels on the viewed channel's host keyed by the author their agent's messages carry. The prefix

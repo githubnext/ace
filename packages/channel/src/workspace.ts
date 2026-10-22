@@ -17,7 +17,7 @@ import {
 import { type Browser, type BrowserRequest, type BrowserResult, isBrowserAction } from "./browser";
 import { type Desktop, type DesktopRequest, type DesktopResult, isDesktopAction } from "./desktop";
 import type { ImageFile, Images } from "./images";
-import type { Metadata, RunEnd } from "./protocol";
+import type { Metadata, RunEnd, Said } from "./protocol";
 
 declare function btoa(data: string): string;
 declare function atob(data: string): string;
@@ -36,7 +36,8 @@ export type WorkspaceMessage =
 	| { metadata: Metadata }
 	| { active: number }
 	| { busy: boolean }
-	| { ran: RunEnd };
+	| { ran: RunEnd }
+	| { said: Said };
 
 /** Workspace to channel. */
 export type Reply =
