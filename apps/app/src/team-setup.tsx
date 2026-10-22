@@ -133,7 +133,8 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 								onSelect={() => setStarting(false)}
 								title="Join your team"
 							>
-								Someone already set Ace up. Use the invite link they sent you.
+								Someone already set Ace up. Ask them to let you in, or use the directory URL they
+								sent you.
 							</Choice>
 						</div>
 						<Footer
@@ -150,7 +151,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 							title="Join your team"
 							description={invite
 								? "Check the directory before you join: it lists your channels for everyone who has this link."
-								: "Paste the invite link your teammate sent you, or enter the directory URL and team secret."}
+								: "Ask a teammate on your tailnet to let you in, or enter their directory URL. A deployed directory also needs the team secret, which its invite link carries."}
 						/>
 						{!invite && <Nearby onJoined={onClose} />}
 						<Join initial={invite} onJoined={onClose} back={() => setStep("fork")} />
@@ -570,8 +571,8 @@ function Join({ initial, deployed, onJoined, back }: {
 				<Input
 					{...RAW}
 					type="url"
-					aria-label="Invite link or directory URL"
-					placeholder="Invite link or directory URL"
+					aria-label="Directory URL or invite link"
+					placeholder="Directory URL or invite link"
 					value={url}
 					disabled={busy}
 					onChange={(event) => {
