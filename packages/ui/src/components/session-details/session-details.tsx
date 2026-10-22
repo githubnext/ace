@@ -127,7 +127,9 @@ function External(
 function Changes({ changes, onDiff }: { changes: DetailsChanges; onDiff?: () => void }) {
 	const name = changes.group || "Changes";
 	const files = `${changes.files.toLocaleString()} ${changes.files === 1 ? "file" : "files"}`;
-	const label = `${name}: ${files}, ${changes.adds} additions, ${changes.dels} deletions`;
+	const adds = `${changes.adds} ${changes.adds === 1 ? "addition" : "additions"}`;
+	const dels = `${changes.dels} ${changes.dels === 1 ? "deletion" : "deletions"}`;
+	const label = `${name}: ${files}, ${adds}, ${dels}`;
 	const content = (
 		<>
 			<IconFileDiff className={cn(GLYPH, "text-muted-foreground")} aria-hidden />
@@ -318,7 +320,7 @@ export function SessionDetailsView(
 						</div>
 					)}
 					{pull && <Pull pull={pull} />}
-					{pull === null && (creatingPr || onCreatePr) && (
+					{(creatingPr || onCreatePr) && (
 						<CreatePr creating={creatingPr} onCreate={onCreatePr} onDraft={onCreateDraftPr} />
 					)}
 					{pull === null && !creatingPr && !onCreatePr && (

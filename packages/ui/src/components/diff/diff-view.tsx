@@ -38,6 +38,9 @@ type Totals = {
 	group?: string;
 	adds: number;
 	dels: number;
+	files: number;
+	/** Binary files and summarized directories, which have no line counts. */
+	fixed: boolean;
 };
 
 type Cache = {
@@ -50,6 +53,8 @@ type HeaderProps = {
 	file: DiffViewFile;
 	open: boolean;
 	subtitle?: string;
+	/** Shown when the file is listed in more than one group, so its headers differ. */
+	group?: string;
 	onToggle: (file: DiffViewFile, open: boolean) => void;
 };
 
@@ -61,9 +66,13 @@ function total(files: DiffViewFile[]): Totals[] {
 	let groups = new Map<string | undefined, Totals>();
 	for (let file of files) {
 		let sum = groups.get(file.group);
-		if (!sum) groups.set(file.group, sum = { group: file.group, adds: 0, dels: 0 });
+		if (!sum) {
+			groups.set(file.group, sum = { group: file.group, adds: 0, dels: 0, files: 0, fixed: false });
+		}
 		sum.adds += file.adds;
 		sum.dels += file.dels;
+		sum.files += file.count ?? 1;
+		sum.fixed ||= fixed(file);
 	}
 	return [...groups.values()];
 }
@@ -100,6 +109,21 @@ function stamp(file: DiffViewFile) {
 		file.pending ? "pending" : "ready",
 		file.error ?? "",
 	].join("\0");
+}
+
+function plural(count: number, one: string, many: string) {
+	return `${count.toLocaleString()} ${count === 1 ? one : many}`;
+}
+
+/** Paths listed in more than one group, such as a file both committed and edited since. */
+function regrouped(files: DiffViewFile[]) {
+	let seen = new Set<string>();
+	let repeated = new Set<string>();
+	for (let file of files) {
+		if (seen.has(file.file)) repeated.add(file.file);
+		seen.add(file.file);
+	}
+	return repeated;
 }
 
 function duplicateNames(files: DiffViewFile[]) {
@@ -251,6 +275,7 @@ function Header({
 	file,
 	open,
 	subtitle,
+	group,
 	onToggle,
 }: HeaderProps) {
 	let name = basename(file.file);
@@ -267,7 +292,7 @@ function Header({
 				type="button"
 				className="min-w-0 rounded-md text-left transition-[color] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-ring/50 focus-visible:outline-none motion-reduce:transition-none"
 				aria-expanded={fixed(file) ? undefined : open}
-				title={subtitle ?? file.file}
+				title={group ? `${subtitle ?? file.file} (${group})` : subtitle ?? file.file}
 				onClick={() => onToggle(file, open)}
 			>
 				<span className="flex min-w-0 items-baseline gap-3 text-xs font-medium">
@@ -290,6 +315,7 @@ function Header({
 							)
 							: null}
 					</span>
+					{group ? <span className="shrink-0 text-muted-foreground">{group}</span> : null}
 					{fixed(file)
 						? <span className="shrink-0 text-muted-foreground">{file.note || "Binary"}</span>
 						: (
@@ -333,12 +359,21 @@ function Header({
 	);
 }
 
+type Kept = {
+	tree: [boolean, (update: (open: boolean) => boolean) => void];
+	mode: [DiffViewMode, (mode: DiffViewMode) => void];
+};
+
+/** The content remounts when the file list changes, so view choices live out here. */
 function DiffView(props: DiffViewProps) {
 	let key = useMemo(() => filesKey(props.files), [props.files]);
-	return <DiffViewContent key={key} {...props} />;
+	let tree = useState(props.defaultFileTreeOpen ?? false);
+	let mode = useState<DiffViewMode>(props.defaultMode ?? "unified");
+	return <DiffViewContent key={key} {...props} kept={{ tree, mode }} />;
 }
 
 function useDiffView({
+	kept,
 	files,
 	base = "origin/main",
 	head = "Changes",
@@ -346,8 +381,6 @@ function useDiffView({
 	creatingPr,
 	preparingPr,
 	mode,
-	defaultMode = "unified",
-	defaultFileTreeOpen = false,
 	selected,
 	selectedKey,
 	onSelectedChange,
@@ -359,13 +392,13 @@ function useDiffView({
 	actions,
 	onFileOpen,
 	className,
-}: DiffViewProps) {
+}: DiffViewProps & { kept: Kept }) {
 	let [navigation, setNavigation] = useState<
 		{ current: string; applied?: Selection; pending?: string; request?: Selection }
 	>(() => ({ current: files[0]?.file ?? "" }));
 	let { current } = navigation;
-	let [internalMode, setInternalMode] = useState<DiffViewMode>(defaultMode);
-	let [treeOpen, setTreeOpen] = useState(defaultFileTreeOpen);
+	let [internalMode, setInternalMode] = kept.mode;
+	let [treeOpen, setTreeOpen] = kept.tree;
 	let [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 	let code = useRef<CodeViewHandle<undefined>>(null);
 	let cache = useRef(new Map<string, Cache>());
@@ -399,6 +432,7 @@ function useDiffView({
 		: files[0]?.file ?? "";
 	let summary = useMemo(() => total(files), [files]);
 	let duplicates = useMemo(() => duplicateNames(files), [files]);
+	let repeated = useMemo(() => regrouped(files), [files]);
 	let index = useMemo(() => new Map(files.map(file => [id(file), file])), [files]);
 	let paths = useMemo(() => files.map(file => id(file)), [files]);
 	let decorations = useMemo(
@@ -408,7 +442,9 @@ function useDiffView({
 					text: fixed(file) ? file.note || "Binary" : `+${file.adds} -${file.dels}`,
 					title: fixed(file)
 						? file.note || "Binary file"
-						: `${file.adds} additions, ${file.dels} deletions`,
+						: `${plural(file.adds, "addition", "additions")}, ${
+							plural(file.dels, "deletion", "deletions")
+						}`,
 				}]),
 			),
 		[files],
@@ -502,6 +538,7 @@ function useDiffView({
 				file={file}
 				open={open}
 				subtitle={context(file, duplicates)}
+				group={repeated.has(file.file) ? file.group : undefined}
 				onToggle={toggleFile}
 			/>
 		);
@@ -547,7 +584,7 @@ function useDiffView({
 	};
 }
 
-function DiffViewContent(props: DiffViewProps) {
+function DiffViewContent(props: DiffViewProps & { kept: Kept }) {
 	let {
 		files,
 		base,
@@ -612,8 +649,19 @@ function DiffViewContent(props: DiffViewProps) {
 							className="flex shrink-0 items-center gap-2 text-xs font-medium tabular-nums"
 						>
 							{sum.group ? <span className="text-muted-foreground">{sum.group}</span> : null}
-							<span className="text-accent">+{sum.adds}</span>
-							<span className="text-destructive">-{sum.dels}</span>
+							{sum.fixed
+								? (
+									<span className="font-normal text-muted-foreground">
+										{plural(sum.files, "file", "files")}
+									</span>
+								)
+								: null}
+							{sum.fixed && !sum.adds && !sum.dels ? null : (
+								<>
+									<span className="text-accent">+{sum.adds}</span>
+									<span className="text-destructive">-{sum.dels}</span>
+								</>
+							)}
 						</div>
 					))}
 				</div>

@@ -4,7 +4,7 @@ import { DiffView, type DiffViewFile } from "@ace/ui";
 import type { Change, Changes } from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
 
-import { useDetails } from "../details";
+import { publish, useDetails } from "../details";
 import { useGit } from "../git";
 import { host } from "../host";
 
@@ -14,6 +14,8 @@ type Props = { channel: Listing; chat: number; user: string; active: boolean };
 type Loaded = { stamp: string; patch?: string; signature?: string; error?: string };
 
 const POLL = 2000;
+// Fetching the lane's base is a network round trip, so it runs far less often than the poll.
+const FETCH = 60_000;
 const LIMIT = 4;
 export const GROUPS = {
 	committed: "Committed",
@@ -40,6 +42,7 @@ function same(a: Changes | undefined, b: Changes) {
 	if (!a || a.cwd !== b.cwd || a.lane !== b.lane || a.base !== b.base || a.head !== b.head) {
 		return false;
 	}
+	if (a.against !== b.against || a.behind !== b.behind || a.ahead !== b.ahead) return false;
 	if (a.files.length !== b.files.length) return false;
 	if (JSON.stringify(a.dirs) !== JSON.stringify(b.dirs)) return false;
 	return a.files.every((change, i) =>
@@ -59,7 +62,9 @@ function signature(source: string) {
 }
 
 function short(ref: string) {
-	return /^[0-9a-f]{40}$/.test(ref) ? ref.slice(0, 7) : ref;
+	return /^[0-9a-f]{40}$/.test(ref)
+		? ref.slice(0, 7)
+		: ref.replace(/^refs\/(heads|remotes|tags)\//, "");
 }
 
 function subscribe(listener: () => void) {
@@ -114,6 +119,20 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 			live = false;
 			clearTimeout(timer);
 		};
+	}, [channel, chat, active, focused, status]);
+
+	// Git actions read the details' changes, so a fetch's new behind count reaches them from here.
+	useEffect(() => {
+		if (changes) publish(channel, { changes });
+	}, [channel, changes]);
+
+	// The changes read never fetches, so Rebase could otherwise wait on something else fetching.
+	useEffect(() => {
+		if (!active || !focused || status !== "open") return;
+		const fetch = () => void host.channel(channel, { op: "fetch", chat }).catch(() => {});
+		fetch();
+		const timer = setInterval(fetch, FETCH);
+		return () => clearInterval(timer);
 	}, [channel, chat, active, focused, status]);
 
 	useEffect(() => {
@@ -175,6 +194,7 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 					adds: 0,
 					dels: 0,
 					note: `${count.toLocaleString()} files`,
+					count,
 				});
 			}
 			return files;
@@ -199,9 +219,9 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 	return (
 		<DiffView
 			files={files}
-			base={short(changes.base)}
+			base={short(changes.against || changes.base)}
 			head={changes.lane || short(changes.head)}
-			pr={pull
+			pr={pull && !git.createPr && !git.creatingPr
 				? { state: pull.state, number: String(pull.number), url: pull.url, title: pull.title }
 				: undefined}
 			creatingPr={git.creatingPr}

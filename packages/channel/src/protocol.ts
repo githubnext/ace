@@ -96,11 +96,18 @@ export type Changes = {
 	cwd: string;
 	base: string;
 	head: string;
+	/** What the lane's base names: a full ref such as `refs/remotes/origin/main`, or a commit. */
+	against?: string;
 	/**
 	 * Commits on the lane's base, as last fetched, that the lane doesn't have yet; absent when
 	 * none or without a lane.
 	 */
 	behind?: number;
+	/**
+	 * Commits its remote doesn't have: those past its upstream, or since its base for a lane not
+	 * yet pushed. Absent when none or without a remote.
+	 */
+	ahead?: number;
 	files: Change[];
 	/** Untracked directories too large to list file by file. */
 	dirs?: { dir: string; files: number }[];
@@ -235,6 +242,8 @@ export type Request =
 	/** Resolve once the answer to a submission is placed: "done", or "unanswered" when stopped or killed. */
 	| { op: "wait"; submission: number }
 	| { op: "changes"; chat?: ChatId }
+	/** Fetch the lane's remote base so `Changes.behind` counts what landed since; no-op otherwise. */
+	| { op: "fetch"; chat?: ChatId }
 	/** One listed file's unified diff; without `state`, its worktree against the base. */
 	| { op: "patch"; chat?: ChatId; file: string; state?: Change["state"] }
 	/** Replay the chat's transcript, then stream its events until the connection closes. */

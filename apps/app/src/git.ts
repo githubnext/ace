@@ -32,6 +32,8 @@ function fix(pull: GithubPull, failed: GithubCheck[]) {
 const ASKS: Record<Exclude<Ask, "create">, (pull: number) => string> = {
 	commit: () =>
 		"Commit this lane's uncommitted work, following this repository's commit conventions. Leave out anything that doesn't belong, and don't push.",
+	push: () =>
+		"Push this branch's commits to its remote, with `lane push` in a lane and `git push` otherwise, following this repository's instructions. Don't open a pull request.",
 	update: (pull) =>
 		`Update #${pull} with this lane's work: commit what belongs in it, then push with \`lane push\`, following this repository's instructions.`,
 	rebase: () =>
@@ -46,6 +48,7 @@ const ASKS: Record<Exclude<Ask, "create">, (pull: number) => string> = {
 
 const PENDING: Record<Exclude<Ask, "create">, Pick<GitAction, "label" | "icon">> = {
 	commit: { label: "Committing", icon: IconCommit },
+	push: { label: "Pushing", icon: IconPush },
 	update: { label: "Updating PR", icon: IconPush },
 	rebase: { label: "Rebasing", icon: IconBranch },
 	review: { label: "Addressing review", icon: IconReview },
@@ -107,6 +110,17 @@ export function useGit(channel: Listing, chat: number, user: string) {
 		if (!live && dirty(changes)) {
 			actions.push({ label: "Commit", icon: IconCommit, onClick: go("commit") });
 		}
+		// Not every project uses pull requests, or has its remote on GitHub.
+		if (!live && changes.ahead) {
+			const commits = `${changes.ahead} ${changes.ahead === 1 ? "commit" : "commits"}`;
+			actions.push({
+				label: "Push",
+				icon: IconPush,
+				count: `${changes.ahead}`,
+				title: `${commits} its remote doesn't have`,
+				onClick: go("push"),
+			});
+		}
 		if (live && (unpushed || dirty(changes))) {
 			actions.push({
 				label: "Update PR",
@@ -143,7 +157,10 @@ export function useGit(channel: Listing, chat: number, user: string) {
 		}
 	}
 
-	const open = ready && changed && pull === null && !asked;
+	// A closed pull request, or a merged one the branch has moved past, leaves its work unproposed.
+	const past = pull?.state === "closed"
+		|| (pull?.state === "merged" && !!changes && (pull.sha !== changes.head || dirty(changes)));
+	const open = ready && changed && (pull === null || past) && !asked;
 	return {
 		creatingPr: asked === "create",
 		createPr: open ? () => request("create", create(false)) : undefined,
@@ -168,7 +185,9 @@ export function useAsked(channel: string, busy: boolean, pull: GithubPull | null
 			ran.current = false;
 			return;
 		}
-		if (asked === "create" && pull) return publish(channel, { asked: null });
+		// A closed or merged pull request from before isn't the one Create PR asked for.
+		const live = pull?.state === "open" || pull?.state === "draft";
+		if (asked === "create" && live) return publish(channel, { asked: null });
 		if (busy) ran.current = true;
 		else if (ran.current) publish(channel, { asked: null });
 	}, [channel, asked, busy, pull]);

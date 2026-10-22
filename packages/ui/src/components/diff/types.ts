@@ -16,6 +16,8 @@ type DiffViewFile = {
 	group?: string;
 	/** Shown instead of line counts for an entry without a diff, such as a summarized directory. */
 	note?: string;
+	/** How many files the entry stands for, such as a summarized directory's; 1 otherwise. */
+	count?: number;
 };
 
 type DiffViewMode = "unified" | "split";

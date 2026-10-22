@@ -120,6 +120,25 @@ async function untracked(env: ExecutionEnv, cwd: string, context: Context) {
 	return { files, dirs };
 }
 
+/**
+ * Commits past the branch's upstream, or past the fork point of a lane that has a remote but was
+ * never pushed, since `lane push` sets the upstream.
+ */
+async function unpushed(
+	env: ExecutionEnv,
+	cwd: string,
+	fork: string | undefined,
+	context: Context,
+) {
+	const upstream = await read(env, cwd, `rev-list --count ${quote("@{upstream}..HEAD")}`, context, [
+		0,
+		128,
+	]);
+	if (upstream) return Number(upstream);
+	if (!fork || !(await read(env, cwd, "remote", context)).trim()) return 0;
+	return Number(await read(env, cwd, `rev-list --count ${quote(`${fork}..HEAD`)}`, context));
+}
+
 export async function changes(
 	env: ExecutionEnv,
 	cwd: string,
@@ -131,9 +150,10 @@ export async function changes(
 	const stat = async (args: string, state: Stat["state"]) =>
 		numstat(await read(env, cwd, `diff -M --numstat -z ${args}`, context))
 			.map((change) => Object.assign(change, { state }));
-	const [branch, behind, committed, uncommitted, loose] = await Promise.all([
+	const [branch, behind, ahead, committed, uncommitted, loose] = await Promise.all([
 		read(env, cwd, "rev-parse --abbrev-ref HEAD", context),
 		against && read(env, cwd, `rev-list --count ${quote(`HEAD..${against}`)}`, context),
+		unpushed(env, cwd, against && range.base, context),
 		stat(`${range.base} ${range.head}`, "committed"),
 		stat(range.head, "uncommitted"),
 		untracked(env, cwd, context),
@@ -154,10 +174,34 @@ export async function changes(
 		...(name && name !== "HEAD" ? { branch: name } : {}),
 		cwd,
 		...range,
+		...(against ? { against } : {}),
 		...(Number(behind) ? { behind: Number(behind) } : {}),
+		...(ahead ? { ahead } : {}),
 		files,
 		...(loose.dirs.length ? { dirs: loose.dirs } : {}),
 	};
+}
+
+/**
+ * Fetches a lane's base when it is a remote-tracking branch, so `behind` can count what landed
+ * on it. Kept apart from `changes`, which runs every Diff refresh and must stay local.
+ */
+export async function fetchBase(
+	env: ExecutionEnv,
+	cwd: string,
+	base: string | undefined,
+	context: Context,
+) {
+	const ref = base?.startsWith("refs/remotes/") && base.slice("refs/remotes/".length);
+	if (!ref) return;
+	const remote = (await read(env, cwd, "remote", context)).split("\n")
+		.filter((name) => name && ref.startsWith(`${name}/`))
+		.sort((a, b) => b.length - a.length)[0];
+	if (!remote) return;
+	const branch = ref.slice(remote.length + 1);
+	await git(env, `fetch -q ${quote(remote)} ${quote(`+refs/heads/${branch}:${base}`)}`, context, {
+		cwd,
+	});
 }
 
 /** `file` must be one `changes` listed; it is passed to git only as a quoted literal path. */
