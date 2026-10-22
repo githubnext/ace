@@ -121,9 +121,9 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 		<Row
 			id={`${id}-label`}
 			label={provider.name}
-			description={provider.override
-				? `${provider.override} overrides Keychain`
-				: sources[provider.source]}
+			description={`${
+				provider.override ? `${provider.override} overrides Keychain` : sources[provider.source]
+			}${provider.rejected ? `, but ${provider.name} rejected it` : ""}`}
 			footer={
 				<>
 					{editing && (

@@ -85,10 +85,24 @@ const known = new Map<string, Read>();
 /** When Ace Helper last saved or removed each name; a read started before then is stale. */
 const changed = new Map<string, number>();
 
+/** Names whose current value its provider rejected at the last check; a new value clears it. */
+const rejected = new Set<string>();
+
 function change(name: string): void {
 	known.delete(name);
+	rejected.delete(name);
 	changed.set(name, performance.now());
 }
+
+/** Records a provider's verdict on `name`'s current value; true when that changes what Settings shows. */
+export function judge(name: string, accepted: boolean): boolean {
+	if (accepted !== rejected.has(name)) return false;
+	if (accepted) rejected.delete(name);
+	else rejected.add(name);
+	return true;
+}
+
+export const isRejected = (name: string) => rejected.has(name);
 
 export async function store(name: string, value: string): Promise<void> {
 	await Bun.secrets.set({ service: config.keychain, name, value });
