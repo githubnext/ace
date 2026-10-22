@@ -485,7 +485,10 @@ the handoff, signed feeds, hosting, and release credentials.
 ## Hosted channels
 
 Teams deploy `services/channel` to run the same `packages/channel` core in a Durable Object,
-one per channel. Hosted describes channel placement, not an Ace-operated service.
+one per channel. Hosted describes channel placement, not an Ace-operated service. Ace no longer
+creates hosted channels with a host as their workspace (`ace new --hosted` and Move to hosted are
+gone); cloud workspaces still run on this service, and earlier hosted channels keep running and
+move back with `ace move <channel> --local`.
 The object provides what the host's worker provides locally (single ownership of the store,
 isolation, and routing by channel ID) and adds hibernation and placement off any one machine.
 pi's portable SQLite core runs on the object's own SQL through `storage.ts`.

@@ -322,10 +322,10 @@ export type HostRequest =
 	/** Join after the directory accepts the URL and secret, or keep the saved secret; null leaves. */
 	| { op: "directory-set"; url: string | null; secret?: string }
 	/**
-	 * Deploy the tailnet's directory, and hosted channels with `hosted`, to the owner's Cloudflare
-	 * account, then join it. Answers with the directory URL and the secret to send teammates.
+	 * Deploy the tailnet's directory to the owner's Cloudflare account, then join it. Answers with
+	 * the directory URL and the secret to send teammates.
 	 */
-	| { op: "team-deploy"; hosted: boolean }
+	| { op: "team-deploy" }
 	/** The joined directory's URL and the saved team secret, for the owner to invite a teammate. */
 	| { op: "team-invite" }
 	/** Peers whose hosts are in a team, for a host that isn't in one yet. */

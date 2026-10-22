@@ -265,11 +265,8 @@ export class GatewayClient {
 	}
 
 	/** Deploy and join the team's services, hearing each step; see `team-deploy`. */
-	deployTeam(
-		hosted: boolean,
-		waiting: (text: string | null) => void,
-	): Promise<{ url: string; secret: string }> {
-		return this.#request({ op: "team-deploy", hosted }, { waiting });
+	deployTeam(waiting: (text: string | null) => void): Promise<{ url: string; secret: string }> {
+		return this.#request({ op: "team-deploy" }, { waiting });
 	}
 
 	#request<T>(

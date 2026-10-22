@@ -85,36 +85,6 @@ export function hostedConfig(record: catalog.Listing) {
 	};
 }
 
-/** Create a channel on a hosting service, with this host as its workspace. */
-export async function host(
-	dir: string,
-	model: ModelRef | undefined,
-	name: string | undefined,
-	url: string,
-) {
-	// Saving the record starts the workspace link, so the service must have the channel first.
-	const record = catalog.draft(dir, model, name, url.replace(/\/$/, ""));
-	const headers = await hostedAuth();
-	let response: Response;
-	try {
-		response = await fetch(`${record.hosted}/channels/${record.id}`, {
-			method: "POST",
-			headers,
-			body: JSON.stringify(hostedConfig(record)),
-		});
-	} catch (error) {
-		throw new Error(`Could not reach ${record.hosted}: ${(error as Error).message}.`, {
-			cause: error,
-		});
-	}
-	if (!response.ok) {
-		throw new Error(
-			`${await refusal(response, "The hosting service")} The channel was not created.`,
-		);
-	}
-	return catalog.save(record);
-}
-
 /**
  * Forks a channel into a new sibling channel in its project, seeded with the source's summary and
  * a link back to it. The root chat's lane continues in a new lane from its current commit, where

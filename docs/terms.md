@@ -18,6 +18,8 @@ _Avoid_: server, node, VM
 **Hosted channel**:
 A channel that lives in a cell deployed by the team instead of on a host. Its tools run on its
 workspace. Hosted describes where the channel runs; Ace does not operate a hosting service.
+Ace no longer moves channels to a channel service; a cloud workspace's channel is the one hosted
+channel it creates, and earlier hosted channels keep running and can move back to a host.
 
 **Workspace**:
 The execution environment that runs a hosted channel's tools, from lanes on its filesystem.
