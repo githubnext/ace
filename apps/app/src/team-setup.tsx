@@ -301,7 +301,7 @@ function Setup({ provider, back, onJoined }: {
 				}
 			/>
 			<Copyable value={command} />
-			<Join onJoined={onJoined} back={back} />
+			<Join deployed onJoined={onJoined} back={back} />
 		</>
 	);
 }
@@ -527,9 +527,14 @@ function Nearby({ onJoined, team }: { onJoined: () => void; team?: string }) {
 	);
 }
 
-/** Today's Settings → Team join: the directory checks the secret before either is saved. */
-function Join({ initial, onJoined, back }: {
+/**
+ * Today's Settings → Team join: the directory checks the secret before either is saved. As there, a
+ * blank secret is left out, for a directory a host serves on the tailnet or a secret already saved.
+ * A new deployment's invite carries its secret, so `deployed` requires one.
+ */
+function Join({ initial, deployed, onJoined, back }: {
 	initial?: Team;
+	deployed?: boolean;
 	onJoined: (url: string, secret: string) => void;
 	back: () => void;
 }) {
@@ -543,7 +548,7 @@ function Join({ initial, onJoined, back }: {
 		setBusy(true);
 		setError("");
 		try {
-			await host.request({ op: "directory-set", url, secret });
+			await host.request({ op: "directory-set", url, ...(secret.trim() ? { secret } : {}) });
 			onJoined(url.trim(), secret.trim());
 		} catch (error) {
 			setError((error as Error).message);
@@ -580,7 +585,7 @@ function Join({ initial, onJoined, back }: {
 					type="password"
 					autoComplete="new-password"
 					aria-label="Team secret"
-					placeholder="Team secret"
+					placeholder={deployed ? "Team secret" : "Team secret, for a deployed directory"}
 					value={secret}
 					disabled={busy}
 					onChange={(event) => setSecret(event.target.value)}
@@ -590,7 +595,11 @@ function Join({ initial, onJoined, back }: {
 			<Footer
 				back={<Button variant="ghost" disabled={busy} onClick={back}>Back</Button>}
 				next={
-					<Button type="submit" form={id} disabled={busy || !url.trim() || !secret.trim()}>
+					<Button
+						type="submit"
+						form={id}
+						disabled={busy || !url.trim() || (deployed && !secret.trim())}
+					>
 						{busy ? "Checking…" : "Check and join"}
 					</Button>
 				}
