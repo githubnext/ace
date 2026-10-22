@@ -56,6 +56,7 @@ import { type AppProject, label, projects, title } from "./projects";
 import { type Section, Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { ShareProject, useCanShare } from "./share-project";
+import { TeamAsks } from "./team-asks";
 import { TeamSetup } from "./team-setup";
 import { UpdateNotice } from "./updates";
 import { useWindowStorage } from "./window-storage";
@@ -1076,6 +1077,7 @@ export function App() {
 						}}
 					/>
 				)}
+				<TeamAsks />
 				{desktop && <UpdateNotice onOpen={() => window.dispatchEvent(new Event("ace:updates"))} />}
 				<Toaster />
 			</TooltipProvider>
