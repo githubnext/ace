@@ -17,7 +17,7 @@ import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlit
 import { importSnapshot, type Snapshot } from "@ace/channel/transfer";
 
 import * as catalog from "./catalog";
-import { hostedAuth } from "./client";
+import { hostedAuth, request } from "./client";
 import { refusal } from "./http";
 import { project } from "./manage";
 
@@ -131,7 +131,7 @@ export async function restore(directory: string, dir?: string): Promise<catalog.
 	const original = JSON.parse(readFileSync(join(path, "channel.json"), "utf8")) as catalog.Listing;
 	const record: catalog.Listing = {
 		...catalog.draft(await project(dir || original.project), original.model),
-		name: original.name,
+		name: catalog.restored(original.name),
 		named: original.named !== false,
 		summary: original.summary,
 	};
@@ -150,9 +150,15 @@ export async function restore(directory: string, dir?: string): Promise<catalog.
 			copyFileSync(join(path, "channel.sqlite"), storage);
 		}
 		// Saved last: the catalog lists the channel only once its store is complete.
-		return catalog.save(record);
+		catalog.save(record);
 	} catch (error) {
 		rmSync(base, { recursive: true, force: true });
 		throw error;
 	}
+	// The restored store's own metadata still names the original, and it wins when the channel
+	// opens, so the new name has to be committed there too.
+	if (record.name !== original.name) {
+		await request(record.id, { op: "rename", author: catalog.user, name: record.name });
+	}
+	return catalog.read(record.id);
 }

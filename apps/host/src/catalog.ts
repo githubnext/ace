@@ -142,9 +142,9 @@ function taken(except?: string): Set<string> {
 }
 
 /** `base`, or the first of `base-2`, `base-3`, … not in `names`, within the 63-character limit. */
-function unused(base: string, names: Set<string>): string {
+function unused(base: string, names: Set<string>, first = 2): string {
 	let name = base;
-	for (let count = 2; names.has(name); count++) {
+	for (let count = first; names.has(name); count++) {
 		name = `${base.slice(0, 62 - String(count).length).replace(/-+$/, "")}-${count}`;
 	}
 	return name;
@@ -178,6 +178,11 @@ export function claim(id: string, name: string, exact: boolean): string {
 		write({ ...read(id), name: chosen });
 		return chosen;
 	});
+}
+
+/** A restored copy's name: its original's, or Finder-style `<name>-1`, `<name>-2`, … when taken. */
+export function restored(name: string): string {
+	return unused(name, taken(), 1);
 }
 
 /**
