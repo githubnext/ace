@@ -70,6 +70,12 @@ const options = {
 	expansionLineCount: 40,
 	theme: "ace",
 	unsafeCSS: `
+		/* The ace theme is a CSS-variables theme Shiki types as dark, so pierre
+		   pins color-scheme: dark and untokenized text resolves to --diffs-dark. */
+		:host {
+			color-scheme: inherit;
+		}
+
 		[data-diff] {
 			--diffs-grid-number-column-width: calc(3ch + 24px);
 			--diffs-bg-separator-override: var(--color-background);
@@ -204,6 +210,10 @@ const source = {
 	overflow: "scroll",
 	theme: "ace",
 	unsafeCSS: `
+		:host {
+			color-scheme: inherit;
+		}
+
 		[data-file] {
 			--diffs-grid-number-column-width: minmax(min-content, max-content);
 		}
