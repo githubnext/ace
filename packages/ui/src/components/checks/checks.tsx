@@ -72,7 +72,7 @@ export function ChecksNotice({ pull, failed, onFix, onDismiss, className }: Chec
 			</a>
 			<span className="min-w-0 flex-1 truncate text-muted-foreground">
 				{failed.map((check, index) => (
-					<span key={check.url || check.name}>
+					<span key={`${check.name}\0${check.url}`}>
 						{index > 0 && ", "}
 						{check.url
 							? (

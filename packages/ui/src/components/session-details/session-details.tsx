@@ -188,13 +188,15 @@ function Checks({ checks, summary: [Icon, color, label] }: {
 							</>
 						);
 						const name = `${check.name}: ${check.state}`;
+						// GitHub can list several checks under one URL, such as codecov/patch and codecov/project.
+						const key = `${check.name}\0${check.url}`;
 						return check.url
 							? (
-								<External key={check.url} href={check.url} label={name}>
+								<External key={key} href={check.url} label={name}>
 									{content}
 								</External>
 							)
-							: <div key={check.name} className={ROW} aria-label={name}>{content}</div>;
+							: <div key={key} className={ROW} aria-label={name}>{content}</div>;
 					})}
 				</div>
 			)}
