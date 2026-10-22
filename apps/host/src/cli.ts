@@ -60,7 +60,8 @@ const USAGE = `ace — channels on this host
   ace tabs [--port <port>] [--json]              list open windows and their current channel's tabs
   ace tab rename <window> <channel> <tab> <name>  rename one tab; an empty name restores its default
   ace backup <channel> <directory>              snapshot a local or hosted channel's data into a new directory
-  ace restore <directory> [--project <dir>]      restore a backup as a new local channel
+  ace restore <directory> [--project <dir>] [--name <name>]
+                                                restore a backup as a new local channel
   ace export <channel> <file>                    save a channel's chats as an editable seed file
   ace import <file> [--project <dir>] [--name <name>] [--now]
                                                 add a seed as a new local channel; --now moves its
@@ -478,9 +479,9 @@ async function main() {
 		}
 		case "restore": {
 			if (positionals.length !== 2) {
-				throw new Error("ace restore <backup-directory> [--project <dir>]");
+				throw new Error("ace restore <backup-directory> [--project <dir>] [--name <name>]");
 			}
-			const record = await restore(ref!, flags.project);
+			const record = await restore(ref!, { dir: flags.project, name: flags.name });
 			return console.log(`${record.name}\t${record.id}`);
 		}
 		case "import": {

@@ -40,6 +40,7 @@ export async function defaultModel(): Promise<ModelRef> {
 /** The Git top level containing `dir`, which needs a commit for lanes to start from. */
 export async function project(dir: string): Promise<string> {
 	dir = resolve(dir === "~" ? homedir() : dir.startsWith("~/") ? homedir() + dir.slice(1) : dir);
+	if (!existsSync(dir)) throw new Error(`${dir} doesn't exist.`);
 	const result = await git(dir, ["rev-parse", "--show-toplevel"]);
 	if (result.status === null) throw new Error("Git is unavailable. Check Settings → Ace Helper.");
 	if (result.status !== 0) {

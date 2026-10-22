@@ -3,10 +3,10 @@ id: 01M4ZYZJRBTSD6WJVT8HEH8XQ0
 anchor: function restore
 created: 2026-10-15T14:20:42Z
 norm: '1'
-sig: 05c78f711a9a9228
-body_hash: dac1c9f5bf404d33
-raw_hash: 3f94de7e3f41e61b
-vouched: 2026-10-22T21:13:56Z
+sig: 34ffa326bc970eeb
+body_hash: b7adc8d1cb030bd6
+raw_hash: 9cd4b31a0f2d0251
+vouched: 2026-10-22T22:15:45Z
 lines: 119-158
 ---
 

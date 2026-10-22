@@ -76,12 +76,12 @@ keeps the original working-directory paths; it is not a way to move lanes to ano
 
 ## Restore as a new channel
 
-`ace restore <backup-directory> [--project <dir>]` verifies every file against `backup.json`, then
-adds the backup as a new local channel on this host, in the recorded project or `--project`. A
-hosted snapshot is imported and checked against its digest; a local `channel.sqlite` is copied. The
-copy has a new ID and a new lane branch prefix, so it can never run as the original channel, which
-may still be live here or on its service. Its pi metadata keeps the original name, so refer to it by
-ID while both exist. The backup itself is left unchanged, and a failed restore removes only the new
+`ace restore <backup-directory> [--project <dir>] [--name <name>]` verifies every file against
+`backup.json`, then adds the backup as a new local channel on this host, in the recorded project or
+`--project`. A hosted snapshot is imported and checked against its digest; a local `channel.sqlite`
+is copied. The copy has a new ID and a new lane branch prefix, so it can never run as the original
+channel, which may still be live here or on its service. It takes `--name`, or the original's name
+with `-1`, `-2`, … added while that name is taken. The backup itself is left unchanged, and a failed restore removes only the new
 channel's directory.
 
 The restored chats keep the original working-directory and lane paths. If the backup was taken
