@@ -4,9 +4,9 @@ anchor: function Composer
 created: 2026-10-15T12:44:15Z
 norm: '1'
 sig: 6e0e6c5c8afbd01a
-body_hash: 5d41556386df9599
-raw_hash: da6fdc606e9e685b
-vouched: 2026-10-22T15:31:22Z
+body_hash: 50b1bf8d25d5e6da
+raw_hash: fcc5ab24dfd60256
+vouched: 2026-10-22T17:49:27Z
 lines: 101-290
 ---
 
