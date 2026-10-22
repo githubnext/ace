@@ -106,6 +106,24 @@ export async function diagnostics(started?: string): Promise<Diagnostics["tailsc
 	}
 }
 
+/**
+ * Calls `moved` once Tailscale has run on a tailnet other than `started` for two checks in a row.
+ * Tailscale stopping never counts: the host's channels stay on the tailnet it started on.
+ */
+export function watch(started: string | undefined, moved: (tailnet: string) => void): () => void {
+	let seen: string | undefined;
+	const timer = setInterval(async () => {
+		const now = (await status())?.MagicDNSSuffix;
+		if (!now || now === started) seen = undefined;
+		else if (now !== seen) seen = now;
+		else {
+			clearInterval(timer);
+			moved(now);
+		}
+	}, 10_000);
+	return () => clearInterval(timer);
+}
+
 /** Online machines owned by people; tagged nodes are servers, not participants. */
 export async function peers(): Promise<Machine[]> {
 	const value = await status();
