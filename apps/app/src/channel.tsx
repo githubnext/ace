@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import type { Change, Changes, GithubPull } from "@ace/channel/protocol";
-import type { ChannelInfo, Listing } from "@ace/host/protocol";
+import type { ChannelInfo, Listing, TerminalShell } from "@ace/host/protocol";
 import {
 	Badge,
 	type DetailsChanges,
@@ -28,7 +28,7 @@ import { EFFORTS } from "./composer";
 import { Conversation } from "./conversation";
 import { forget, publish, useDetails } from "./details";
 import { useAsked, useGit } from "./git";
-import { host } from "./host";
+import { host, onOpen as onHostOpen } from "./host";
 import { CHAT, Layout } from "./layout/layout";
 import { Diff, GROUPS } from "./panels/diff";
 import { Terminal } from "./panels/terminal";
@@ -333,6 +333,27 @@ export function Channel(
 		});
 	}, [channel.id]);
 
+	// Shells live on this host, so only its own channels have them; reconnecting may follow a reload.
+	const [shells, setShells] = useState<TerminalShell[]>();
+	useEffect(() => {
+		if (remote || place.kind !== "local") return;
+		let live = true;
+		const load = () => {
+			host.request<TerminalShell[]>({ op: "terminals", channel: channel.id }).then(
+				(value) => {
+					if (live) setShells(value.filter((shell) => !shell.attached));
+				},
+				() => {},
+			);
+		};
+		if (host.status === "open") load();
+		const off = onHostOpen(load);
+		return () => {
+			live = false;
+			off();
+		};
+	}, [channel.id, remote, place.kind]);
+
 	const opener = useRef<() => void>(undefined);
 	useEffect(() => {
 		publish(channel.id, {
@@ -362,6 +383,7 @@ export function Channel(
 			chat={chat}
 			changed={changed}
 			opener={opener}
+			shells={shells}
 			actions={<ChannelAccess channel={channel} user={user} />}
 			render={(data, uid, active, update) => {
 				if (uid === CHAT) {

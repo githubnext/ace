@@ -508,6 +508,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"terminal-input",
 	"terminal-resize",
 	"terminal-close",
+	"terminals",
 ]);
 
 type ChannelRequest = Extract<HostRequest, { op: "channel" }>["request"];
@@ -844,6 +845,8 @@ async function handle(
 		case "terminal-close":
 			client.terminals.delete(request.terminal);
 			return terminals.close(request.terminal);
+		case "terminals":
+			return catalog.owns(request.channel) ? terminals.list(request.channel) : [];
 		case "channel": {
 			if (WORKER.has(request.request.op)) throw new Error(`Unknown request ${request.request.op}`);
 			// Only a watch streams; other requests must not leave watchers behind in relays.

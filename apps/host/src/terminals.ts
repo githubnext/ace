@@ -1,6 +1,6 @@
 import { request } from "./client";
 import { log } from "./log";
-import type { ChannelInfo, TerminalFrame, TerminalOpened } from "./protocol";
+import type { ChannelInfo, TerminalFrame, TerminalOpened, TerminalShell } from "./protocol";
 
 /** Replayed on reattach so a reopened tab shows where the shell left off. */
 const SCROLLBACK = 256 * 1024;
@@ -12,6 +12,7 @@ type Listener = (frame: TerminalFrame) => void;
 type Terminal = {
 	id: string;
 	channel: string;
+	chat?: number;
 	cwd: string;
 	process: Bun.Subprocess;
 	pty: Bun.Terminal;
@@ -93,6 +94,7 @@ async function spawn(
 	terminal = {
 		id,
 		channel: request.channel,
+		chat: request.chat,
 		cwd: dir,
 		process: child,
 		pty: child.terminal!,
@@ -135,9 +137,22 @@ export function close(id: string) {
 	}
 }
 
-/** Every terminal of a channel, when the channel is killed, archived or deleted. */
-export function closeChannel(channel: string) {
-	for (const terminal of terminals.values()) if (terminal.channel === channel) close(terminal.id);
+/** A channel's running shells, including those no tab shows any more. */
+export function list(channel: string): TerminalShell[] {
+	const shells: TerminalShell[] = [];
+	for (const terminal of terminals.values()) {
+		if (terminal.channel !== channel) continue;
+		const attached = terminal.listeners.size > 0;
+		shells.push({ terminal: terminal.id, chat: terminal.chat, cwd: terminal.cwd, attached });
+	}
+	return shells;
+}
+
+/** Every terminal of a channel, when the channel is killed, archived or deleted; returns how many. */
+export function closeChannel(channel: string): number {
+	const running = list(channel);
+	for (const terminal of running) close(terminal.terminal);
+	return running.length;
 }
 
 export async function closeAll(): Promise<void> {
