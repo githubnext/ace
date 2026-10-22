@@ -4,9 +4,9 @@ anchor: function useAttention
 created: 2026-10-22T15:40:01Z
 norm: '1'
 sig: 764bb872be391a4f
-body_hash: eaaf5ba9249c1195
-raw_hash: 9ac21a4b149b612a
-vouched: 2026-10-22T20:27:44Z
+body_hash: e8f4fd56e6b15297
+raw_hash: 3466b3d2a2a88367
+vouched: 2026-10-22T20:42:40Z
 lines: 100-195
 ---
 
