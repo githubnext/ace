@@ -651,6 +651,7 @@ function frame(
 		? group.display || String(group.sender || "User")
 		: group.display || (group.run ? "Ace" : "ace");
 	let name = label;
+	let credit = group.credit;
 	let open = group.role === "user" && group.sender != null
 		? openSender?.(String(group.sender))
 		: undefined;
@@ -694,6 +695,7 @@ function frame(
 		workingSettling,
 		label,
 		name,
+		credit,
 		open,
 		hasByline,
 		own,
@@ -812,7 +814,7 @@ function GroupAvatar({ props, state }: GroupRender) {
 }
 
 function GroupByline({ state }: { state: GroupState }) {
-	let { hasByline, mine, name, open, agent, tone, title, date, edit, editTitle } = state;
+	let { hasByline, mine, name, credit, open, agent, tone, title, date, edit, editTitle } = state;
 	return (
 		<>
 			{hasByline && (
@@ -844,6 +846,11 @@ function GroupByline({ state }: { state: GroupState }) {
 								{name}
 							</span>
 						)}
+					{credit && (
+						<span className="min-w-0 truncate text-[0.625rem]" title={credit}>
+							{credit}
+						</span>
+					)}
 					{agent && (
 						<span
 							className="min-w-0 truncate text-[0.625rem] font-medium"

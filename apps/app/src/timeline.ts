@@ -2,6 +2,7 @@ import { MENTION, type QueuedMessage, type Reactions } from "@ace/channel/protoc
 import type { Listing, People } from "@ace/host/protocol";
 import type { Event } from "@ace/ui";
 
+import { placement } from "./placement";
 import type { Item, Tool } from "./transcript";
 
 const AGENT = "ace:agent";
@@ -60,6 +61,31 @@ function withdrawal(
 		lines.push(`Withdrew ${count} from ${names(agents.map((message) => message.author))}.`);
 	}
 	return lines.join(" ");
+}
+
+/**
+ * Who asked for a teammate's run and what ran it, written for the viewer. A local channel's agents
+ * run as its owner on the owner's host with the owner's model keys; a hosted or cloud channel's
+ * service runs them with its own keys.
+ */
+export function credit(
+	asker: string,
+	channel: Listing,
+	user: string,
+	people: People,
+	channels: Map<string, Listing>,
+): string | undefined {
+	if (asker === channel.owner || asker.startsWith("agent@")) return;
+	const name = (login: string) => login === user ? "you" : authorName(login, people, channels);
+	const place = placement(channel);
+	const where = place.kind === "cloud"
+		? `ran in a cloud container on ${place.service} with its key`
+		: place.kind === "hosted"
+		? `ran on ${place.workspace} with ${place.service}'s key`
+		: channel.owner === user
+		? `ran on your ${place.host} with your key`
+		: `ran on ${name(channel.owner)}'s ${place.host} with their key`;
+	return `asked by ${name(asker)} · ${where}`;
 }
 
 function text(value: string): Event.Message.Content.Text {
@@ -126,7 +152,19 @@ export function toEvents(
 	captions: Record<string, string>,
 	recaps: Record<string, string>,
 	reactions: Reactions,
+	by: (asker: string) => string | undefined,
 ): Event[] {
+	// A run answers the newest message that invoked it, as the channel's run end reports.
+	let asker: string | undefined;
+	const sender = (model: string | undefined): Event.Sender.Agent => {
+		const value = asker && by(asker);
+		return {
+			kind: "agent",
+			value: AGENT,
+			display: model || "Agent",
+			...(value ? { credit: value } : {}),
+		};
+	};
 	const events = items.map((item) => {
 		const reacted = item.entry === undefined ? undefined : reactions[item.entry];
 		const base = {
@@ -146,6 +184,7 @@ export function toEvents(
 				: {}),
 		} as const;
 		if (item.kind === "message") {
+			if (item.invoked) asker = item.author;
 			return {
 				...base,
 				sender: {
@@ -190,7 +229,7 @@ export function toEvents(
 		if (item.withdrawn) content.push(text(withdrawal(item.withdrawn, people, channels)));
 		return {
 			...base,
-			sender: { kind: "agent", value: AGENT, display: item.model || "Agent" },
+			sender: sender(item.model),
 			content,
 		} as Event;
 	});
@@ -201,7 +240,7 @@ export function toEvents(
 		type: "message",
 		topic,
 		created_at: Math.floor(Date.now() / 1000),
-		sender: { kind: "agent", value: AGENT, display: draft.model || "Agent" },
+		sender: sender(draft.model),
 		content: [text(draft.text)],
 		streaming: true,
 	} as Event);

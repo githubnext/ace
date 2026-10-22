@@ -14,7 +14,7 @@ import { MessageQueue } from "./message-queue";
 import { OfflineHost, useRoster } from "./onboarding";
 import { present } from "./presence";
 import { pendingQuestion, Question } from "./question";
-import { sources, toEvents } from "./timeline";
+import { credit, sources, toEvents } from "./timeline";
 import { useTranscript, useTyping } from "./transcript";
 import { Usage } from "./usage";
 
@@ -95,6 +95,7 @@ export function Conversation(
 				transcript.captions,
 				transcript.recaps,
 				transcript.reactions,
+				(asker) => credit(asker, channel, user, people, senders),
 			),
 		[
 			transcript.items,
@@ -107,6 +108,8 @@ export function Conversation(
 			transcript.captions,
 			transcript.recaps,
 			transcript.reactions,
+			channel,
+			user,
 		],
 	);
 	const byKey = useMemo(

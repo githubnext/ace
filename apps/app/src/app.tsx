@@ -512,6 +512,7 @@ export function App() {
 		hello.user,
 		names,
 		page === "channels" ? channel?.id : undefined,
+		people,
 	);
 	const online = (channel: Listing) =>
 		present(presence[channelProject(channel)], people[hello.user], channel.id);

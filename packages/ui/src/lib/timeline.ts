@@ -105,6 +105,7 @@ type Row = {
 	role: "user" | "assistant" | "system";
 	sender?: Event.Sender["value"];
 	display?: Event.Sender["display"];
+	credit?: string;
 	run?: string;
 	/** Agent selection used for this user message. */
 	agent?: Event.Message.User["agent"];
@@ -128,6 +129,7 @@ type Group = {
 	role: "user" | "assistant";
 	sender?: Event.Sender["value"];
 	display?: Event.Sender["display"];
+	credit?: string;
 	run?: string;
 	rows: Row[];
 	/** Unix seconds of the last row in the group — used for the byline. */
@@ -338,6 +340,7 @@ function eventToRow(event: Event, project?: REPO, aborted = false): Row | null {
 				role,
 				sender: event.sender.value,
 				display: event.sender.display,
+				credit: event.sender.kind === "agent" ? event.sender.credit : undefined,
 				...(agent ? { agent } : undefined),
 				streaming,
 				run: "run" in event ? event.run : undefined,
@@ -1139,6 +1142,7 @@ function compile(
 					role: row.role as "user" | "assistant",
 					sender: row.sender,
 					display: row.display,
+					credit: row.credit,
 					run: row.run,
 					rows: [row],
 					ts,

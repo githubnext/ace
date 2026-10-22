@@ -15,7 +15,8 @@ const ACTIVE = 3;
 
 /**
  * Deterministic team pulse from listings and the lobby: who is here, their active channels, and
- * runs that ended in their channels after `since`. Teammates with none of these are left out.
+ * runs they asked for that ended after `since`, in anyone's channel. Teammates with none of these
+ * are left out.
  */
 export function pulse(
 	channels: Listing[],
@@ -39,14 +40,16 @@ export function pulse(
 	}
 	const latest = (channel: Listing) => channel.active || channel.created;
 	for (const channel of [...channels].sort((a, b) => latest(b) - latest(a))) {
-		if (channel.owner === user) continue;
-		const ended = channel.ran && channel.ran.at > since ? channel.ran.outcome : undefined;
 		const live = channel.state !== "archived" && !isInactive(channel, now);
-		if (!live && ended !== "done" && ended !== "failed") continue;
-		const teammate = get(people[channel.owner] || channel.owner);
-		if (live && teammate.active.length < ACTIVE) teammate.active.push(channel);
-		if (ended === "done") teammate.finished.push(channel);
-		if (ended === "failed") teammate.failed.push(channel);
+		if (live && channel.owner !== user) {
+			const owner = get(people[channel.owner] || channel.owner);
+			if (owner.active.length < ACTIVE) owner.active.push(channel);
+		}
+		// A run ended belongs to whoever asked for it, which may be a guest in someone else's channel.
+		const { ran } = channel;
+		if (!ran || ran.at <= since || ran.author === user) continue;
+		if (ran.outcome === "done") get(people[ran.author] || ran.author).finished.push(channel);
+		if (ran.outcome === "failed") get(people[ran.author] || ran.author).failed.push(channel);
 	}
 	const order = { here: 0, away: 1 };
 	return [...team.values()].sort((a, b) =>
