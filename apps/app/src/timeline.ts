@@ -225,7 +225,15 @@ export function toEvents(
 			}
 		}
 		if (item.error) content.push(text(`Run failed: ${item.error}`));
-		if (item.stopped) content.push(text("Stopped."));
+		if (item.stopped) {
+			content.push(
+				text(
+					item.stopper
+						? `Stopped by ${authorName(item.stopper, people, channels)}.`
+						: "Stopped.",
+				),
+			);
+		}
 		if (item.withdrawn) content.push(text(withdrawal(item.withdrawn, people, channels)));
 		return {
 			...base,

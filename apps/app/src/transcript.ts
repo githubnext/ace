@@ -47,6 +47,8 @@ export type Item =
 		tools: Tool[];
 		error?: string;
 		stopped?: boolean;
+		/** Who stopped the run, once the channel records it. */
+		stopper?: string;
 		/** Queued messages withdrawn when the run was stopped. */
 		withdrawn?: QueuedMessage[];
 	};
@@ -232,6 +234,24 @@ export function apply(state: Transcript, event: Event): Transcript {
 			const items = withdraw(state.items, state.withdrawn);
 			return { ...state, busy, draft: "", items, withdrawn: [] };
 		}
+		case "stopped": {
+			const last = state.items.at(-1);
+			if (last?.kind === "reply") {
+				const item: Item = { ...last, stopped: true, stopper: event.author };
+				return { ...state, items: [...state.items.slice(0, -1), item] };
+			}
+			const item: Item = {
+				kind: "reply",
+				key: `s${event.at}`,
+				at: event.at,
+				model: "",
+				text: "",
+				tools: [],
+				stopped: true,
+				stopper: event.author,
+			};
+			return { ...state, items: [...state.items, item] };
+		}
 		case "live":
 			return { ...state, live: true };
 		case "agent":
@@ -377,6 +397,7 @@ export function useTranscript(
 				actions: true,
 				typing: true,
 				agent: true,
+				stops: true,
 				...(chat === undefined ? {} : { chat }),
 			}, {
 				event(event) {

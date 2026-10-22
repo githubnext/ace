@@ -20,6 +20,27 @@ import { type Image, MAX_IMAGES, type TextFile } from "./protocol";
 /** A human message that did not invoke an agent. */
 export const MessageEntry = defineEntry<{ author: string; text: string }>("ace.message");
 
+/**
+ * A person stopped the run before this entry. Its user message tells the chat's next run, which
+ * otherwise sees only an aborted reply and can't tell a person's Stop from a failure.
+ */
+export const StopEntry = defineEntry<{ author: string }>("ace.stopped");
+
+export function stop(author: string, timestamp: number) {
+	return {
+		kind: StopEntry.kind,
+		data: { author } satisfies JsonObject,
+		model: [
+			{
+				role: "user",
+				content:
+					`[${author} stopped your previous run before it finished. Anything it was doing when stopped may not have completed.]`,
+				timestamp,
+			} satisfies UserMessage,
+		],
+	};
+}
+
 const AUTHOR = /^[A-Za-z0-9][A-Za-z0-9._@-]*$/;
 
 export function isAuthor(value: string): boolean {

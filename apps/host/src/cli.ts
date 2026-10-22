@@ -173,6 +173,8 @@ function render(event: Event, info: ChannelInfo) {
 	switch (event.kind) {
 		case "message":
 			return console.log(`${tag}${bold(event.author)}: ${event.text}`);
+		case "stopped":
+			return console.log(dim(`${tag}Stopped by ${event.author}.`));
 		case "reply": {
 			const ending = event.error
 				? `\x1b[31m${event.text ? "\n" : ""}Run failed: ${event.error}\x1b[0m`
@@ -212,7 +214,7 @@ async function watch(session: Session, replay = true): Promise<{ ended: Promise<
 	const info = await session.request<ChannelInfo>({ op: "info" });
 	let live = false;
 	const ended = Promise.withResolvers<void>();
-	await session.request({ op: "watch", chat: chat() }, {
+	await session.request({ op: "watch", chat: chat(), stops: true }, {
 		event(event) {
 			if (event.kind === "live") return void (live = true);
 			if (live || replay) render(event, info);
