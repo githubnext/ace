@@ -4,9 +4,9 @@ anchor: function useTranscript
 created: 2026-10-15T04:57:01Z
 norm: '1'
 sig: 3961cde46070e655
-body_hash: 715b52c056e02eac
-raw_hash: 0c5f8df4fea08fca
-vouched: 2026-10-22T20:30:45Z
+body_hash: 835435c05643b8c8
+raw_hash: 4c294bc99f24c95b
+vouched: 2026-10-22T21:41:26Z
 lines: 197-314
 ---
 
