@@ -4,8 +4,9 @@ anchor: function restore
 created: 2026-10-22T15:17:03Z
 norm: '1'
 sig: 05c78f711a9a9228
-body_hash: 4373dd894fb82afc
-raw_hash: 718d009589045a72
+body_hash: dac1c9f5bf404d33
+raw_hash: 3f94de7e3f41e61b
+vouched: 2026-10-22T21:13:56Z
 lines: 119-164
 ---
 
