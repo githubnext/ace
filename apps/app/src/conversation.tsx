@@ -11,6 +11,7 @@ import { EditMessage } from "./edit-message";
 import { publish } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
+import { OfflineHost } from "./onboarding";
 import { pendingQuestion, Question } from "./question";
 import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
@@ -213,22 +214,22 @@ export function Conversation(
 							intro={{ name: channel.name, createdAt: Math.floor(channel.created / 1000) }}
 						/>
 					)
+					: offline
+					? <OfflineHost name={channel.name} host={channel.host} />
 					: (
 						<div
 							className="grid h-full place-content-center justify-items-center gap-3 px-6 text-center text-sm text-muted-foreground"
 							role={failed ? "alert" : "status"}
 						>
 							<p>
-								{offline
-									? `Offline: ${channel.host} is unreachable. This chat loads when it's back.`
-									: transition
-										|| failed
-										|| notice
-										|| (transcript.restarting
-											? "Channel is restarting…"
-											: channel.state === "dormant"
-											? "Starting channel…"
-											: "Loading chat…")}
+								{transition
+									|| failed
+									|| notice
+									|| (transcript.restarting
+										? "Channel is restarting…"
+										: channel.state === "dormant"
+										? "Starting channel…"
+										: "Loading chat…")}
 							</p>
 							{failed && <Button onClick={transcript.retry}>Try again</Button>}
 						</div>

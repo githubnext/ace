@@ -178,6 +178,15 @@ export type Hello = {
 export type Invite = { url: string; secret: string };
 
 /** A peer whose host is in a team, which this host can ask to join. */
+/** A host on the team, by tailnet machine name and owner. */
+export type Member = {
+	host: string;
+	login: string;
+	github?: string;
+	online: boolean;
+	self?: boolean;
+};
+
 export type TeamPeer = { host: string; login: string; github?: string; team: string };
 
 /** Someone on the tailnet asking this host's owner to let them into the team. */
@@ -344,6 +353,8 @@ export type HostRequest =
 	| { op: "team-invite" }
 	/** Peers whose hosts are in a team, for a host that isn't in one yet. */
 	| { op: "team-peers" }
+	/** This host, hosts running Ace on the tailnet, and hosts the directory lists while offline. */
+	| { op: "team-roster" }
 	/**
 	 * Ask a peer's owner to let this host into their team; on approval it answers with the
 	 * directory and secret over the tailnet, and this host joins as with `directory-set`.

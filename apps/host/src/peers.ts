@@ -5,7 +5,7 @@ import { config } from "./config";
 import * as directory from "./directory";
 import { GatewayClient } from "./gateway-client";
 import { log } from "./log";
-import type { Hello, Invite, Listing, People, TeamPeer } from "./protocol";
+import type { Hello, Invite, Listing, Member, People, TeamPeer } from "./protocol";
 import { type Machine, peers } from "./tailnet";
 
 /** Hosts serve their tailnet listener on the same port unless told otherwise. */
@@ -165,6 +165,20 @@ export async function teams(): Promise<TeamPeer[]> {
 		}),
 	);
 	return found.filter((peer) => !!peer);
+}
+
+/** Hosts running Ace on the tailnet now. */
+export function online(): Member[] {
+	return [...hosts.values()].flatMap(({ machine, client }) => {
+		if (client.status !== "open") return [];
+		const github = named[machine.login];
+		return [{
+			host: machine.name,
+			login: machine.login,
+			...(github ? { github } : {}),
+			online: true,
+		}];
+	});
 }
 
 /** Waits for the peer's owner to approve; see asks.ts. */
