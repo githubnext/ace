@@ -66,6 +66,8 @@ export type Diagnostics = {
 		services: { hosted?: string; app?: string; compute?: string };
 		/** This host serves the team's directory on the tailnet. */
 		serving: boolean;
+		/** The project shares in the directory this host serves, which stopping it deletes. */
+		shares: Share[];
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };

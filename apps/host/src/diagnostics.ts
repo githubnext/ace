@@ -61,6 +61,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 			secret: await secret,
 			services: { hosted, app, compute },
 			serving: served.isServing(),
+			shares: served.shares(),
 		},
 		shell: { ...environment },
 		web: web.address,

@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 
 import { Button, Input } from "@ace/ui";
-import type { Diagnostics } from "@ace/host/protocol";
+import { type Diagnostics, type Share, TEAM } from "@ace/host/protocol";
 
 import { desktop } from "./desktop";
 import { host } from "./host";
@@ -180,6 +180,20 @@ function served(directory: Diagnostics["directory"]): boolean {
 	return directory.serving || URL.parse(directory.url || "")?.pathname === "/directory";
 }
 
+/** Each shared project and who it is shared with, as "b-sandbox with the team; ace with rivera". */
+function shared(shares: Share[]): string {
+	const projects = new Map<string, string[]>();
+	for (const { project, person } of shares) {
+		const name = project.startsWith("github:")
+			? project.slice("github:".length)
+			: (JSON.parse(project) as [string, string])[1].replace(/\/+$/, "").split("/").pop()!;
+		const people = projects.get(name) || [];
+		people.push(person === TEAM ? "the team" : person);
+		projects.set(name, people);
+	}
+	return [...projects].map(([name, people]) => `${name} with ${people.join(", ")}`).join("; ");
+}
+
 /** A time today, or a date and time when older, so a stale sync doesn't read as recent. */
 function when(time: number) {
 	const date = new Date(time);
@@ -340,8 +354,12 @@ function TeamDirectory(
 									)}
 								onCancel={() => setConfirm(undefined)}
 							>
-								Stop serving the directory? Teammates stop seeing channels on offline Macs, and its
-								shares are deleted.
+								Stop serving the directory? Teammates stop seeing channels on offline Macs
+								{directory.shares.length
+									? `, and these shares are deleted, ending the access they give: ${
+										shared(directory.shares)
+									}.`
+									: "."}
 							</Confirm>
 						)}
 						{confirm === "leave" && (
