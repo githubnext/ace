@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+	aceAvatar,
 	Button,
 	buttonVariants,
 	ChatComposer,
@@ -67,6 +68,8 @@ function adopt(project: AppProject): string {
 }
 
 const MODES = [{ id: "ace", name: "Ace", placeholder: "Start a new channel" }];
+// A new channel has no one else in it yet; a list also stops unknown @words becoming chips.
+const MENTIONS = [{ name: "ace", avatar: aceAvatar }];
 
 /** Where a new channel's agent works, offered while the cloud compute beta is on. */
 const PLACES = [
@@ -449,6 +452,7 @@ export function Dashboard(
 						ref={composer}
 						scope={scope}
 						modes={MODES}
+						mentions={MENTIONS}
 						mode="ace"
 						agents={cloud ? PLACES : undefined}
 						agent={place}

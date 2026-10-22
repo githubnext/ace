@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	aceAvatar,
@@ -24,8 +24,7 @@ const MODES = [
 ];
 // A teammate the owner hasn't let invoke sees no @ace; the stored mode brings it back with access.
 const BLOCKED_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }];
-const MENTIONS = [{ name: "ace", avatar: aceAvatar }];
-const NO_MENTIONS: typeof MENTIONS = [];
+const ACE_MENTION = { name: "ace", avatar: aceAvatar };
 export const EFFORTS: Record<Effort, string> = {
 	off: "Off",
 	minimal: "Minimal",
@@ -65,6 +64,8 @@ type Props = {
 	failure?: string;
 	onProviders?: () => void;
 	accessory?: ReactNode;
+	/** People to suggest after @, by GitHub login. */
+	members: { name: string; avatar?: string }[];
 };
 
 /** Below the composer: its attachment tray rises over the space above it and takes clicks there. */
@@ -98,6 +99,7 @@ export function Composer(
 		failure,
 		onProviders,
 		accessory,
+		members,
 	}: Props,
 ) {
 	const composer = useRef<ChatComposerHandle>(null);
@@ -110,6 +112,7 @@ export function Composer(
 	// The channel refuses a blocked teammate's ask, stop, and kill too.
 	const blocked = shared === false && channel.owner !== user;
 	const mode = blocked ? "chat" : stored;
+	const mentions = useMemo(() => blocked ? members : [ACE_MENTION, ...members], [blocked, members]);
 	const [models, setModels] = useState<ModelOption[]>();
 	const [modelError, setModelError] = useState<string>();
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
@@ -319,7 +322,7 @@ export function Composer(
 				modes={blocked ? BLOCKED_MODES : MODES}
 				mode={mode}
 				onModeChange={changeMode}
-				mentions={blocked ? NO_MENTIONS : MENTIONS}
+				mentions={mentions}
 				models={choices}
 				model={model}
 				onModelChange={(value) => changePick({ model: value })}
