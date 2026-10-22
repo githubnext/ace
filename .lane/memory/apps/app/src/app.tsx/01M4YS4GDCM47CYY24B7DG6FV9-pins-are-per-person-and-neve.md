@@ -4,9 +4,9 @@ anchor: function pinnedGroup
 created: 2026-10-15T03:19:17Z
 norm: '1'
 sig: 58e3b298c3735df9
-body_hash: b8c3efd6fb70866d
-raw_hash: d12e8469fd135be8
-vouched: 2026-10-15T03:35:06Z
+body_hash: 8d39b5406045357d
+raw_hash: 8adf6bb06abf3680
+vouched: 2026-10-22T14:47:34Z
 lines: 149-161
 ---
 
