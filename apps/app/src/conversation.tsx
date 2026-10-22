@@ -76,6 +76,8 @@ export function Conversation(
 		: "Sending";
 	const reply = transcript.items.findLast((item) => item.kind === "reply");
 	const question = reply?.kind === "reply" && pendingQuestion(reply.tools, transcript.busy);
+	const last = transcript.items.at(-1);
+	const failure = !transcript.busy && last?.kind === "reply" ? last.error : undefined;
 	const senders = useMemo(() => sources(channels, channel.host), [channels, channel.host]);
 	const events = useMemo(
 		() =>
@@ -299,6 +301,7 @@ export function Conversation(
 						draft={draft}
 						onDraftLoaded={onDraftLoaded}
 						returned={transcript.returned}
+						failure={failure}
 						onProviders={onProviders}
 						accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
 					/>

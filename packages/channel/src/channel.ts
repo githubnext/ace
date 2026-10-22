@@ -652,7 +652,7 @@ export class Channel {
 		room.checkAttachments(request);
 		await this.#mayInvoke(request.author);
 		const conversation = await this.#conversation(request.chat);
-		await this.#select(conversation, request, request.model, request.effort);
+		await this.#select(conversation, request, request.model, request.effort, request.automatic);
 		const submission = await conversation.submit({
 			type: "input",
 			content: room.content(request.author, request.text, request),
@@ -678,11 +678,12 @@ export class Channel {
 		attached: room.Attached,
 		requested: ModelRef | undefined,
 		effort?: Effort,
+		automatic?: boolean,
 	) {
 		const agent = await conversation.agent(context);
 		const current = agent.model;
 		// A chat's inherited model can lose its provider key; only an explicit request must keep it.
-		const kept = !requested && current && await usable(this.#options.models, current)
+		const kept = !requested && !automatic && current && await usable(this.#options.models, current)
 			? current
 			: undefined;
 		const model = requested || kept || await (

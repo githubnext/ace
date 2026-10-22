@@ -221,6 +221,8 @@ export type Request =
 		images?: Image[];
 		files?: TextFile[];
 		model?: ModelRef;
+		/** Without `model`, replace the chat's model with the channel's choice, as for a new chat. */
+		automatic?: boolean;
 		effort?: Effort;
 		requestId?: string;
 	}
