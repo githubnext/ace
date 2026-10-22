@@ -152,6 +152,10 @@ export const projectId = (host: string, path: string, repo?: string) =>
 export const channelProject = (channel: Pick<Listing, "host" | "project" | "root" | "repo">) =>
 	projectId(channel.host, root(channel), channel.repo);
 
+/** What the host and the app say about a repository `githubRepo` doesn't recognize. */
+export const NOT_GITHUB =
+	"Ace clones GitHub repositories. Enter one such as https://github.com/owner/name or owner/name.";
+
 /**
  * The owner/name a GitHub URL, SSH remote, or owner/name names, or undefined for anything else.
  * The app reads it to suggest a clone's folder and the host to clone, so both agree on the name.

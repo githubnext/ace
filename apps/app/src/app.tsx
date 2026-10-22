@@ -604,8 +604,24 @@ export function App() {
 	}
 
 	async function open(path: string) {
-		const value = await host.request<Project>({ op: "project-open", path });
-		chooseProject(projectId(hello.host, value.path, value.repo));
+		const value = await host.request<Project & { from?: string }>({ op: "project-open", path });
+		const id = projectId(hello.host, value.path, value.repo);
+		// A GitHub project is one project on this host however many checkouts of it are opened.
+		const other = value.repo
+			&& opened?.find((checkout) =>
+				checkout.path !== value.path && projectId(hello.host, checkout.path, checkout.repo) === id
+			);
+		chooseProject(id);
+		if (other) {
+			toast(`${value.name} is already a project at ${other.path}`, {
+				description: "Channels in it keep starting from that checkout.",
+			});
+		} else if (value.from) {
+			toast(`Opened ${value.name}`, {
+				description:
+					`${value.from} is inside the Git repository at ${value.path}, so Ace opened that.`,
+			});
+		}
 	}
 
 	// Declared, not a const: the All Projects groups above call it during render.
@@ -1096,6 +1112,7 @@ export function App() {
 												name={current.label}
 												ignored={current.ignored}
 												disabled={!connected}
+												path={current.path}
 												onInit={() => init(current.path)}
 											/>
 										</div>
@@ -1142,6 +1159,7 @@ export function App() {
 				{setup && (
 					<SetupProject
 						project={setup.project}
+						opened={opened || []}
 						starting={!!setup.start}
 						onSetup={finishSetup}
 						onClose={() => setSetup(undefined)}

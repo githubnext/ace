@@ -127,18 +127,21 @@ export async function list(): Promise<Project[]> {
 const expand = (value: string) =>
 	value === "~" ? homedir() : value.startsWith("~/") ? homedir() + value.slice(1) : value;
 
-/** Opening a folder must not require model credentials or create a channel. */
-export async function open(value: string): Promise<Project> {
+/**
+ * Opening a folder must not require model credentials or create a channel. A folder inside a
+ * repository opens that repository, and `from` names the folder asked for so the app can say so.
+ */
+export async function open(value: string): Promise<Project & { from?: string }> {
 	// A relative path would resolve against Ace Helper's working directory, which no one sees.
 	const expanded = expand(value.trim());
 	if (!isAbsolute(expanded)) throw new Error("Enter a full folder path, such as ~/code/project");
 	if (!existsSync(expanded)) throw new Error(`There's no folder at ${expanded}. Check the path.`);
-	let path = realpathSync(expanded);
-	if (!statSync(path).isDirectory()) throw new Error("Choose a folder to open as a project");
-	path = realpathSync((await checkout(path)).root);
+	const folder = realpathSync(expanded);
+	if (!statSync(folder).isDirectory()) throw new Error("Choose a folder to open as a project");
+	const path = realpathSync((await checkout(folder)).root);
 	const opened = paths();
 	if (!opened.includes(path)) save([...opened, path]);
-	return project(path);
+	return { ...await project(path), ...(path === folder ? {} : { from: folder }) };
 }
 
 /** Removing a project forgets the folder; its files and lanes stay where they are. */

@@ -439,6 +439,7 @@ export function Dashboard(
 			{needsGit && (
 				<div className="mx-auto mt-9 max-w-[39rem]">
 					<InitGit
+						path={project.path}
 						name={project.label}
 						ignored={project.ignored}
 						disabled={!connected}
