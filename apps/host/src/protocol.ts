@@ -67,6 +67,8 @@ export type Diagnostics = {
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
+	/** This host's HTTPS address on the tailnet; unset without a tailnet certificate. */
+	web?: string;
 };
 
 /** `offline`: the channel's host is unreachable. Hosted channels are never offline. */

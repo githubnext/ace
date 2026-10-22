@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@ace/ui";
+import { IconCheck, IconCopy } from "@ace/ui/icons";
 import type { HelperAction, HelperState } from "@ace/desktop/protocol";
 import type { Diagnostics } from "@ace/host/protocol";
 
 import { CommandLine } from "./command-settings";
 import { desktop } from "./desktop";
 import { host } from "./host";
+import { Qr } from "./qr";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
 /** The host's tool and team checks, re-read while `active` and whenever `refresh` is called. */
@@ -190,6 +192,11 @@ export function HostStatus({ active }: { active: boolean }) {
 					<CommandLine active={active} />
 				</Group>
 			)}
+			{checked?.tailscale.state === "running" && !checked.tailscale.loopback && (
+				<Group title="Phone">
+					<Phone web={checked.web} />
+				</Group>
+			)}
 			<Group
 				title="Tools"
 				action={
@@ -240,5 +247,42 @@ export function HostStatus({ active }: { active: boolean }) {
 				: !checked && !checks.error && <Status>Checking…</Status>}
 			{checks.error && checks.open && <Problem>{checks.error}</Problem>}
 		</Page>
+	);
+}
+
+/** This host's HTTPS address, which the owner's phone opens over the tailnet. */
+function Phone({ web }: { web?: string }) {
+	const [copied, setCopied] = useState(false);
+	if (!web) {
+		return (
+			<Row
+				label="Open on your phone"
+				description="Turn on HTTPS in the Tailscale admin console's DNS settings, then restart Ace Helper."
+			/>
+		);
+	}
+	return (
+		<Row
+			label="Open on your phone"
+			description="Scan with a phone on your tailnet."
+			footer={
+				<div className="flex flex-wrap items-center gap-4">
+					<Qr value={web} label={`QR code for ${web}`} className="size-36 rounded-md" />
+					<div className="flex min-w-0 items-center gap-1">
+						<code className="truncate text-xs text-muted-foreground">{web}</code>
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Copy address"
+							onClick={() => {
+								void navigator.clipboard.writeText(web).then(() => setCopied(true));
+							}}
+						>
+							{copied ? <IconCheck /> : <IconCopy />}
+						</Button>
+					</div>
+				</div>
+			}
+		/>
 	);
 }
