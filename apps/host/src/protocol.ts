@@ -39,7 +39,7 @@ export type WorkerInfo = { id: string; pid: number };
 export type WorkerRequest = { op: "worker" } | { op: "freeze" } | { op: "export" };
 
 export type Diagnostics = {
-	tools: { name: string; path?: string; version?: string; error?: string }[];
+	tools: { name: string; path?: string; version?: string; account?: string; error?: string }[];
 	tailscale: {
 		state: "missing" | "offline" | "running" | "error";
 		name?: string;

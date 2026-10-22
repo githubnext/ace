@@ -242,7 +242,11 @@ export function HostStatus({ active }: { active: boolean }) {
 								description={tool.path}
 								footer={tool.error && <Problem>{tool.error}</Problem>}
 							>
-								{(tool.version || !tool.path) && <Value>{tool.version || "Not found"}</Value>}
+								{(tool.version || tool.account || !tool.path) && (
+									<Value>
+										{tool.version || (tool.account ? `Signed in as ${tool.account}` : "Not found")}
+									</Value>
+								)}
 							</Row>
 						))}
 					</>

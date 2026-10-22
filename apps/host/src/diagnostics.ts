@@ -6,6 +6,7 @@ import { config } from "./config";
 import * as directory from "./directory";
 import * as served from "./directory-server";
 import { shell as environment } from "./environment";
+import * as github from "./github";
 import { latest } from "./keys";
 import type { Diagnostics } from "./protocol";
 import * as tailnet from "./tailnet";
@@ -41,6 +42,32 @@ async function shell(): Promise<Diagnostics["tools"][number]> {
 	}
 }
 
+async function gh(): Promise<Diagnostics["tools"][number]> {
+	const name = "GitHub CLI";
+	const path = Bun.which("gh", { PATH: process.env.PATH }) || undefined;
+	if (!path) {
+		return { name, error: "Install GitHub CLI, then sign in with gh auth login, to use GitHub." };
+	}
+	const child = Bun.spawn([path, "auth", "status", "--hostname", "github.com", "--json", "hosts"], {
+		env: github.environment(),
+		stdin: "ignore",
+		stdout: "pipe",
+		stderr: "ignore",
+		timeout: 5000,
+	});
+	const [out, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+	if (code !== 0) return { name, path, error: "GitHub CLI could not start." };
+	const { hosts } = JSON.parse(out) as {
+		hosts: Record<string, { state: string; active: boolean; login: string }[]>;
+	};
+	const account = hosts["github.com"]?.find((account) => account.active);
+	if (!account) return { name, path, error: "Sign in with gh auth login to use GitHub." };
+	if (account.state !== "success" || !account.login) {
+		return { name, path, error: "GitHub didn't accept this sign-in. Run gh auth login again." };
+	}
+	return { name, path, account: account.login };
+}
+
 export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 	const secret = latest("ACE_SECRET", sync);
 	if (sync) {
@@ -49,7 +76,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 		if (!(await secret).waiting) await Promise.race([synced, Bun.sleep(25_000)]);
 	}
 	const [tools, tailscale] = await Promise.all([
-		Promise.all([git(), shell()]),
+		Promise.all([git(), gh(), shell()]),
 		tailnet.diagnostics(started),
 	]);
 	const { hosted, app, compute, hosts } = directory.read();

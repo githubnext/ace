@@ -147,9 +147,8 @@ function sentence(error: string): string {
 	return error.replace(/^GraphQL: /, "GitHub refused the request: ");
 }
 
-async function gh<T>(args: string[]): Promise<T> {
-	const path = Bun.which("gh", { PATH: process.env.PATH });
-	if (!path) throw new Error("Install GitHub CLI on this host, then sign in with gh auth login.");
+/** The environment gh runs in: this host's GitHub token, github.com, and no prompts. */
+export function environment(): NodeJS.ProcessEnv {
 	const env: NodeJS.ProcessEnv = {
 		...process.env,
 		...githubEnv(),
@@ -158,8 +157,14 @@ async function gh<T>(args: string[]): Promise<T> {
 		GH_PAGER: "cat",
 	};
 	delete env.GH_REPO;
+	return env;
+}
+
+async function gh<T>(args: string[]): Promise<T> {
+	const path = Bun.which("gh", { PATH: process.env.PATH });
+	if (!path) throw new Error("Install GitHub CLI on this host, then sign in with gh auth login.");
 	const child = Bun.spawn([path, ...args], {
-		env,
+		env: environment(),
 		stdin: "ignore",
 		stdout: "pipe",
 		stderr: "pipe",
