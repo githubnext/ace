@@ -51,6 +51,8 @@ const BUBBLE_GAP = 2;
 const BUBBLE_BORDER = 1;
 const BUBBLE_PAD_X = 12;
 const BUBBLE_PAD_Y = 5;
+// Bubbles in a message group leave room beside them for an earlier message's time.
+const STAMP = 52;
 const FILES_HEIGHT = 20;
 const TOOL_GROUP_ROW_HEIGHT = TOOL_ROW_HEIGHT;
 const TOOL_GROUP_PAD_Y = 6;
@@ -810,7 +812,7 @@ function itemHeight(
 	} else {
 		for (let row of group.rows) {
 			let isBubble = group.role === "user" || group.role === "assistant";
-			let w = isBubble ? content - BUBBLE_PAD_X * 2 : content;
+			let w = isBubble ? content - STAMP - BUBBLE_PAD_X * 2 : content;
 			let b = blocks.get(row.uid);
 			if (b) h += measureRow(b, w).height;
 			if (isBubble) h += BUBBLE_PAD_Y * 2;
@@ -901,6 +903,7 @@ export {
 	PR_COMMENT_BUBBLE_PAD_BOTTOM,
 	PR_COMMENT_GAP,
 	REACTION_GAP,
+	STAMP,
 	summaryId,
 	TAIL,
 	textBlocks,
