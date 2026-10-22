@@ -40,6 +40,10 @@ const LEADING = /^\s*@ace\b/i;
 const UNPICKED: { model?: string; effort?: Effort } = {};
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
+// Errors a provider gives for the model or its key, which another try with them would repeat.
+const MODEL_FAULT =
+	/\b(401|403|404)\b|api key|unauthori[sz]ed|authenticat|permission|does not exist|not found|access to/i;
+const RETRY = "Try again.";
 
 type Props = {
 	channel: Listing;
@@ -57,6 +61,8 @@ type Props = {
 	onDraftLoaded: () => void;
 	/** Messages withdrawn from the chat's queue; the user's own come back into the draft. */
 	returned: QueuedMessage[];
+	/** The error of the chat's latest run, when it failed and nothing has run since. */
+	failure?: string;
 	onProviders?: () => void;
 	accessory?: ReactNode;
 };
@@ -89,6 +95,7 @@ export function Composer(
 		draft,
 		onDraftLoaded,
 		returned,
+		failure,
 		onProviders,
 		accessory,
 	}: Props,
@@ -265,6 +272,42 @@ export function Composer(
 		}
 	}
 
+	// Retrying a model's own failure on that model would fail again, so it hands the choice back.
+	const reset = !!failure && MODEL_FAULT.test(failure) && model !== "auto";
+	async function retry() {
+		if (sending.current) return;
+		sending.current = true;
+		setPending(true);
+		try {
+			const [provider, ...rest] = model.split("/");
+			await host.channel(channel.id, {
+				op: "ask",
+				chat: id,
+				author: user,
+				text: RETRY,
+				...(reset
+					? { automatic: true }
+					: {
+						...(levels ? { effort } : {}),
+						...(picked && picked !== "auto"
+							? { model: { provider: provider!, modelId: rest.join("/") } }
+							: {}),
+					}),
+			});
+			if (reset) {
+				changePick(UNPICKED);
+				toast("Switched this chat to Automatic", {
+					description: `${model} failed, so Retry let Ace choose the model.`,
+				});
+			}
+		} catch (error) {
+			toast.error("Could not retry", { description: (error as Error).message });
+		} finally {
+			sending.current = false;
+			setPending(false);
+		}
+	}
+
 	return (
 		<>
 			<ChatComposer
@@ -294,6 +337,24 @@ export function Composer(
 				clearOnSend={false}
 				onSend={({ doc, mode, attachments }) => void send(serialize(doc), mode, attachments)}
 			/>
+			{failure && !blocked && !busy && (
+				<Notice
+					action={
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={!ready || status !== "open" || pending}
+							onClick={() => void retry()}
+						>
+							Retry
+						</Button>
+					}
+				>
+					{reset
+						? `The last run failed on ${model}. Retry switches this chat to Automatic.`
+						: "The last run failed."}
+				</Notice>
+			)}
 			{mode === "ace" && !offline && models?.length === 0 && (
 				<Notice
 					action={onProviders && (
