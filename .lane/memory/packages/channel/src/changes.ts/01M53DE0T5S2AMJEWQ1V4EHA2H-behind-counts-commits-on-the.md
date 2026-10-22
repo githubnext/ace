@@ -4,8 +4,9 @@ anchor: function changes
 created: 2026-10-16T22:30:58Z
 norm: '1'
 sig: f55c70c150e7bf86
-body_hash: 449d72f9376e96c0
-raw_hash: 75f3d6495136245b
+body_hash: 3e0b55394db271ed
+raw_hash: 0530a5cc5672aff8
+vouched: 2026-10-22T14:35:52Z
 lines: 123-161
 ---
 

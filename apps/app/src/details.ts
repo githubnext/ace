@@ -9,6 +9,7 @@ import type { Item } from "./transcript";
 export type Ask =
 	| "create"
 	| "commit"
+	| "push"
 	| "update"
 	| "rebase"
 	| "review"

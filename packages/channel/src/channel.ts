@@ -50,7 +50,7 @@ import {
 	STRONG,
 } from "./captions";
 import { instructions } from "./context";
-import { changes, patch } from "./changes";
+import { changes, fetchBase, patch } from "./changes";
 import { type Desktop, desktop } from "./desktop";
 import { HANDOFF, Handoffs } from "./handoffs";
 import { type Images, images } from "./images";
@@ -401,6 +401,10 @@ export class Channel {
 			case "changes": {
 				const { cwd, lane } = await this.#place(request.chat);
 				return changes(this.#options.env(cwd), cwd, this.#options.project, lane, context);
+			}
+			case "fetch": {
+				const { cwd, lane } = await this.#place(request.chat);
+				return fetchBase(this.#options.env(cwd), cwd, lane?.base, context);
 			}
 			case "patch": {
 				const { cwd, lane } = await this.#place(request.chat);
