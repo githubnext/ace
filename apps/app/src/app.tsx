@@ -66,7 +66,7 @@ import {
 	useDirectory,
 	Welcome,
 } from "./onboarding";
-import { TeamSetup } from "./team-setup";
+import { TEAM_SETUP, TeamSetup, TeamSetupItem } from "./team-setup";
 import { UpdateNotice } from "./updates";
 import { useWindowStorage } from "./window-storage";
 
@@ -395,7 +395,7 @@ export function App() {
 		const add = () => setTeammate(true);
 		window.addEventListener(CREATE_DIRECTORY, create);
 		window.addEventListener("ace:add-teammate", add);
-		window.addEventListener("ace:team-setup", open);
+		window.addEventListener(TEAM_SETUP, open);
 		window.addEventListener("ace:team-invite", invite);
 		window.addEventListener("ace:join", joining);
 		const fragment = new URLSearchParams(location.hash.slice(1)).get("join");
@@ -406,7 +406,7 @@ export function App() {
 		return () => {
 			window.removeEventListener(CREATE_DIRECTORY, create);
 			window.removeEventListener("ace:add-teammate", add);
-			window.removeEventListener("ace:team-setup", open);
+			window.removeEventListener(TEAM_SETUP, open);
 			window.removeEventListener("ace:team-invite", invite);
 			window.removeEventListener("ace:join", joining);
 		};
@@ -858,7 +858,7 @@ export function App() {
 							side="left"
 							id="sidebar"
 							className="-my-2 h-[calc(100%+1rem)]"
-							innerClassName={card ? "flex h-full min-h-0 flex-col" : "h-full min-h-0"}
+							innerClassName="flex h-full min-h-0 flex-col"
 						>
 							{page === "channels"
 								? (
@@ -947,6 +947,7 @@ export function App() {
 									/>
 								)}
 							{card && <DirectoryCard onDismiss={() => setDismissed(true)} />}
+							<TeamSetupItem />
 						</Sidebar>
 					)}
 					<Main

@@ -65,7 +65,9 @@ tailnet finds it in this host's hello and joins it on its own, unless it left a 
 
 Teams that set up a directory before can keep it deployed as a cell. Whoever sets up the team
 deploys the services once from a checkout; everyone else joins in `Settings → Team` (Join…) with
-the directory's URL and the team's secret, shared privately. Refresh there syncs at once. From a
+the directory's URL and the team's secret, shared privately, or uses **Ask to join** next to a
+teammate's host in **Team setup** (at the bottom of the sidebar, or `Settings → Team → Set up…`),
+which their owner approves in their Ace. Refresh in `Settings → Team` syncs at once. From a
 checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does
 the same.
 
@@ -107,8 +109,10 @@ printf %s https://ace-app.<your-subdomain>.workers.dev | bunx wrangler secret pu
 
 ### From the app
 
-**Get your team started** (also under `Settings → Team`) can deploy to Cloudflare for you, with
-no checkout. **Deploy** does this, and nothing else:
+**Team setup**, at the bottom of the sidebar or `Settings → Team → Set up…`, can deploy to
+Cloudflare for you, with no checkout: choose **Get your team started**, then a hosted directory on
+Cloudflare. For Fly.io it shows the command to run from a checkout and joins with what it prints.
+**Deploy** does this, and nothing else:
 
 - Signs in with your own `wrangler login`. If you aren't signed in, it opens Cloudflare's sign-in
   page in your browser. Ace never sees a Cloudflare password or token.
