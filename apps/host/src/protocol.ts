@@ -197,6 +197,12 @@ export type Member = {
 
 export type TeamPeer = { host: string; login: string; github?: string; team: string };
 
+/**
+ * Long enough to notice the prompt; an unanswered ask then fails instead of waiting forever. The
+ * asker's app names when it lapses from this.
+ */
+export const TEAM_ASK_EXPIRES = 5 * 60_000;
+
 /** Someone on the tailnet asking this host's owner to let them into the team. */
 export type TeamAsk = { id: string; login: string; host: string; github?: string; expires: number };
 

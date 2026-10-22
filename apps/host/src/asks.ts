@@ -4,11 +4,8 @@
  * WireGuard, so nobody sends them by hand. Tailscale names who is asking, and only this host's
  * owner, from its local app, can approve.
  */
-import type { Invite, TeamAsk } from "./protocol";
+import { type Invite, TEAM_ASK_EXPIRES as EXPIRES, type TeamAsk } from "./protocol";
 import { invite } from "./settings";
-
-/** Long enough to notice the prompt; an unanswered ask then fails instead of waiting forever. */
-const EXPIRES = 5 * 60_000;
 
 type Waiting = {
 	ask: TeamAsk;

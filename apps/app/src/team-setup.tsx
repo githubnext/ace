@@ -10,9 +10,10 @@ import {
 	DialogHeader,
 	DialogTitle,
 	Input,
+	toast,
 } from "@ace/ui";
 import { IconArrowUpRight, IconCheck, IconCopy, IconLoader, IconUsers } from "@ace/ui/icons";
-import type { TeamPeer } from "@ace/host/protocol";
+import { TEAM_ASK_EXPIRES, type TeamPeer } from "@ace/host/protocol";
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
@@ -429,18 +430,26 @@ function useTeamPeers(): TeamPeer[] {
 	return peers;
 }
 
+const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+
 /** Ask a teammate's host to let this one in; their owner approves in their Ace. */
 function Nearby({ onJoined }: { onJoined: () => void }) {
 	const peers = useTeamPeers();
-	const [asking, setAsking] = useState<TeamPeer>();
+	// By host: the peer list is read again every few seconds, which replaces its objects.
+	const [asking, setAsking] = useState<{ host: string; who: string; lapses: number }>();
 	const [error, setError] = useState("");
 	if (!peers.length) return null;
 
 	async function ask(peer: TeamPeer) {
-		setAsking(peer);
+		const who = peer.github || peer.login;
+		setAsking({ host: peer.host, who, lapses: Date.now() + TEAM_ASK_EXPIRES });
 		setError("");
 		try {
 			await host.request({ op: "team-ask", host: peer.host });
+			// Joining closes Team setup, so the asker may have looked away; say it outside it.
+			toast.success(`${who} let you in`, {
+				description: "You're in your team's directory now.",
+			});
 			onJoined();
 		} catch (error) {
 			setError((error as Error).message);
@@ -468,14 +477,18 @@ function Nearby({ onJoined }: { onJoined: () => void }) {
 						disabled={!!asking}
 						onClick={() => void ask(peer)}
 					>
-						{asking === peer && <IconLoader className="size-3.5 animate-spin" aria-hidden />}
-						{asking === peer ? "Waiting…" : "Ask to join"}
+						{asking?.host === peer.host && (
+							<IconLoader className="size-3.5 animate-spin" aria-hidden />
+						)}
+						{asking?.host === peer.host ? "Waiting…" : "Ask to join"}
 					</Button>
 				</div>
 			))}
 			{asking && (
 				<p className="text-xs text-muted-foreground">
-					{asking.github || asking.login} approves it in their Ace. You join as soon as they do.
+					Asked {asking.who}{" "}
+					to approve it in their Ace. You join as soon as they do; the request lapses at{" "}
+					{CLOCK.format(asking.lapses)} if nobody answers.
 				</p>
 			)}
 			{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
