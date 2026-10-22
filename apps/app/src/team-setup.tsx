@@ -611,6 +611,9 @@ function Join({ initial, deployed, onJoined, back }: {
 export function Checks({ github }: { github?: string }) {
 	const { value } = useDiagnostics(true);
 	const tailscale = value?.tailscale;
+	const cli = value?.tools.find((tool) => tool.name === "GitHub CLI");
+	// hello's login can arrive before gh answers and isn't resent, so a fresh host's check reads gh here.
+	const login = cli?.account || github;
 	return (
 		<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 			<Check ok={tailscale?.state === "running"}>
@@ -620,12 +623,18 @@ export function Checks({ github }: { github?: string }) {
 					? "isn't connected"
 					: "…"}
 			</Check>
-			<Check ok={!!github}>
-				{github ? `GitHub · ${github}` : (
-					<>
-						GitHub: run <code>gh auth login</code>
-					</>
-				)}
+			<Check ok={!!login}>
+				{login ? `GitHub · ${login}` : cli && !cli.path
+					? (
+						<>
+							GitHub: install GitHub CLI, then run <code>gh auth login</code>
+						</>
+					)
+					: (
+						<>
+							GitHub: run <code>gh auth login</code>
+						</>
+					)}
 			</Check>
 		</div>
 	);
