@@ -1393,7 +1393,7 @@ function ComposerAgent({ state }: { state: ComposerState }) {
 				<span className="max-w-32 truncate">{selectedAgent.name}</span>
 				<IconChevronDownMicro className="size-3 transition-transform duration-150 group-data-[popup-open]/button:scale-y-[-1]" />
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" sideOffset={6} className="min-w-56">
+			<DropdownMenuContent align="start" sideOffset={6} className="inline-auto min-inline-56">
 				{agents?.map((entry, index) => {
 					let EntryIcon = entry.icon
 						?? (entry.id === "plan" ? IconListTodoMicro : IconSparkleMicro);
