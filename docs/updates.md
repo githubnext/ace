@@ -52,7 +52,8 @@ there is an equally safe installer handoff; a slow download currently means a lo
 Projects, databases, preferences, logs, and Keychain credentials are outside the app bundle.
 Installed apps need neither `.env` nor a checkout. Stable and canary have separate identifiers,
 helper registrations, ports, data directories, preferences, and Keychain services.
-Stable and development builds use the green Ace icon; canary uses the same mark in yellow. Both icon sets include all macOS sizes and are compiled into the signed application bundle.
+Stable and development builds use the green Ace icon; canary uses the same mark in yellow. Both
+icon sets include all macOS sizes and are compiled into the signed application bundle.
 
 ## Build and verification
 
