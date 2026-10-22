@@ -19,6 +19,8 @@ export type Tool = {
 	};
 	/** The running call's live output tail, until its result replaces it. */
 	progress?: { text: string; truncated?: boolean };
+	/** The reply ended while the agent was still writing this call, so it never ran. */
+	unrun?: boolean;
 };
 
 export type Item =
@@ -148,7 +150,12 @@ export function apply(state: Transcript, event: Event): Transcript {
 			return { ...state, draft: "", items: [...state.items, item] };
 		}
 		case "tool": {
-			const tool: Tool = { call: event.call, name: event.name, args: event.args };
+			const tool: Tool = {
+				call: event.call,
+				name: event.name,
+				args: event.args,
+				...(event.unrun ? { unrun: true } : {}),
+			};
 			const last = state.items.at(-1);
 			if (last?.kind === "reply" && !last.text) {
 				return {

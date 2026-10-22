@@ -353,6 +353,8 @@ export type Event =
 		call: string;
 		name: string;
 		args: unknown;
+		/** The reply ended while the agent was still writing this call, so it never ran. */
+		unrun?: true;
 	}
 	/**
 	 * The bounded tail of a running tool call's output, sent on attachment and as it grows, at most
