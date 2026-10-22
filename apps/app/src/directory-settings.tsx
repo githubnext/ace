@@ -302,8 +302,8 @@ function TeamDirectory(
 									autoFocus
 									type="url"
 									spellCheck={false}
-									aria-label="Invite link or directory URL"
-									placeholder="Invite link or https://ace-directory.example.workers.dev"
+									aria-label="Directory URL or invite link"
+									placeholder="Directory URL or invite link"
 									value={url}
 									disabled={!!action.busy}
 									onChange={(event) => {
