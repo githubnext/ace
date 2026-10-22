@@ -13,6 +13,7 @@ import {
 	Switch,
 } from "@ace/ui";
 import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons";
+import type { TeamPeer } from "@ace/host/protocol";
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
@@ -74,6 +75,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 							title="Set up Ace for your team"
 							description="Everyone on your tailnet is your team. Start with how they'll find each other's channels."
 						/>
+						<Nearby onJoined={onClose} />
 						<div role="radiogroup" className="flex flex-col gap-2">
 							<Choice
 								selected={starting}
@@ -107,6 +109,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 								? "Check the directory before you join: it lists your channels for everyone who has this link."
 								: "Paste the invite link your teammate sent you, or enter the directory URL and team secret."}
 						/>
+						{!invite && <Nearby onJoined={onClose} />}
 						<Join initial={invite} onJoined={onClose} back={() => setStep("fork")} />
 					</>
 				)}
@@ -428,6 +431,80 @@ function Members({ team }: { team: Team }) {
 				post in hosted channels.
 			</p>
 		</>
+	);
+}
+
+/** Peers' hosts already in a team; asked again while open, since a teammate may come online. */
+function useTeamPeers(): TeamPeer[] {
+	const [peers, setPeers] = useState<TeamPeer[]>([]);
+	useEffect(() => {
+		let live = true;
+		const load = () =>
+			host.request<TeamPeer[]>({ op: "team-peers" }).then(
+				(value) => live && setPeers(value),
+				() => {},
+			);
+		void load();
+		const timer = setInterval(load, 5000);
+		return () => {
+			live = false;
+			clearInterval(timer);
+		};
+	}, []);
+	return peers;
+}
+
+/** Ask a teammate's host to let this one in; their owner approves in their Ace. */
+function Nearby({ onJoined }: { onJoined: () => void }) {
+	const peers = useTeamPeers();
+	const [asking, setAsking] = useState<TeamPeer>();
+	const [error, setError] = useState("");
+	if (!peers.length) return null;
+
+	async function ask(peer: TeamPeer) {
+		setAsking(peer);
+		setError("");
+		try {
+			await host.request({ op: "team-ask", host: peer.host });
+			onJoined();
+		} catch (error) {
+			setError((error as Error).message);
+		} finally {
+			setAsking(undefined);
+		}
+	}
+
+	return (
+		<div className="flex flex-col gap-2">
+			{peers.map((peer) => (
+				<div
+					key={peer.host}
+					className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm"
+				>
+					<span className="min-w-0">
+						<span className="font-medium">{peer.github || peer.login}</span>
+						<span className="text-muted-foreground">
+							{" "}on {peer.host} is in a team.
+						</span>
+					</span>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={!!asking}
+						onClick={() => void ask(peer)}
+					>
+						{asking === peer && <IconLoader className="size-3.5 animate-spin" aria-hidden />}
+						{asking === peer ? "Waiting…" : "Ask to join"}
+					</Button>
+				</div>
+			))}
+			{asking && (
+				<p className="text-xs text-muted-foreground">
+					{asking.github || asking.login} approves it in their Ace. You join as soon as they do.
+				</p>
+			)}
+			{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+		</div>
 	);
 }
 

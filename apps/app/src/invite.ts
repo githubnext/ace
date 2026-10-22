@@ -2,7 +2,9 @@
  * An invite link carries the team's directory URL and secret in one string a teammate can click or
  * paste. Opening one only fills in the join form; the person still checks and joins.
  */
-export type Invite = { url: string; secret: string };
+import type { Invite } from "@ace/host/protocol";
+
+export type { Invite };
 
 /**
  * An https page, because chat apps linkify it and not `ace://`; it offers the download, then hands

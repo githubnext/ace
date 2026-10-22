@@ -139,15 +139,18 @@ export async function certificate(
 	return { cert, key };
 }
 
-/** The person behind an inbound TCP connection, as Tailscale verified it. Tagged nodes are refused. */
-export async function whois(ip: string, port: number): Promise<string> {
+/**
+ * The person and machine behind an inbound TCP connection, as Tailscale verified them. Tagged
+ * nodes are refused.
+ */
+export async function whois(ip: string, port: number): Promise<{ login: string; host: string }> {
 	const address = tailnet(ip);
 	if (!address) throw new Error("Not a tailnet address");
 	const endpoint = isIP(address) === 6 ? `[${address}]:${port}` : `${address}:${port}`;
 	const value = await run(["whois", "--json", "--proto=tcp", endpoint]) as {
-		Node: { Tags?: string[] };
+		Node: { Name: string; Tags?: string[] };
 		UserProfile: { LoginName: string };
 	};
 	if (value.Node.Tags?.length) throw new Error("Tagged nodes cannot participate");
-	return value.UserProfile.LoginName;
+	return { login: value.UserProfile.LoginName, host: value.Node.Name.split(".")[0] || address };
 }

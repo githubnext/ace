@@ -11,6 +11,7 @@ import type {
 	Project,
 	Request,
 	TabRename,
+	TeamAsk,
 	TerminalFrame,
 	WindowState,
 } from "./protocol";
@@ -61,6 +62,8 @@ export class GatewayClient {
 	channels: Listing[] = [];
 	projects: Project[] = [];
 	people: People = {};
+	/** Asks to join the team waiting for this host's owner; only the local app receives them. */
+	asks: TeamAsk[] = [];
 	/** Everyone here by project ID, while the host is connected. */
 	presence: Record<string, Presence[]> = {};
 	settingsVersion = 0;
@@ -135,6 +138,10 @@ export class GatewayClient {
 		if ("rename" in frame) return void this.#rename(frame.rename, socket);
 		if ("projects" in frame) {
 			this.projects = frame.projects;
+			return this.#emit();
+		}
+		if ("asks" in frame) {
+			this.asks = frame.asks;
 			return this.#emit();
 		}
 		if ("people" in frame) {
