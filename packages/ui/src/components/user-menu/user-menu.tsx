@@ -15,13 +15,12 @@ import {
 	DropdownMenuContent,
 	DropdownMenuGroup,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
 import { cn } from "../../lib/utils";
 
 type Props = Omit<ComponentPropsWithRef<"button">, "children"> & {
-	/** Display name shown in the menu label and used for the avatar fallback. */
+	/** Display name used for the avatar alt text and fallback. */
 	name: string;
 	/** GitHub handle, when the current identity has been linked to GitHub. */
 	handle?: string;
@@ -31,15 +30,11 @@ type Props = Omit<ComponentPropsWithRef<"button">, "children"> & {
 	align?: "start" | "center" | "end";
 	/** Side for the dropdown content. */
 	side?: "top" | "right" | "bottom" | "left" | "inline-start" | "inline-end";
-	/** Fires when the Sign out item is selected. */
-	onSignOut?: () => void;
 	/** Fires when the GitHub profile item is selected. */
 	onProfile?: () => void;
 	/** Fires when the Settings item is selected. */
 	onSettings?: () => void;
-	/** Fires when the Download app item is selected. */
-	onDownload?: () => void;
-	/** Extra menu items rendered above the Sign out section. */
+	/** Extra menu items rendered below Settings. */
 	children?: ReactNode;
 };
 
@@ -58,10 +53,8 @@ function UserMenu({
 	avatar = handle && format.avatar(handle),
 	align = "start",
 	side = "bottom",
-	onSignOut,
 	onProfile,
 	onSettings,
-	onDownload,
 	children,
 	className,
 	"aria-label": label = "Open account menu",
@@ -147,18 +140,7 @@ function UserMenu({
 				<DropdownMenuGroup>
 					<DropdownMenuItem onClick={profile} disabled={!profile}>GitHub profile</DropdownMenuItem>
 					<DropdownMenuItem onClick={onSettings} disabled={!onSettings}>Settings</DropdownMenuItem>
-					{onDownload
-						? <DropdownMenuItem onClick={onDownload}>Download app</DropdownMenuItem>
-						: null}
 					{children}
-				</DropdownMenuGroup>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuItem variant="destructive" onClick={onSignOut} disabled={!onSignOut}>
-						<span className="min-w-0 truncate whitespace-nowrap" title={`Sign out ${name}`}>
-							Sign out {name}
-						</span>
-					</DropdownMenuItem>
 				</DropdownMenuGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
