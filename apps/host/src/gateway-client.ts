@@ -60,7 +60,8 @@ export class GatewayClient {
 	 */
 	stalled = false;
 	channels: Listing[] = [];
-	projects: Project[] = [];
+	/** Undefined until the host first sends them, so an app can tell loading from having none. */
+	projects?: Project[];
 	people: People = {};
 	/** Asks to join the team waiting for this host's owner; only the local app receives them. */
 	asks: TeamAsk[] = [];
