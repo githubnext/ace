@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import type { Changes, GithubCheck, GithubPull } from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
@@ -72,6 +72,10 @@ export function useGit(channel: Listing, chat: number, user: string) {
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
 	const ready = !!info && !busy && (shared !== false || channel.owner === user);
 	const changed = !!changes && (changes.files.length > 0 || !!changes.dirs);
+	// The agent acts with the channel owner's GitHub account, which can't push to or ready another
+	// author's pull request; an unknown login offers them anyway.
+	const github = useSyncExternalStore(host.subscribe, () => host.people)[channel.owner];
+	const own = !github || !pull || pull.author === github;
 
 	function ask(text: string) {
 		return host.channel(channel.id, { op: "ask", chat, author: user, text }).catch(
@@ -132,7 +136,7 @@ export function useGit(channel: Listing, chat: number, user: string) {
 		if (live && pull.review === "changes") {
 			actions.push({ label: "Address review", icon: IconReview, onClick: go("review") });
 		}
-		if (pull?.state === "draft") {
+		if (pull?.state === "draft" && own) {
 			actions.push({
 				label: "Ready for review",
 				icon: IconPullRequest,
@@ -140,10 +144,10 @@ export function useGit(channel: Listing, chat: number, user: string) {
 				menu: [close],
 			});
 		}
-		// Offered only once GitHub would merge it as is, with nothing left to push.
+		// Offered only once GitHub would merge it as is, with nothing left to commit or push.
 		const passing = pull?.checks.every((check) => ["passed", "skipped"].includes(check.state));
 		const approved = pull?.review !== "changes" && pull?.review !== "required";
-		if (pull?.state === "open" && passing && approved && !unpushed) {
+		if (pull?.state === "open" && passing && approved && !unpushed && !dirty(changes)) {
 			actions.push({
 				label: "Merge PR",
 				icon: IconMerge,
@@ -165,7 +169,7 @@ export function useGit(channel: Listing, chat: number, user: string) {
 		creatingPr: asked === "create",
 		createPr: open ? () => request("create", create(false)) : undefined,
 		createDraftPr: open ? () => request("create", create(true)) : undefined,
-		fixChecks: ready && pull
+		fixChecks: ready && pull && own
 			? (failed: GithubCheck[]) => void ask(fix(pull, failed)).catch(() => {})
 			: undefined,
 		actions,

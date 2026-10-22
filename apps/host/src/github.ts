@@ -127,6 +127,15 @@ function number(value: number): string {
 	return String(value);
 }
 
+/** GitHub's GraphQL errors as a sentence; GitHub answers this way for private repositories too. */
+function sentence(error: string): string {
+	const repo = /Could not resolve to a Repository with the name '([^']+)'/.exec(error)?.[1];
+	if (repo) {
+		return `GitHub didn't find ${repo} for this host's GitHub account. Check that the project's origin names the right repository and that the account signed in with gh can read it; a pending invitation must be accepted first.`;
+	}
+	return error.replace(/^GraphQL: /, "GitHub refused the request: ");
+}
+
 async function gh<T>(args: string[]): Promise<T> {
 	const path = Bun.which("gh", { PATH: process.env.PATH });
 	if (!path) throw new Error("Install GitHub CLI on this host, then sign in with gh auth login.");
@@ -151,7 +160,7 @@ async function gh<T>(args: string[]): Promise<T> {
 		child.exited,
 	]);
 	if (code === 4) throw new Error("Sign in to GitHub on this host with gh auth login.");
-	if (code !== 0) throw new Error(error.trim() || "GitHub did not respond. Try again.");
+	if (code !== 0) throw new Error(sentence(error.trim()) || "GitHub did not respond. Try again.");
 	return JSON.parse(out) as T;
 }
 

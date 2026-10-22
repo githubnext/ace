@@ -233,6 +233,12 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 			const term = shell.current!;
 			// The host replays recent output on reattach; clear first so it doesn't repeat.
 			term.reset();
+			// The saved shell is gone, such as after the host restarted; its command and output are too.
+			if (saved && value.terminal !== saved) {
+				term.write(
+					"\x1b[2mThe host no longer had this terminal's shell, so this is a new one. The previous shell's command and output are gone.\x1b[0m\r\n",
+				);
+			}
 			off = host.terminal(value.terminal, (frame) => {
 				if ("data" in frame) {
 					if (!frame.replay) return term.write(bytes(frame.data));
