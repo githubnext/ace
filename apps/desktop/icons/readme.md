@@ -1,15 +1,20 @@
 # Desktop icons
 
-`ace.svg` (green, stable and development) and `canary.svg` (yellow) are the sources. Each draws
-Ace's mark, the `AceAvatar` hypotrochoid (`R` 4, scale 5.2, `d` 3, stroke 7 in its 100-unit box), at
-6.4× on a superellipse (`n` 5) that follows Apple's 1024 grid: 824 wide, 100 in from each edge, so
-the icon sits at the same size as other apps in the Dock.
+`ace.icon` (green: stable and development) and `canary.icon` (yellow) are Icon Composer documents
+and the source of truth. Both use `mark.svg`, Ace's mark as the site shows it: the `AceAvatar`
+hypotrochoid at the shape `ace-avatar.svg` uses (`d` 3.175, scale 5.515), stroke 6.4, and tilted 7°
+counter-clockwise. It was rendered at 8× and traced into one filled path with potrace, so Icon
+Composer can fill it. `ace-avatar.svg`'s 360-segment polyline facets at icon sizes.
 
-The mark is sampled at 4096 points. `ace-avatar.svg` uses 360, which facets visibly at icon sizes.
+Electrobun compiles an `.iconset` with `iconutil`, so each PNG is rendered from the `.icon` with
+Icon Composer's `ictool` at 824/1024 of the PNG's size. It's then centred with a soft shadow
+(30% black, blur 12/1024, offset 6/1024 down), matching the margin of the legacy `.icns` that
+`actool` writes. `actool` stops at 256 px, so it can't supply the iconset itself.
 
-Every PNG in an `.iconset` is rendered from its SVG at that PNG's own pixel size in Chrome (an `<img>`
-screenshotted with a transparent background), not downscaled from 1024, so small sizes stay sharp.
-Change an SVG, then re-render all ten sizes for both sets.
+```sh
+ictool=/Applications/Icon\ Composer.app/Contents/Executables/ictool
+"$ictool" ace.icon --export-image --output-file body.png --platform macOS --rendition Default \
+	--width 824 --height 824 --scale 1
+```
 
-Electrobun selects the yellow set for canary and the green set for stable and development builds.
-It compiles the selected set with macOS `iconutil`.
+After editing an `.icon`, render all ten sizes for both sets again.
