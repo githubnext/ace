@@ -689,14 +689,16 @@ export function App() {
 		}
 	}
 
-	async function init(path: string) {
+	async function init(path: string, empty?: boolean) {
 		try {
 			await host.request<Project>({ op: "project-init", path });
-			toast.success("Initialized Git", {
+			toast.success(empty ? "Made the first commit" : "Initialized Git", {
 				description: "Committed the folder's files as Initial commit. Channels can start here now.",
 			});
 		} catch (error) {
-			toast.error("Could not initialize Git", { description: (error as Error).message });
+			toast.error(empty ? "Could not make the first commit" : "Could not initialize Git", {
+				description: (error as Error).message,
+			});
 		}
 	}
 
@@ -1068,7 +1070,7 @@ export function App() {
 									local={local}
 									connected={connected}
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}
-									onInit={() => init(current.path)}
+									onInit={() => init(current.path, current.empty)}
 									onProject={chooseProject}
 									onRemove={removeRepo}
 									onOpen={() => void choose()}
@@ -1128,10 +1130,11 @@ export function App() {
 										<div className="w-full max-w-[34rem]">
 											<InitGit
 												name={current.label}
+												empty={current.empty}
 												ignored={current.ignored}
 												disabled={!connected}
 												path={current.path}
-												onInit={() => init(current.path)}
+												onInit={() => init(current.path, current.empty)}
 											/>
 										</div>
 									)}

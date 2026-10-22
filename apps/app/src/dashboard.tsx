@@ -441,6 +441,7 @@ export function Dashboard(
 					<InitGit
 						path={project.path}
 						name={project.label}
+						empty={project.empty}
 						ignored={project.ignored}
 						disabled={!connected}
 						onInit={onInit}

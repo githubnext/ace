@@ -3,9 +3,10 @@ id: 01M5JNQ72H3WS44JG82D60Q37M
 anchor: function InitGit
 created: 2026-10-22T20:44:24Z
 norm: '1'
-sig: e05f5c81094473f3
-body_hash: faffdcfc736d2780
-raw_hash: e2bf3f4586e0df5c
+sig: bbe6f480fcc6cbd1
+body_hash: 0fc448d2189f968d
+raw_hash: 517902d11c496496
+vouched: 2026-10-22T22:08:11Z
 lines: 52-111
 ---
 
