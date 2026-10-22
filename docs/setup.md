@@ -50,11 +50,24 @@ home screen to use it as an app.
 
 ## Team directory
 
-The team's directory lists every host's channels, so they stay visible while their host sleeps.
-Whoever sets up the team deploys the services once from a checkout; everyone else joins in
-`Settings → Team` (Join…) with the directory's URL and the team's secret, shared privately.
-Refresh there syncs at once. From a checkout,
-`printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
+Everyone on your tailnet who runs Ace is on your team, with or without a directory; without one,
+teammates see each other's channels only while their Mac is online. The team's directory lists
+every host's channels, so they stay listed while their host is offline, and keeps project shares
+and presence.
+
+Create it in the app: the sidebar's Team directory card, an offline channel, or `Settings → Team`
+offers **Create directory**. **This Mac** serves it from this host on the tailnet, with no account
+or secret; a Mac that stays on (a Mac mini) is the best place for it. Every other host on the
+tailnet finds it in this host's hello and joins it on its own, unless it left a directory before.
+**Stop serving…** in `Settings → Team` turns it off and deletes its shares.
+
+### Deployed directory
+
+Teams that set up a directory before can keep it deployed as a cell. Whoever sets up the team
+deploys the services once from a checkout; everyone else joins in `Settings → Team` (Join…) with
+the directory's URL and the team's secret, shared privately. Refresh there syncs at once. From a
+checkout, `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does
+the same.
 
 The services are cells, so they run on Cloudflare Workers, or on [celld](#on-celld) on machines the
 team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, give the Workers the
