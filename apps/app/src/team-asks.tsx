@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
 	Button,
@@ -8,9 +8,14 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
+	toast,
 } from "@ace/ui";
 
+import { desktop } from "./desktop";
+import { isFocused } from "./focus";
 import { host } from "./host";
+
+const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
 /**
  * Someone on the tailnet asked to join this host's team. Approving sends them the directory URL
@@ -21,6 +26,19 @@ export function TeamAsks() {
 	const [dismissed, setDismissed] = useState<string[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	// The dialog waits in a window the owner may not be looking at; the ask lapses unanswered.
+	const told = useRef(new Set<string>());
+	useEffect(() => {
+		for (const ask of asks) {
+			if (told.current.has(ask.id)) continue;
+			told.current.add(ask.id);
+			if (isFocused()) continue;
+			desktop?.notify(
+				`Let ${ask.github || ask.login} join your team?`,
+				`${ask.login} on ${ask.host} asked. Open Ace to approve or deny.`,
+			).catch(() => {});
+		}
+	}, [asks]);
 	const ask = asks.find((value) => !dismissed.includes(value.id));
 	if (!ask) return null;
 	const who = ask.github || ask.login;
@@ -30,6 +48,11 @@ export function TeamAsks() {
 		setError("");
 		try {
 			await host.request({ op: "team-answer", ask: ask!.id, approve });
+			if (approve) {
+				toast.success(`Let ${who} in`, {
+					description: `${ask!.host} has your team's directory and joins it now.`,
+				});
+			} else toast(`Declined ${who}'s request`);
 		} catch (error) {
 			setError((error as Error).message);
 		} finally {
@@ -46,7 +69,7 @@ export function TeamAsks() {
 						{ask.login} on {ask.host}{" "}
 						asked from Ace. Approving sends this host's directory URL and team secret to {ask.host}
 						{" "}
-						over your tailnet.
+						over your tailnet. The request lapses at {CLOCK.format(ask.expires)}.
 					</DialogDescription>
 				</DialogHeader>
 				{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
