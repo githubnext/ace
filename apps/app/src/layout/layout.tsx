@@ -108,12 +108,15 @@ type Props = {
 	opener?: { current?: () => void };
 	/** Running shells no client shows; each without a tab here opens as a background Terminal tab. */
 	shells?: { terminal: string; chat?: number }[];
+	/** Whether this host opens the channel's shells; only then is Terminal offered. */
+	terminals: boolean;
 };
 
 const MIN = 350;
 const CHAT_MIN = 450;
 // The old app also offered Plan, Browse, and Browser Preview; they return when their backends do.
 const CHOICES: Choice[] = ["chat", "diff", "terminal"];
+const SHELLESS: Choice[] = ["chat", "diff"];
 const ICONS: Record<Kind, Icon> = {
 	blank: IconSplitView,
 	chat: IconMessage,
@@ -193,14 +196,20 @@ function focus(uid: string) {
 	document.querySelector<HTMLElement>(`[data-layout-tab="${CSS.escape(uid)}"]`)?.focus();
 }
 
-function Blank({ item, onChoose }: { item: Item; onChoose: (choice: Choice) => void }) {
+function Blank(
+	{ item, choices, onChoose }: {
+		item: Item;
+		choices: Choice[];
+		onChoose: (choice: Choice) => void;
+	},
+) {
 	const Icon = item.icon;
 
 	if (item.kind === "blank") {
 		return (
 			<div className="flex h-full min-h-0 items-center justify-center px-4 contain-content">
 				<div className="scrollbar-muted flex max-h-full min-w-0 flex-col overflow-y-auto py-2 contain-style">
-					{CHOICES.map((choice) => {
+					{choices.map((choice) => {
 						const Icon = ICONS[choice];
 						return (
 							<Button
@@ -231,7 +240,7 @@ function Blank({ item, onChoose }: { item: Item; onChoose: (choice: Choice) => v
 	);
 }
 
-function Add({ onAdd }: { onAdd: (choice: Choice) => void }) {
+function Add({ choices, onAdd }: { choices: Choice[]; onAdd: (choice: Choice) => void }) {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -253,7 +262,7 @@ function Add({ onAdd }: { onAdd: (choice: Choice) => void }) {
 				className="scrollbar-muted max-h-80 w-56 overflow-y-auto"
 			>
 				<DropdownMenuGroup>
-					{CHOICES.map((choice) => {
+					{choices.map((choice) => {
 						const Icon = ICONS[choice];
 						return (
 							<DropdownMenuItem key={choice} onClick={() => onAdd(choice)}>
@@ -573,6 +582,7 @@ type BarProps = {
 	onFork: (side: "right" | "bottom") => void;
 	can: (side: "right" | "bottom") => boolean;
 	onSelect: (id: string) => void;
+	choices: Choice[];
 	onAdd: (choice: Choice) => void;
 	onClose: (id: string) => void;
 	onRename: (id: string, name: string) => void;
@@ -595,6 +605,7 @@ function Bar({
 	onFork,
 	can,
 	onSelect,
+	choices,
 	onAdd,
 	onClose,
 	onRename,
@@ -677,7 +688,7 @@ function Bar({
 			</div>
 			{more && <More pane={pane} items={items} onSelect={onSelect} />}
 			{actions}
-			<Add onAdd={onAdd} />
+			<Add choices={choices} onAdd={onAdd} />
 			{!flat && <Tools split={onFork} can={can} />}
 		</div>
 	);
@@ -694,7 +705,8 @@ type PaneProps = BarProps & {
 };
 
 function Pane(props: PaneProps) {
-	const { pane, items, meta, focused, drop, header, render, onFocus, onChoose, onUpdate } = props;
+	const { pane, items, meta, focused, drop, header, render, choices, onFocus, onChoose, onUpdate } =
+		props;
 	const hover = drop?.kind === "pane" ? drop : undefined;
 	const blocked = !!hover?.side && !hover.valid;
 
@@ -731,7 +743,13 @@ function Pane(props: PaneProps) {
 								active ? "" : "pointer-events-none invisible"
 							}`}
 						>
-							{node || <Blank item={item} onChoose={(choice) => onChoose(id, choice)} />}
+							{node || (
+								<Blank
+									item={item}
+									choices={choices}
+									onChoose={(choice) => onChoose(id, choice)}
+								/>
+							)}
 						</div>
 					);
 				})}
@@ -1038,6 +1056,7 @@ export function Layout(props: Props) {
 			onFork: (side: "right" | "bottom") => add(pane, "blank", side),
 			can: (side: "right" | "bottom") => allow(pane, side),
 			onSelect: (uid: string) => choose(uid, pane),
+			choices: props.terminals ? CHOICES : SHELLESS,
 			onAdd: (choice: Choice) => add(pane, choice),
 			onClose: close,
 			onRename: rename,
