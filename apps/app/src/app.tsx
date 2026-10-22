@@ -509,7 +509,7 @@ export function App() {
 	];
 	const github = people[hello.user];
 	const names = useMemo(() => github ? [github.toLowerCase()] : [], [github]);
-	const { attention, pulse } = useAttention(
+	const { attention, pulse, seen } = useAttention(
 		channels,
 		hello.user,
 		names,
@@ -1054,6 +1054,7 @@ export function App() {
 									channels={channels}
 									user={hello.user}
 									remote={channel.host !== hello.host}
+									seen={seen(channel)}
 									draft={draft}
 									onDraftLoaded={() => setDraft(undefined)}
 									onProviders={() => setSettings("providers")}

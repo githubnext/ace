@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
+import { MENTION } from "@ace/channel/protocol";
 import { Button, ChatStatus, Timeline, toast } from "@ace/ui";
 import { channelProject, type Listing } from "@ace/host/protocol";
 
@@ -26,6 +27,8 @@ type Props = {
 	channels: Listing[];
 	chat: number;
 	user: string;
+	/** Others' messages after `since` and up to `until` arrived while this person was away. */
+	unread?: { since?: number; until?: number };
 	draft?: string;
 	onDraftLoaded: () => void;
 	onProviders?: () => void;
@@ -36,7 +39,18 @@ type Props = {
 
 /** One chat's timeline and composer over its transcript; the content of a Chat tab. */
 export function Conversation(
-	{ channel, channels, chat: id, user, draft, onDraftLoaded, onProviders, onOpen, onWork }: Props,
+	{
+		channel,
+		channels,
+		chat: id,
+		user,
+		unread,
+		draft,
+		onDraftLoaded,
+		onProviders,
+		onOpen,
+		onWork,
+	}: Props,
 ) {
 	const offline = channel.state === "offline";
 	const placement = channel.hosted || channel.host;
@@ -115,6 +129,28 @@ export function Conversation(
 	const byKey = useMemo(
 		() => new Map(transcript.items.map((item) => [item.key, item])),
 		[transcript.items],
+	);
+	const { since, until = 0 } = unread || {};
+	const first = since === undefined
+		? undefined
+		: transcript.items.find((item) =>
+			item.kind === "message" && item.author !== user && item.at > since && item.at <= until
+		)?.key;
+	// Mentions name people by GitHub login, as the channel's host counts them.
+	const self = people[user]?.toLowerCase();
+	const mentioned = useMemo(
+		() =>
+			new Set(
+				self
+					? transcript.items.flatMap((item) =>
+						item.kind === "message" && item.author !== user && !item.deleted
+							&& [...item.text.matchAll(MENTION)].some((match) => match[1]!.toLowerCase() === self)
+							? [item.key]
+							: []
+					)
+					: [],
+			),
+		[transcript.items, user, self],
 	);
 	// Reactions and deletions target stored entries; the streamed draft and tool-only replies have none.
 	const actions = (uid: string) => {
@@ -219,6 +255,8 @@ export function Conversation(
 							events={events}
 							working={transcript.busy || undefined}
 							currentUser={{ login: user, own: [user] }}
+							unread={first}
+							mentioned={mentioned}
 							actions={actions}
 							onReact={(uid, emoji) => {
 								const entry = byKey.get(uid)!.entry!;

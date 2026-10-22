@@ -45,6 +45,8 @@ type Props = {
 	channels: Listing[];
 	user: string;
 	remote: boolean;
+	/** When this person last saw the channel, before opening it now. */
+	seen?: number;
 	draft?: ChannelDraft;
 	onDraftLoaded: () => void;
 	onProviders?: () => void;
@@ -301,9 +303,11 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 
 /** A channel's tabs: its chat, plus Diff and Terminal views of that chat's lane. */
 export function Channel(
-	{ channel, channels, user, remote, draft, onDraftLoaded, onProviders, onOpen }: Props,
+	{ channel, channels, user, remote, seen, draft, onDraftLoaded, onProviders, onOpen }: Props,
 ) {
 	const place = placement(channel);
+	// Taken as the channel opens: opening it marks everything seen, and later messages arrive in view.
+	const [unread] = useState(() => ({ since: seen, until: channel.said?.at }));
 	const [changed, setChanged] = useState<boolean>();
 	const check = useRef({ busy: false, again: false });
 
@@ -367,6 +371,7 @@ export function Channel(
 							channels={channels}
 							chat={chat}
 							user={user}
+							unread={unread}
 							draft={draft?.channel === channel.id ? draft.text : undefined}
 							onDraftLoaded={onDraftLoaded}
 							onProviders={!remote && !channel.hosted ? onProviders : undefined}

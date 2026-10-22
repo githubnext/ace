@@ -182,7 +182,9 @@ type AgentTurn = {
 type TimelineItem =
 	| { kind: "group"; group: Group; turn?: AgentTurn }
 	| { kind: "event"; row: Row }
-	| { kind: "day"; ts: number };
+	| { kind: "day"; ts: number }
+	/** Where messages the viewer hasn't seen start. */
+	| { kind: "new" };
 
 // -- Constants --
 
@@ -1084,6 +1086,7 @@ function compile(
 	events: Event[],
 	working: TimelineWorking = false,
 	project?: REPO,
+	unread?: string,
 ): TimelineItem[] {
 	let items: TimelineItem[] = [];
 	let current: { group: Group; ts: number } | null = null;
@@ -1116,6 +1119,11 @@ function compile(
 			flush(false);
 			items.push({ kind: "day", ts: day });
 			lastDay = day;
+		}
+
+		if (row.uid === unread) {
+			flush(false);
+			items.push({ kind: "new" });
 		}
 
 		// System events always break the current group and stand alone.
