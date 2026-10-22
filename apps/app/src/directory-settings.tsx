@@ -8,8 +8,8 @@ import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { parse } from "./invite";
 import { CREATE_DIRECTORY, DIRECTORY_CHANGED, People, useRoster } from "./onboarding";
-import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
-import { TEAM_SETUP } from "./team-setup";
+import { Confirm, Group, Page, Problem, Row, Status, Value, when } from "./settings-layout";
+import { DirectoryHosts, TEAM_SETUP } from "./team-setup";
 
 const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
 
@@ -107,6 +107,11 @@ export function TeamSettings({ active }: { active: boolean }) {
 					</>
 				)}
 			</Group>
+			{checked?.directory.url && (
+				<Group title="In the directory">
+					<DirectoryHosts directory={checked.directory} self={checked.tailscale.name} />
+				</Group>
+			)}
 			{checks.open && <TeamPeople />}
 			{checked?.directory.url && checked.directory.synced && !served(checked.directory) && (
 				<TeamServices services={checked.directory.services} />
@@ -192,14 +197,6 @@ function shared(shares: Share[]): string {
 		projects.set(name, people);
 	}
 	return [...projects].map(([name, people]) => `${name} with ${people.join(", ")}`).join("; ");
-}
-
-/** A time today, or a date and time when older, so a stale sync doesn't read as recent. */
-function when(time: number) {
-	const date = new Date(time);
-	return date.toDateString() === new Date().toDateString()
-		? date.toLocaleTimeString()
-		: date.toLocaleString();
 }
 
 /** `row` keeps each result beside the control that caused it. */

@@ -13,11 +13,12 @@ import {
 	toast,
 } from "@ace/ui";
 import { IconArrowUpRight, IconCheck, IconCopy, IconLoader, IconUsers } from "@ace/ui/icons";
-import { TEAM_ASK_EXPIRES, type TeamPeer } from "@ace/host/protocol";
+import { type Diagnostics, TEAM_ASK_EXPIRES, type TeamPeer } from "@ace/host/protocol";
 
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { type Invite as Team, link, page, parse } from "./invite";
+import { Row, Status, Value, when } from "./settings-layout";
 
 const DOCS = "https://github.com/githubnext/ace/blob/main/docs/setup.md";
 export const TEAM_SETUP = "ace:team-setup";
@@ -68,6 +69,11 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	const [provider, setProvider] = useState<Provider>("cloudflare");
 	const [joined, setJoined] = useState<Team>();
 	const [error, setError] = useState("");
+	const checks = useDiagnostics(step === "fork");
+	const checked = checks.value;
+	const directory = checked?.directory.url ? checked.directory : undefined;
+	// Until the host answers, the fork can't tell a first person from one already in a team.
+	const pending = checks.open && !checked && !checks.error;
 
 	useEffect(() => {
 		if (!inviting) return;
@@ -81,7 +87,31 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 		<Dialog open onOpenChange={next => next || onClose()}>
 			<DialogContent className="gap-4 sm:max-w-[34rem]">
 				{STEPS[step] && !inviting && <Steps current={step} />}
-				{step === "fork" && (
+				{step === "fork" && directory && (
+					<>
+						<Checks github={github} />
+						<Header
+							title="Your team"
+							description={directory.serving
+								? "This Mac serves your team's directory. Teammates on the tailnet join it on their own."
+								: `This Mac is in your team's directory at ${new URL(directory.url!).host}.`}
+						/>
+						<div className="flex flex-col divide-y divide-border/60 rounded-md border border-border/70 px-3">
+							<DirectoryHosts directory={directory} self={checked?.tailscale.name} />
+						</div>
+						<Nearby onJoined={onClose} team={new URL(directory.url!).host} />
+						<Footer
+							back={
+								<Button variant="ghost" onClick={() => setStep("directory")}>
+									List channels elsewhere…
+								</Button>
+							}
+							next={<Button onClick={onClose}>Done</Button>}
+						/>
+					</>
+				)}
+				{step === "fork" && pending && <Checks github={github} />}
+				{step === "fork" && !pending && !directory && (
 					<>
 						<Checks github={github} />
 						<Header
@@ -433,8 +463,9 @@ function useTeamPeers(): TeamPeer[] {
 const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
 /** Ask a teammate's host to let this one in; their owner approves in their Ace. */
-function Nearby({ onJoined }: { onJoined: () => void }) {
-	const peers = useTeamPeers();
+function Nearby({ onJoined, team }: { onJoined: () => void; team?: string }) {
+	// A teammate already in this host's directory has no other team to let it into.
+	const peers = useTeamPeers().filter((peer) => peer.team !== team);
 	// By host: the peer list is read again every few seconds, which replaces its objects.
 	const [asking, setAsking] = useState<{ host: string; who: string; lapses: number }>();
 	const [error, setError] = useState("");
@@ -720,5 +751,33 @@ export function Copyable(
 				{copied ? <IconCheck aria-hidden /> : <IconCopy aria-hidden />}
 			</Button>
 		</div>
+	);
+}
+
+/** Hosts that have joined the directory, and when each last published its channels there. */
+export function DirectoryHosts(
+	{ directory, self }: { directory: Diagnostics["directory"]; self?: string },
+) {
+	if (!directory.hosts?.length) {
+		return (
+			<div className="py-3">
+				<Status>
+					{directory.synced ? "No hosts have joined yet." : "Waiting for the directory…"}
+				</Status>
+			</div>
+		);
+	}
+	return (
+		<>
+			{directory.hosts?.map((host) => (
+				<Row
+					key={host.name}
+					label={host.name === self ? `${host.name} (this Mac)` : host.name}
+					description={host.github || host.login}
+				>
+					<Value>Synced {when(host.seen)}</Value>
+				</Row>
+			))}
+		</>
 	);
 }

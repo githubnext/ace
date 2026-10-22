@@ -52,7 +52,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 		Promise.all([git(), shell()]),
 		tailnet.diagnostics(started),
 	]);
-	const { hosted, app, compute } = directory.read();
+	const { hosted, app, compute, hosts } = directory.read();
 	return {
 		tools,
 		tailscale: config.loopback ? { ...tailscale, loopback: true } : tailscale,
@@ -62,6 +62,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 			services: { hosted, app, compute },
 			serving: served.isServing(),
 			shares: served.shares(),
+			hosts: hosts.map(({ address: _, ...host }) => host),
 		},
 		shell: { ...environment },
 		web: web.address,

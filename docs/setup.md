@@ -59,7 +59,9 @@ Create it in the app: the sidebar's Team directory card, an offline channel, or 
 offers **Create directory**. **This Mac** serves it from this host on the tailnet, with no account
 or secret; a Mac that stays on (a Mac mini) is the best place for it. Every other host on the
 tailnet finds it in this host's hello and joins it on its own, unless it left a directory before.
-**Stop serving…** in `Settings → Team` turns it off and deletes its shares.
+**Stop serving…** in `Settings → Team` turns it off and deletes its shares. `Settings → Team` and
+**Team setup** list the hosts in the directory and when each last synced; when the Mac serving it is
+offline or stops serving, teammates' sync errors name that Mac.
 
 ### Deployed directory
 

@@ -211,14 +211,35 @@ async function call(
 		});
 	} catch (cause) {
 		if (signal.aborted) throw cause;
-		throw new Error(`Could not reach ${base}. Check the URL and your connection.`, { cause });
+		const host = server(base);
+		throw new Error(
+			host
+				? `${host.name}, which serves the directory, is offline. Channels stay listed as they were.`
+				: `Could not reach ${base}. Check the URL and your connection.`,
+			{ cause },
+		);
 	}
 	if (response.status === 401) throw new Error(await rejection(response, "The directory"));
 	if (!response.ok) {
+		const host = server(base);
+		if (host && response.status === 404) {
+			throw new Error(
+				`${host.name} stopped serving the directory. Channels stay listed as they were.`,
+			);
+		}
 		const reason = await refusal(response, "The directory");
 		throw new Error(response.status < 500 ? `${reason} Check the URL.` : reason);
 	}
 	return response;
+}
+
+/**
+ * The teammate's host serving a tailnet directory, found by the address it publishes, so a failure
+ * names their Mac rather than blaming this one's connection. A deployed directory has none.
+ */
+function server(base: string): Host | undefined {
+	const address = new URL(base).hostname.replace(/^\[|\]$/g, "");
+	return known.hosts.find((host) => host.address === address);
 }
 
 type Options = {

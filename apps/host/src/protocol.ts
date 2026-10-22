@@ -68,6 +68,8 @@ export type Diagnostics = {
 		serving: boolean;
 		/** The project shares in the directory this host serves, which stopping it deletes. */
 		shares: Share[];
+		/** Hosts in the directory's last answer, and when each last published to it; older hosts omit it. */
+		hosts?: DirectoryHost[];
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
@@ -76,6 +78,9 @@ export type Diagnostics = {
 	/** This host's plain HTTP address on the tailnet; unset off the tailnet. */
 	http?: string;
 };
+
+/** A host in the team's directory; `seen` is when it last published there. */
+export type DirectoryHost = { name: string; login: string; github?: string; seen: number };
 
 /** `offline`: the channel's host is unreachable. Hosted channels are never offline. */
 export type ChannelState = "running" | "dormant" | "archived" | "offline";
