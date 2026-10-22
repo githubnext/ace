@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Button, Input } from "@ace/ui";
 import type { Diagnostics } from "@ace/host/protocol";
 
+import { desktop } from "./desktop";
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { parse } from "./invite";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
+
+const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
+
+/** What each service the directory can name offers, since an unnamed one leaves no trace elsewhere. */
+const services = [
+	{ key: "hosted", label: "Hosted channels", offers: "Move to cloud in a channel's menu" },
+	{ key: "app", label: "Web app", offers: "Ace in a browser on other devices" },
+	{ key: "compute", label: "Cloud compute", offers: "Run in cloud for new channels" },
+] as const;
 
 const secrets = {
 	keychain: "Saved in Keychain",
@@ -25,6 +35,20 @@ const tailnet = {
 export function TeamSettings({ active }: { active: boolean }) {
 	const checks = useDiagnostics(active);
 	const checked = checks.value;
+	const [restart, setRestart] = useState<{ busy?: boolean; error?: string }>({});
+
+	async function restartHelper() {
+		if (!desktop) return;
+		setRestart({ busy: true });
+		try {
+			await desktop.helper("restart");
+			setRestart({});
+		} catch (error) {
+			setRestart({ error: (error as Error).message });
+		}
+		checks.refresh();
+	}
+
 	return (
 		<Page>
 			<Group
@@ -45,20 +69,75 @@ export function TeamSettings({ active }: { active: boolean }) {
 							label="Tailscale"
 							description={checked.tailscale.loopback
 								? "Loopback only, so teammates can't reach this host"
+								: checked.tailscale.restart
+								? `${checked.tailscale.name}. Ace Helper started before this tailnet was connected; restart it to use the tailnet.`
 								: checked.tailscale.name}
-							footer={checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
+							footer={
+								<>
+									{checked.tailscale.error && <Problem>{checked.tailscale.error}</Problem>}
+									{restart.busy && <Status>Restarting Ace Helper…</Status>}
+									{restart.error && <Problem>{restart.error}</Problem>}
+								</>
+							}
 						>
-							<Value>{tailnet[checked.tailscale.state]}</Value>
+							<Value>
+								{checked.tailscale.restart ? "Restart needed" : tailnet[checked.tailscale.state]}
+							</Value>
+							{checked.tailscale.restart && desktop && (
+								<Button
+									variant="outline"
+									disabled={restart.busy}
+									onClick={() => void restartHelper()}
+								>
+									Restart
+								</Button>
+							)}
 						</Row>
 						<TeamDirectory directory={checked.directory} onChange={() => checks.refresh()} />
 					</>
 				)}
 			</Group>
+			{checked?.directory.url && checked.directory.synced && (
+				<TeamServices services={checked.directory.services} />
+			)}
 			{!checks.open
 				? <Status>Waiting for Ace Helper…</Status>
 				: !checked && !checks.error && <Status>Checking…</Status>}
 			{checks.error && checks.open && <Problem>{checks.error}</Problem>}
 		</Page>
+	);
+}
+
+function Setup({ children }: { children: ReactNode }) {
+	return (
+		<a
+			href={SETUP}
+			target="_blank"
+			rel="noopener noreferrer"
+			className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
+		>
+			{children}
+		</a>
+	);
+}
+
+/** Which services the joined directory names; whoever deployed it sets the rest up. */
+function TeamServices({ services: named }: { services: Diagnostics["directory"]["services"] }) {
+	return (
+		<Group title="Team services">
+			{services.map(({ key, label, offers }) => (
+				<Row key={key} label={label} description={offers}>
+					<Value>{named[key] ? URL.parse(named[key])?.host || named[key] : "Not set up"}</Value>
+				</Row>
+			))}
+			{services.some(({ key }) => !named[key]) && (
+				<div className="py-3">
+					<Status>
+						Whoever deployed the directory can add the rest. <Setup>Set up team services</Setup>
+					</Status>
+				</div>
+			)}
+		</Group>
 	);
 }
 

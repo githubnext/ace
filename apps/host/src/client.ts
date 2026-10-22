@@ -63,7 +63,7 @@ export async function hostedAuth(): Promise<Record<string, string>> {
 	const secret = await key("ACE_SECRET");
 	if (!secret) {
 		throw new Error(
-			"The team's services need ACE_SECRET. Add it in Settings → This Mac → Team directory, or with ace key set ACE_SECRET",
+			"The team's services need ACE_SECRET. Add it in Settings → Team, or with ace key set ACE_SECRET",
 		);
 	}
 	return serviceAuth(secret);
@@ -74,20 +74,6 @@ export async function serviceAuth(secret: string): Promise<Record<string, string
 	const domain = await tailnet.domain();
 	if (!domain) throw new Error("The team's services need Tailscale running on this Mac.");
 	return { authorization: `Bearer ${await credential(secret, domain)}` };
-}
-
-/** Why a team service refused this host, naming both tailnets when they differ. */
-export async function rejection(response: Response, service: string): Promise<string> {
-	await response.body?.cancel();
-	const served = response.headers.get("ace-tailnet");
-	const domain = await tailnet.domain();
-	if (!served) {
-		return `${service} names no tailnet: it predates tailnet-scoped services or lacks its TAILNET setting. Check its URL against your team's current services.`;
-	}
-	if (domain && served !== domain) {
-		return `${service} serves the ${served} tailnet, but this Mac is on ${domain}. Switch tailnets, or use services deployed for this one.`;
-	}
-	return `${service} rejected this host's ACE_SECRET. Ask whoever set it up for the team's secret.`;
 }
 
 export async function hostedSocket(base: string, path: string): Promise<WebSocket> {

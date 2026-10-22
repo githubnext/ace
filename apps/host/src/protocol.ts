@@ -46,6 +46,11 @@ export type Diagnostics = {
 		error?: string;
 		/** Served with ace serve --loopback: no tailnet listener, peers, or directory entry. */
 		loopback?: boolean;
+		/**
+		 * Tailscale runs on a tailnet the host did not start on, often none: the host reads its tailnet
+		 * once, so it needs a restart before it can create or show that tailnet's channels.
+		 */
+		restart?: boolean;
 	};
 	/**
 	 * `error` is the last directory sync's failure and `failed` when it happened; a successful sync
@@ -57,9 +62,13 @@ export type Diagnostics = {
 		error?: string;
 		failed?: number;
 		secret: CredentialStatus;
+		/** The team services the directory named in its last answer; an unnamed one is not set up. */
+		services: { hosted?: string; app?: string; compute?: string };
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
+	/** This host's HTTPS address on the tailnet; unset without a tailnet certificate. */
+	web?: string;
 };
 
 /** `offline`: the channel's host is unreachable. Hosted channels are never offline. */

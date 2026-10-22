@@ -9,6 +9,7 @@ import type { SidebarRow } from "./session-item.types";
 import {
 	IconArchive as Archive,
 	IconCloud,
+	IconGlobe,
 	IconHand as HandWave,
 	IconHash,
 	IconLock,
@@ -105,6 +106,7 @@ function resolveIcon(data: SidebarRow) {
 	}
 	if (data.private) return <IconLock aria-label="Private channel" />;
 	if (data.cloud) return <IconCloud aria-label="Cloud channel" />;
+	if (data.hosted) return <IconGlobe aria-label="Hosted channel" />;
 	return <IconHash aria-label="Channel" />;
 }
 

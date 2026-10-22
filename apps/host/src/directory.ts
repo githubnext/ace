@@ -8,8 +8,8 @@ import { join } from "node:path";
 import type { Lifecycle, Share } from "@ace/directory/protocol";
 
 import * as catalog from "./catalog";
-import { hostedAuth, rejection, serviceAuth } from "./client";
-import { refusal } from "./http";
+import { hostedAuth, serviceAuth } from "./client";
+import { refusal, rejection } from "./http";
 import { failure, log } from "./log";
 import type { Listing } from "./protocol";
 
@@ -22,22 +22,38 @@ type Host = { name: string; login: string; github?: string; address?: string; se
 
 const config = join(catalog.home, "directory.json");
 
-export function url(): string | undefined {
-	if (process.env.ACE_DIRECTORY) return process.env.ACE_DIRECTORY;
-	if (existsSync(config)) return JSON.parse(readFileSync(config, "utf8")).url;
+/** `app`, `hosted`, and `compute` are the team's web app and services, set where the directory is deployed. */
+type Services = { app?: string; hosted?: string; compute?: string };
+type Known = Services & { hosts: Host[]; channels: Listing[]; shares: Share[] };
+
+/** The joined directory's URL and the services it last named. */
+type Saved = Services & { url: string };
+
+function saved(): Saved | undefined {
+	if (existsSync(config)) return JSON.parse(readFileSync(config, "utf8"));
 }
 
-/** `app`, `hosted`, and `compute` are the team's web app and services, set where the directory is deployed. */
-type Known = {
-	hosts: Host[];
-	channels: Listing[];
-	shares: Share[];
-	app?: string;
-	hosted?: string;
-	compute?: string;
-};
+export function url(): string | undefined {
+	return process.env.ACE_DIRECTORY || saved()?.url;
+}
 
-let known: Known = { hosts: [], channels: [], shares: [] };
+/** The services survive a restart so cloud options don't wait for the first sync, or vanish offline. */
+function remembered(): Known {
+	const value = saved();
+	const base = { hosts: [], channels: [], shares: [] };
+	if (!value || value.url !== url()) return base;
+	return { ...base, app: value.app, hosted: value.hosted, compute: value.compute };
+}
+
+/** Only the joined directory's file records its services; ACE_DIRECTORY alone writes nothing. */
+function remember(base: string, { app, hosted, compute }: Services) {
+	const value = saved();
+	if (value?.url !== base) return;
+	if (value.app === app && value.hosted === hosted && value.compute === compute) return;
+	writeFileSync(config, JSON.stringify({ url: base, app, hosted, compute }));
+}
+
+let known: Known = remembered();
 let synced: number | undefined;
 /** The last sync's failure, kept until a sync succeeds so Settings can say what is wrong and since when. */
 let error: string | undefined;
@@ -203,6 +219,7 @@ export function watch({ self, channels, changed, published, covered }: Options) 
 			// Directories deployed before project access keep no shares.
 			answer.shares ||= [];
 			known = answer;
+			remember(base, answer);
 			synced = Date.now();
 			error = undefined;
 			failed = undefined;

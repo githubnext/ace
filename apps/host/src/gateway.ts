@@ -1184,7 +1184,8 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 		if (tls && !closing) {
 			const listener = { port: config.webPort ?? port + 1000, secure: true };
 			servers.push(team(machine, listener, tls));
-			console.log(`and https://${machine.dns}:${listener.port}`);
+			web.served(machine, listener);
+			console.log(`and ${web.address}`);
 		}
 	} else if (!loopback) {
 		console.log("Tailscale is not running; channels stay on this machine");

@@ -15,7 +15,7 @@ take priority and Settings identifies them.
 
 ## Command line tool
 
-`Settings → This Mac` installs the command line tool. It links `ace` for stable, or `ace-canary`
+`Settings → Ace Helper` installs the command line tool. It links `ace` for stable, or `ace-canary`
 for Canary, in `~/.local/bin` to the app's own Ace Helper, so it uses that app's channels and port
 and stays current with app updates. Settings says whether your shell finds it and, if not, what to
 add to your `PATH`.
@@ -52,14 +52,26 @@ home screen to use it as an app.
 
 The team's directory lists every host's channels, so they stay visible while their host sleeps.
 Whoever sets up the team deploys the services once from a checkout; everyone else joins in
-`Settings → This Mac → Team directory` with the directory's URL and the team's secret, shared
-privately. `Troubleshooting → Refresh status` syncs at once. From a checkout,
+`Settings → Team` (Join…) with the directory's URL and the team's secret, shared privately.
+Refresh there syncs at once. From a checkout,
 `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
 
 The services are cells, so they run on Cloudflare Workers, or on [celld](#on-celld) on machines the
 team runs or on [Fly.io](#on-flyio). To deploy them to your Cloudflare account, give the Workers the
 same secret and your tailnet's MagicDNS suffix. The services then serve only that tailnet; see
 [the team](architecture.md#the-team) for what that scope does and doesn't protect.
+
+One command does every step below for Cloudflare or Fly.io, signed in to `wrangler` or `fly`,
+with Tailscale on. It names the services for your tailnet (`ace-directory-tail1234` for
+`tail1234.ts.net`), deploys the directory with a new team secret, and prints the directory's URL
+and the secret to join with. `--hosted` adds hosted channels, with `ANTHROPIC_API_KEY` and
+`OPENAI_API_KEY` from your environment or the checkout's `.env`.
+
+```sh
+bun services/deploy.ts <cloudflare|fly> [--hosted]
+```
+
+By hand, on Cloudflare:
 
 ```sh
 SECRET=$(openssl rand -hex 32)
@@ -69,7 +81,7 @@ for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf
 ```
 
 Then name the other services in the directory, from `services/directory`, so every host that joins
-picks them up:
+picks them up. `Settings → Team → Team services` shows which ones a host's directory names:
 
 - `HOSTED`: the channel service (`https://ace-channel.<your-subdomain>.workers.dev`), offered in a
   channel's `Move to` menu.
@@ -137,7 +149,7 @@ restart. Compute still needs Cloudflare.
 
 [`services/fly.toml`](../services/fly.toml) runs one celld node per service on Fly.io, with a
 Tigris bucket each. Tigris needs a card on the Fly account. Pick app names (`ace-directory-<team>`
-and `ace-channel-<team>` below), then create the apps and buckets. `fly storage create` prints the
+and `ace-channel-<tailnet>` below), then create the apps and buckets. `fly storage create` prints the
 bucket's keys once; keep them to deploy from a checkout.
 
 ```sh

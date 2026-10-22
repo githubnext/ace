@@ -140,6 +140,7 @@ function row(
 		lifecycle: channel.state === "archived" ? "archived" : "live",
 		private: false,
 		cloud: place.kind === "cloud",
+		hosted: place.kind === "hosted",
 		mine: channel.owner === user,
 		member: true,
 		capabilities: {

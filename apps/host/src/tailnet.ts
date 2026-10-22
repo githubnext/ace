@@ -91,12 +91,16 @@ export async function domain(): Promise<string | undefined> {
 	return (await status())?.MagicDNSSuffix;
 }
 
-export async function diagnostics(): Promise<Diagnostics["tailscale"]> {
+/** `started` is the tailnet the host read at startup, which its channels and listeners still use. */
+export async function diagnostics(started?: string): Promise<Diagnostics["tailscale"]> {
 	if (!binary) return { state: "missing" };
 	try {
 		const value = await run(["status", "--json"]) as Status;
 		if (value.BackendState !== "Running") return { state: "offline" };
-		return { state: "running", name: machine(value.Self, value).name };
+		const name = machine(value.Self, value).name;
+		return value.MagicDNSSuffix === started
+			? { state: "running", name }
+			: { state: "running", name, restart: true };
 	} catch (error) {
 		return { state: "error", error: (error as Error).message };
 	}
