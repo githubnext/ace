@@ -679,9 +679,10 @@ async function main() {
 			}
 			const shared = rest[0] === "on";
 			await request(record.id, { op: "share", author: catalog.user, shared });
-			if (!shared) return;
 			return console.log(
-				`Agent access is on for ${record.name}. Teammates can run commands as you on this machine.`,
+				shared
+					? `Agent access is on for ${record.name}. Teammates can run commands as you on this machine.`
+					: `Agent access is off for ${record.name}. Only you can ask its agents.`,
 			);
 		}
 		case "desktop": {
