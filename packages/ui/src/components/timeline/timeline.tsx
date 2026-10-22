@@ -671,11 +671,17 @@ function frame(
 	let meta = active
 		? group.rows.find(row => row.uid === active) ?? turn?.final
 		: group.rows.at(-1) ?? turn?.final;
-	let edited = meta?.edited;
+	// Unhovered, the byline speaks for every message in the group, so any edit marks it.
+	let edited = active
+		? meta?.edited
+		: [...group.rows, turn?.final].reduce<number | undefined>(
+			(at, row) => row?.edited && row.edited > (at ?? 0) ? row.edited : at,
+			undefined,
+		);
 	let stamp = meta?.ts ?? group.ts;
 	let date = timeFmt.format(stamp * 1000);
 	let title = exactFmt.format(stamp * 1000);
-	let edit = edited && (active ? exactFmt.format(edited * 1000) : "edited");
+	let edit = edited && (active ? `edited ${exactFmt.format(edited * 1000)}` : "edited");
 	let editTitle = edited ? exactFmt.format(edited * 1000) : undefined;
 	let selection = meta?.agent;
 	let agent = agentLabel(selection);
