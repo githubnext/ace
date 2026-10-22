@@ -1,81 +1,87 @@
 {
-  "fill-specializations": [
+  "fill-specializations" : [
     {
-      "value": {
-        "automatic-gradient": "display-p3:0.48956,0.60455,0.51659,1.00000",
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
+      "value" : {
+        "linear-gradient" : [
+          "display-p3:0.52350,0.64655,0.55272,1.00000",
+          "display-p3:0.41322,0.59650,0.42639,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 0
           },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.7
           }
         }
       }
     },
     {
-      "appearance": "dark",
-      "value": {
-        "automatic-gradient": "display-p3:0.52350,0.64655,0.55272,1.00000",
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
+      "appearance" : "dark",
+      "value" : {
+        "linear-gradient" : [
+          "display-p3:0.34489,0.37410,0.35472,1.00000",
+          "display-p3:0.10459,0.12929,0.11164,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 0
           },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.7
           }
         }
       }
     }
   ],
-  "groups": [
+  "groups" : [
     {
-      "layers": [
+      "layers" : [
         {
-          "blend-mode": "normal",
-          "fill-specializations": [
+          "blend-mode" : "overlay",
+          "fill-specializations" : [
             {
-              "value": {
-                "solid": "display-p3:1.00000,1.00000,1.00000,1.00000"
+              "value" : {
+                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
-              "appearance": "dark",
-              "value": {
-                "solid": "display-p3:0.09998,0.09998,0.09998,1.00000"
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
               }
             }
           ],
-          "glass": true,
-          "hidden": false,
-          "image-name": "mark.svg",
-          "name": "mark",
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "mark.svg",
+          "name" : "mark",
+          "opacity" : 0.8,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
               0,
               0
             ]
           }
         }
       ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
       },
-      "translucency": {
-        "enabled": true,
-        "value": 0.5
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
       }
     }
   ],
-  "supported-platforms": {
-    "squares": [
+  "supported-platforms" : {
+    "squares" : [
       "macOS"
     ]
   }
