@@ -185,6 +185,7 @@ function render(event: Event, info: ChannelInfo) {
 			return console.log(`${tag}${bold(event.model)}: ${event.text}${ending}`);
 		}
 		case "tool": {
+			if (event.unrun) return console.log(dim(`${tag}  → ${event.name} (not run)`));
 			if (event.name !== "question") {
 				return console.log(dim(`${tag}  → ${event.name} ${clip(JSON.stringify(event.args), 100)}`));
 			}

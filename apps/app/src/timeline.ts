@@ -97,6 +97,8 @@ function text(value: string): Event.Message.Content.Text {
 	return parts.length ? { type: "text", text: value, parts } : { type: "text", text: value };
 }
 
+const NOT_RUN = "Not run";
+
 function tool(
 	tool: Tool,
 	busy: boolean,
@@ -110,8 +112,11 @@ function tool(
 		name: tool.name,
 		arguments: (tool.args ?? {}) as Record<string, unknown>,
 		status,
-		...(caption ? { caption } : {}),
+		...(tool.unrun ? { caption: NOT_RUN } : caption ? { caption } : {}),
 		...(recap ? { recap } : {}),
+		...(tool.unrun
+			? { result: { content: `${NOT_RUN}: the run ended while the agent was writing this call.` } }
+			: {}),
 		...(tool.result
 			? {
 				result: {

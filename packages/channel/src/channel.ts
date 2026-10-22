@@ -432,7 +432,7 @@ export class Channel {
 			case "kill":
 				this.#author(request.author);
 				await this.#mayInvoke(request.author);
-				return this.kill();
+				return this.kill(request.author);
 			case "share":
 				return this.#share(request);
 			case "desktop":
@@ -637,14 +637,20 @@ export class Channel {
 		return importSeed(this.#harness, value, shift);
 	}
 
-	async kill(): Promise<void> {
+	/** `author`'s kill records a Stop in each chat it ended, so their next runs know. */
+	async kill(author?: string): Promise<void> {
 		const { chats } = await this.info();
-		this.#log("warn", "channel.kill", {
-			chats: chats.filter((chat) => chat.busy).map((c) => c.id),
-		});
+		const busy = chats.filter((chat) => chat.busy);
+		this.#log("warn", "channel.kill", { chats: busy.map((c) => c.id) });
 		await Promise.all(chats.map(async (chat) => {
 			const conversation = await this.#harness.conversation(chat.id as ConversationId, context);
 			await conversation?.abort(context, { background: true });
+		}));
+		if (!author) return;
+		const at = Date.now();
+		await Promise.all(busy.map(async (chat) => {
+			const conversation = await this.#conversation(chat.id);
+			await conversation.submit({ type: "write", entry: room.stop(author, at) }, context);
 		}));
 	}
 
@@ -1235,6 +1241,8 @@ function events(entry: EntryRecord): Event[] {
 				call: block.id,
 				name: block.name,
 				args: block.arguments,
+				// pi runs calls only from a finished reply; a cut-off one's calls were never run.
+				...(error || stopped ? { unrun: true as const } : {}),
 			});
 		}
 		return out;
