@@ -416,15 +416,20 @@ const REVIEWS: Record<string, GithubPull["review"]> = {
 	REVIEW_REQUIRED: "required",
 };
 
-/** The newest pull request whose head is `branch`, or null when there is none. */
+/**
+ * The newest pull request from `branch` in the repository itself, or null when there is none.
+ * `--head` matches the branch name in any fork, and strangers open pull requests from their forks'
+ * `master` or `main`, so pull requests from other repositories never count as the channel's.
+ */
 export async function pull(repo: string, branch: string): Promise<GithubPull | null> {
 	if (!branch || branch.startsWith("-")) throw new Error("Invalid branch name");
-	const [value] = await gh<
+	const found = await gh<
 		(Item & {
 			isDraft: boolean;
 			statusCheckRollup: Check[];
 			headRefOid: string;
 			reviewDecision: string;
+			isCrossRepository: boolean;
 		})[]
 	>([
 		"pr",
@@ -435,10 +440,11 @@ export async function pull(repo: string, branch: string): Promise<GithubPull | n
 		"--state",
 		"all",
 		"--limit",
-		"1",
+		"30",
 		"--json",
-		`${FIELDS},isDraft,statusCheckRollup,headRefOid,reviewDecision`,
+		`${FIELDS},isDraft,statusCheckRollup,headRefOid,reviewDecision,isCrossRepository`,
 	]);
+	const value = found.find((candidate) => !candidate.isCrossRepository);
 	if (!value) return null;
 	const review = REVIEWS[value.reviewDecision];
 	return {
