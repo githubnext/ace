@@ -70,6 +70,8 @@ export type Diagnostics = {
 		shares: Share[];
 		/** Hosts in the directory's last answer, and when each last published to it; older hosts omit it. */
 		hosts?: DirectoryHost[];
+		/** A directory a teammate's host names while this host has none, such as after leaving it. */
+		offered?: { url: string; host: string };
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };

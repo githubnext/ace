@@ -1010,7 +1010,13 @@ export function App() {
 										onClone={cloneUrl}
 									/>
 								)}
-							{card && <DirectoryCard onDismiss={() => setDismissed(true)} />}
+							{card && (
+								<DirectoryCard
+									offered={directory.offered}
+									onDismiss={() => setDismissed(true)}
+									onChange={() => setSettings("team")}
+								/>
+							)}
 							<TeamSetupItem />
 						</Sidebar>
 					)}

@@ -63,6 +63,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 			serving: served.isServing(),
 			shares: served.shares(),
 			hosts: hosts.map(({ address: _, ...host }) => host),
+			offered: directory.offered(),
 		},
 		shell: { ...environment },
 		web: web.address,

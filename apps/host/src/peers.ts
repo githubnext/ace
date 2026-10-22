@@ -41,6 +41,7 @@ async function discover(signal: AbortSignal) {
 		if (online.get(name)?.address === host.machine.address) continue;
 		host.client.close();
 		hosts.delete(name);
+		directory.offer(name, undefined);
 		log("info", "peer.gone", { peer: name });
 		emit();
 	}
@@ -65,16 +66,17 @@ async function discover(signal: AbortSignal) {
 		});
 		hosts.set(name, host);
 	}
-	// A teammate can start a directory after this host first greeted them, and a peer that answered
-	// before `gh` resolved has a login to give.
-	const chosen = directory.isChosen();
+	// A teammate can start a directory after this host first greeted them, a host that left one
+	// offers a teammate's instead, and a peer that answered before `gh` resolved has a login to give.
+	const listening = !directory.isChosen() || !directory.url();
 	for (const [name, { client, machine }] of hosts) {
-		if (client.status === "open" && (!chosen || unnamed.has(name))) greet(client, machine);
+		if (client.status === "open" && (listening || unnamed.has(name))) greet(client, machine);
 	}
 }
 
 function greet(client: GatewayClient, machine: Machine) {
 	client.request<Hello>({ op: "hello" }).then((hello) => {
+		directory.offer(machine.name, hello.directory);
 		if (hello.directory) void directory.adopt(hello.directory);
 		// A freshly started peer answers before `gh` has told it its owner's login, which may have changed.
 		if (!hello.github) return void unnamed.add(machine.name);

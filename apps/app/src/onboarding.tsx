@@ -245,8 +245,33 @@ export function Welcome({ github, onClose }: { github?: string; onClose: () => v
 	);
 }
 
-/** Sidebar footer upsell while the team has no directory. */
-export function DirectoryCard({ onDismiss }: { onDismiss: () => void }) {
+/**
+ * Sidebar footer while this host has no directory: join the one a teammate's host names, or
+ * create one when nobody has.
+ */
+export function DirectoryCard(
+	{ offered, onDismiss, onChange }: {
+		offered?: { url: string; host: string };
+		onDismiss: () => void;
+		onChange: () => void;
+	},
+) {
+	const [joining, setJoining] = useState(false);
+	const [error, setError] = useState("");
+
+	async function join(url: string) {
+		setJoining(true);
+		setError("");
+		try {
+			await host.request({ op: "directory-set", url });
+			window.dispatchEvent(new Event(DIRECTORY_CHANGED));
+		} catch (error) {
+			setError((error as Error).message);
+		} finally {
+			setJoining(false);
+		}
+	}
+
 	return (
 		<div className="m-2 flex shrink-0 flex-col gap-2 rounded-lg border bg-card p-3">
 			<div className="flex items-center gap-2">
@@ -261,17 +286,51 @@ export function DirectoryCard({ onDismiss }: { onDismiss: () => void }) {
 					<IconX className="size-3.5" aria-hidden />
 				</button>
 			</div>
-			<p className="text-xs leading-5 text-muted-foreground">
-				Keep channels listed while Macs are offline, and share projects.
-			</p>
-			<Button
-				size="sm"
-				variant="outline"
-				className="border"
-				onClick={() => window.dispatchEvent(new Event(CREATE_DIRECTORY))}
-			>
-				Create directory
-			</Button>
+			{offered
+				? (
+					<>
+						<p className="text-xs leading-5 text-muted-foreground">
+							{offered.host}{" "}
+							serves your team's directory. This Mac isn't in it, so its channels aren't listed
+							while it's offline.
+						</p>
+						{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+						<div className="flex gap-2">
+							<Button
+								size="sm"
+								className="flex-1"
+								disabled={joining}
+								onClick={() => void join(offered.url)}
+							>
+								{joining ? "Joining…" : "Join"}
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								className="flex-1 border"
+								disabled={joining}
+								onClick={onChange}
+							>
+								Change…
+							</Button>
+						</div>
+					</>
+				)
+				: (
+					<>
+						<p className="text-xs leading-5 text-muted-foreground">
+							Keep channels listed while Macs are offline, and share projects.
+						</p>
+						<Button
+							size="sm"
+							variant="outline"
+							className="border"
+							onClick={() => window.dispatchEvent(new Event(CREATE_DIRECTORY))}
+						>
+							Create directory
+						</Button>
+					</>
+				)}
 		</div>
 	);
 }
@@ -291,7 +350,7 @@ export function OfflineHost({ name, host: machine }: { name: string; host: strin
 					{name} runs on that Mac. Its chat opens here when the Mac is back.
 				</p>
 			</div>
-			{directory && !directory.url && (
+			{directory && !directory.url && !directory.offered && (
 				<div className="flex max-w-sm flex-col gap-3 rounded-lg border bg-card p-4 text-left">
 					<div className="flex items-start gap-2.5">
 						<IconDatabase className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
