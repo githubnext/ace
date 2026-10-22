@@ -72,7 +72,9 @@ const HELP = `ace — channels on this host
   ace chat <channel> [--model <provider/id>]     open another chat
   ace stop <channel> [--chat <id>]               stop the chat's current run
   ace kill <channel>                             stop all work in the channel now
-  ace move <channel> --local | --compute         move an idle hosted channel back, or a channel to a cloud workspace
+  ace move <channel> --compute                   move an idle channel to a cloud workspace, which it
+                                                can't leave
+  ace move <channel> --local                     bring an idle channel back from a hosting service
   ace agents <channel> on|off                    let others invoke agents
   ace project access <project>                   who can see a project, by folder or owner/name
   ace project share|unshare <project> team|<github login>
@@ -662,7 +664,13 @@ async function main() {
 			await move(record.id, flags.local ? "local" : flags.compute ? "compute" : flags.hosted!);
 			const moved = catalog.read(record.id);
 			return console.log(
-				`${moved.name} now runs ${moved.hosted ? `at ${moved.hosted}` : "on this host"}`,
+				`${moved.name} now runs ${
+					moved.compute
+						? "in a cloud workspace"
+						: moved.hosted
+						? `at ${moved.hosted}`
+						: "on this host"
+				}`,
 			);
 		}
 		case "agents": {

@@ -756,7 +756,7 @@ export function App() {
 		} catch (error) {
 			toast.error("Could not start channel", {
 				description: (error as Error).message,
-				action: { label: "Settings", onClick: () => setSettings(true) },
+				action: { label: "Settings", onClick: () => setSettings(cloud ? "beta" : true) },
 			});
 		} finally {
 			creating.current = false;

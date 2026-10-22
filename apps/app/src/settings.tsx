@@ -281,9 +281,20 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 function CloudCompute({ disabled }: { disabled: boolean }) {
 	const { compute, error } = useCompute();
 	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
+	const [note, setNote] = useState<string>();
 
 	async function save(enabled: boolean, url: string | null) {
 		await host.request({ op: "preferences", compute: { enabled, url: url || null } });
+	}
+
+	async function link(url: string) {
+		setNote(undefined);
+		await save(!!compute?.enabled, url);
+		setNote(
+			url
+				? `Saved. ${new URL(url).host} answered as a compute service for this tailnet.`
+				: "Cleared.",
+		);
 	}
 
 	async function toggle(enabled: boolean) {
@@ -317,7 +328,8 @@ function CloudCompute({ disabled }: { disabled: boolean }) {
 				placeholder="https://ace-compute.example.workers.dev"
 				saved={compute && (compute.url || "")}
 				disabled={disabled}
-				onSave={(url) => save(!!compute?.enabled, url)}
+				footer={note && <Status>{note}</Status>}
+				onSave={link}
 			/>
 		</Group>
 	);
