@@ -20,6 +20,7 @@ import * as catalog from "./catalog";
 import { hostedAuth, request } from "./client";
 import { refusal } from "./http";
 import { project } from "./manage";
+import { offline } from "./seed";
 
 async function checksum(path: string): Promise<string> {
 	const hash = createHash("sha256");
@@ -149,6 +150,7 @@ export async function restore(directory: string, dir?: string): Promise<catalog.
 		} else if (names.has("channel.sqlite")) {
 			copyFileSync(join(path, "channel.sqlite"), storage);
 		}
+		if (record.project !== original.project) await offline(record, async () => {}, true);
 		// Saved last: the catalog lists the channel only once its store is complete.
 		catalog.save(record);
 	} catch (error) {

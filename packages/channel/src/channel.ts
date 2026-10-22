@@ -10,6 +10,7 @@ import {
 	AgentDoc,
 	type AgentEvent,
 	type CommitChange,
+	configure,
 	type Conversation,
 	type ConversationId,
 	type ConversationRecord,
@@ -120,6 +121,11 @@ export type Options = {
 	 * root chat, so reopening never moves a chat that has since switched lanes.
 	 */
 	lane?: { name: string; path: string; base: string };
+	/**
+	 * For a copy restored into another project: every chat moves to the project checkout and the
+	 * original's lanes, which are worktrees of the original project, are forgotten before work resumes.
+	 */
+	relocate?: boolean;
 	/** The host's current preference, consulted only for a chat's first agent invocation. */
 	defaultModel?(): Promise<ModelRef>;
 	storage: Storage;
@@ -318,6 +324,19 @@ export class Channel {
 			channel.#publishBusy();
 			if (changes.some((change) => change.type === "entry")) channel.#activity();
 		});
+		if (options.relocate) {
+			await harness.commit(async (tx) => {
+				let cursor: Cursor | undefined;
+				do {
+					const page = await tx.scanConversations({}, 256, cursor);
+					for (const record of page.items) {
+						await configure(tx, record.id, { cwd: options.project });
+					}
+					cursor = page.next;
+				} while (cursor);
+				(await tx.doc(LanesDoc)).lanes = {};
+			}, context);
+		}
 		// Opening resumes work a crash interrupted; a killed channel left only terminal tasks behind.
 		harness.resume();
 		log("info", "channel.open", { name: value.name, project: options.project });
