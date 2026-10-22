@@ -5,6 +5,7 @@
  */
 import { renameSync, rmSync } from "node:fs";
 
+import { applySqliteMigrations } from "@earendil-works/pi-durable/storage/sqlite";
 import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite/node";
 
 import { exportSnapshot, importSnapshot, MAX_SNAPSHOT, type Snapshot } from "@ace/channel/transfer";
@@ -172,6 +173,8 @@ async function park(id: string): Promise<void> {
 async function readLocal(id: string): Promise<Snapshot> {
 	const db = await openNodeSqliteDatabase(catalog.paths(id).storage);
 	try {
+		// A channel made by `ace new` has no store until its worker first opens it.
+		await applySqliteMigrations(db);
 		return await exportSnapshot(db, id);
 	} finally {
 		await db.close();

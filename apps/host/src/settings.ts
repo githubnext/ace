@@ -3,11 +3,20 @@ import { available } from "@ace/channel/models";
 
 import { config } from "./config";
 import * as directory from "./directory";
+import { rejection } from "./http";
 import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } from "./keys";
 import { models, parseModel } from "./manage";
 import { canonical } from "./move";
-import { isModel, preference, saveCompute, saveFolder, savePreference } from "./preferences";
+import {
+	compute,
+	isModel,
+	preference,
+	saveCompute,
+	saveFolder,
+	savePreference,
+} from "./preferences";
 import type { Compute, Invite, ProviderId, Settings } from "./protocol";
+import * as tailnet from "./tailnet";
 
 const providers = new Map(
 	[
@@ -128,10 +137,41 @@ export async function setModel(model: ModelRef | null): Promise<void> {
 	savePreference(model);
 }
 
-export function setCompute({ enabled, url }: Compute): void {
+/**
+ * A compute service answers an unsigned request with 401 and its tailnet, so a new URL is checked
+ * before it's saved, without reading the team's secret.
+ */
+async function probe(url: string): Promise<void> {
+	const { host } = new URL(url);
+	let response: Response;
+	try {
+		response = await fetch(`${url}/workspaces/0000000000000000/status`, {
+			signal: AbortSignal.timeout(10_000),
+		});
+	} catch (error) {
+		throw new Error(`Could not reach ${host}: ${(error as Error).message}. Check the URL.`, {
+			cause: error,
+		});
+	}
+	if (response.status !== 401) {
+		await response.body?.cancel();
+		throw new Error(
+			`${host} is not an Ace compute service (HTTP ${response.status}). Check the URL.`,
+		);
+	}
+	const served = response.headers.get("ace-tailnet");
+	const domain = await tailnet.domain();
+	if (!served || (domain && served !== domain)) {
+		throw new Error(await rejection(response, host));
+	}
+	await response.body?.cancel();
+}
+
+export async function setCompute({ enabled, url }: Compute): Promise<void> {
 	if (typeof enabled !== "boolean") throw new Error("Turn cloud compute on or off");
 	const service = url?.trim() ? canonical(url.trim()) : null;
 	if (enabled && !service) throw new Error("Add the cloud compute service URL first");
+	if (service && service !== compute().url) await probe(service);
 	saveCompute({ enabled, url: service });
 }
 

@@ -691,7 +691,7 @@ async function handle(
 			return settingsChanged();
 		case "preferences":
 			if (request.model !== undefined) await setModel(request.model);
-			if (request.compute) setCompute(request.compute);
+			if (request.compute) await setCompute(request.compute);
 			if (request.folder !== undefined) setFolder(request.folder);
 			return settingsChanged();
 		case "key-store":
