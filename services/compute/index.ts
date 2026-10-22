@@ -94,7 +94,7 @@ export class Compute extends DurableObject<Env> {
 	}
 
 	async #call(path: string, body?: unknown): Promise<Response> {
-		if (!this.ctx.container?.running) throw new Error("The sandbox is stopped");
+		if (!this.ctx.container?.running) throw new Error("The workspace is stopped");
 		const response = await this.ctx.container.getTcpPort(8080).fetch(`http://container${path}`, {
 			method: body === undefined ? "GET" : "POST",
 			body: body === undefined
@@ -119,7 +119,7 @@ export class Compute extends DurableObject<Env> {
 				await scheduler.wait(1000);
 			}
 		}
-		throw new Error("Sandbox did not become ready in 120 seconds");
+		throw new Error("The workspace did not become ready in 120 seconds");
 	}
 
 	async #connect(thaw = true) {
@@ -198,13 +198,13 @@ export class Compute extends DurableObject<Env> {
 			if (this.ctx.storage.kv.get("frozen") && !this.ctx.storage.kv.get("ready")) {
 				await this.ctx.container!.destroy();
 			} else {
-				throw new Error("Sandbox is already running; use resize to change its size");
+				throw new Error("The workspace is already running; resize it to change its size");
 			}
 		}
 		const manifest = this.ctx.storage.kv.get<Manifest>("checkpoint");
 		if (settings.started && !manifest) {
 			throw new Error(
-				"The sandbox was lost without a checkpoint; refusing to create an empty replacement",
+				"The workspace was lost without a checkpoint; refusing to create an empty replacement",
 			);
 		}
 		await this.#channel("freeze");
@@ -324,7 +324,7 @@ export class Compute extends DurableObject<Env> {
 			["exec", "checkpoint", "stop", "resize", "resume"].includes(action)
 			&& !this.ctx.container!.running
 		) {
-			throw new Error("The sandbox is stopped; use start to restore it");
+			throw new Error("The workspace is stopped; Start compute restores it");
 		}
 		switch (action) {
 			case "resume":
