@@ -74,6 +74,7 @@ import {
 	PR_COMMENT_BUBBLE_PAD_BOTTOM,
 	PR_COMMENT_GAP,
 	REACTION_GAP,
+	STAMP,
 	summaryId,
 	TAIL,
 	TOOL_GROUP_PAD_Y,
@@ -977,11 +978,17 @@ function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 
 	let isUser = group.role === "user";
 	let isBubble = isUser || group.role === "assistant";
-	let inner = isBubble ? content - BUBBLE_PAD_X * 2 : content;
-	let entries = group.rows.map(row => {
+	let inner = isBubble ? content - STAMP - BUBBLE_PAD_X * 2 : content;
+	let minutes = group.rows.map(row => timeFmt.format(row.ts * 1000));
+	let entries = group.rows.map((row, i) => {
 		let b = blocks.get(row.uid) || [];
+		let time = minutes[i]!;
 		return {
 			b,
+			// The byline shows the last message's time, so earlier ones show theirs where it changes.
+			stamp: isBubble && time !== minutes[i - 1] && time !== minutes.at(-1)
+				? { time, title: exactFmt.format(row.ts * 1000) }
+				: undefined,
 			agent: row.agent,
 			// An unbreakable token wider than the lane must not widen the bubble past it.
 			fit: isBubble ? Math.min(measureRow(b, inner).fit, inner) : inner,
@@ -1000,7 +1007,7 @@ function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 			className={cn("flex flex-col", mine && "items-end")}
 			style={{ gap: isUser ? BUBBLE_GAP : CONTENT_GAP }}
 		>
-			{entries.map(({ b, agent, fit, reactions, uid }, i) => {
+			{entries.map(({ b, stamp, agent, fit, reactions, uid }, i) => {
 				let prev = entries[i - 1];
 				let next = entries[i + 1];
 				let last = i === entries.length - 1;
@@ -1029,7 +1036,7 @@ function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 						{toolbar(uid, wide)}
 						<div
 							className={cn(
-								"rounded-2xl squircle",
+								"relative rounded-2xl squircle",
 								prev && !prevHasReact && (mine ? "rounded-tr-none" : "rounded-tl-none"),
 								prev && !self && !above && fit <= prev.fit && !prevHasReact
 									&& (mine ? "rounded-tl-none" : "rounded-tr-none"),
@@ -1071,6 +1078,17 @@ function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 							>
 								<BlockList blocks={b} width={fit} />
 							</div>
+							{stamp && (
+								<span
+									className={cn(
+										"absolute bottom-1 whitespace-nowrap text-[0.625rem] text-muted-foreground",
+										mine ? "right-full mr-1.5" : "left-full ml-1.5",
+									)}
+									title={stamp.title}
+								>
+									{stamp.time}
+								</span>
+							)}
 						</div>
 						{reactions && reactions.length > 0 && (
 							<Reactions
