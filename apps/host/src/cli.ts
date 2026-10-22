@@ -95,7 +95,8 @@ const USAGE = `ace — channels on this host
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
   ace open [--port ${config.port}]                          open this host's authenticated app
-  ace archive <channel> | unarchive <channel> | delete <channel>
+  ace archive <channel> | unarchive <channel> | delete <channel> [--yes]
+                                                delete asks first while a run is in progress
   ace --version
 
 info, say, ask, answer, watch, chat and stop also take a teammate's channel, by name or ID, through this
@@ -120,6 +121,7 @@ const OPTIONS = {
 	all: { type: "boolean" },
 	team: { type: "boolean" },
 	detach: { type: "boolean" },
+	yes: { type: "boolean" },
 	now: { type: "boolean" },
 	channel: { type: "string" },
 	trace: { type: "string" },
@@ -447,6 +449,7 @@ async function main() {
 		}
 		case "ls": {
 			if (flags.team) {
+				console.log(["NAME", "ID", "STATE", "HOST", "OWNER", "PROJECT"].join("\t"));
 				for (const listing of await local<Listing[]>({ op: "channels" })) {
 					if (listing.state === "archived" && !flags.all) continue;
 					const { name, id, state, host, owner, project } = listing;
@@ -454,6 +457,7 @@ async function main() {
 				}
 				return;
 			}
+			console.log(["NAME", "ID", "STATE", "MODEL", "PROJECT"].join("\t"));
 			for (const record of catalog.list()) {
 				if (record.archived && !flags.all) continue;
 				const running = isRunning(record.id) ? "running" : "dormant";
@@ -602,7 +606,7 @@ async function main() {
 				case "say":
 					if (!text) throw new Error("Nothing to say");
 					await session.request({ op: "say", chat: chat(), author: catalog.user, text });
-					return;
+					return console.log(`Posted to ${name}.`);
 				case "ask": {
 					if (!text) throw new Error("Nothing to ask");
 					const body = {
@@ -612,7 +616,12 @@ async function main() {
 						text,
 						model: flags.model ? model(flags.model) : undefined,
 					} as const;
-					if (flags.detach) return void (await session.request(body));
+					if (flags.detach) {
+						await session.request(body);
+						return console.log(
+							`Asked ${name}'s agent; the run continues. Follow it with: ace watch ${name}`,
+						);
+					}
 					await watch(session, false);
 					const { submission } = await session.request<{ submission: number }>(body);
 					process.prependListener("SIGINT", () => {
@@ -626,7 +635,7 @@ async function main() {
 				case "answer":
 					if (!text) throw new Error("Nothing to answer");
 					await session.request({ op: "answer", chat: chat(), author: catalog.user, text });
-					return;
+					return console.log(`Answered the question in ${name}.`);
 				case "watch":
 					return await (await watch(session)).ended;
 				case "chat": {
@@ -637,8 +646,18 @@ async function main() {
 					} as const;
 					return console.log((await session.request<{ chat: number }>(body)).chat);
 				}
-				case "stop":
-					return void (await session.request({ op: "stop", chat: chat(), author: catalog.user }));
+				case "stop": {
+					// Stopping settles either way, so the chat's state beforehand says whether a run ended.
+					const { chats } = await session.request<ChannelInfo>({ op: "info" });
+					const id = chat();
+					const busy = chats.find((value) =>
+						id === undefined ? value.parent === undefined : value.id === id
+					)?.busy;
+					await session.request({ op: "stop", chat: id, author: catalog.user });
+					return console.log(
+						busy ? `Stopped the run in ${name}.` : `Nothing was running in ${name}.`,
+					);
+				}
 			}
 		} finally {
 			session.close();
@@ -657,7 +676,7 @@ async function main() {
 		case "rename":
 			if (rest.length !== 1) throw new Error("ace rename <channel> <name>");
 			await request(record.id, { op: "rename", author: catalog.user, name: rest[0]! });
-			return;
+			return console.log(`Renamed ${record.name} to ${rest[0]}.`);
 		case "fork":
 			return console.log((await fork(record.id, catalog.user)).name);
 		case "kill": {
@@ -713,20 +732,33 @@ async function main() {
 			}
 			const enabled = rest[0] === "on";
 			await request(record.id, { op: "desktop", author: catalog.user, enabled });
-			if (!enabled) return;
 			return console.log(
-				`Desktop tools are on for ${record.name}. Its agents can operate this machine's apps.`,
+				enabled
+					? `Desktop tools are on for ${record.name}. Its agents can operate this machine's apps.`
+					: `Desktop tools are off for ${record.name}. Its agents' new desktop calls are refused.`,
 			);
 		}
 		case "archive":
 		case "unarchive": {
 			const archived = command === "archive";
-			if (await isHostRunning()) {
-				return void (await local({ op: "archive", channel: record.id, archived }));
-			}
-			return void (await archive(record.id, archived));
+			if (await isHostRunning()) await local({ op: "archive", channel: record.id, archived });
+			else await archive(record.id, archived);
+			return console.log(
+				archived
+					? `Archived ${record.name}. Resume it with: ace unarchive ${record.name}`
+					: `Unarchived ${record.name}.`,
+			);
 		}
 		case "delete":
+			if (record.busy && !flags.yes) {
+				const asked = `${record.name} has a run in progress. Delete it anyway?`;
+				if (!process.stdin.isTTY) {
+					throw new Error(`${asked} Stop it first, or run: ace delete ${record.name} --yes`);
+				}
+				if (!/^y(es)?$/i.test(prompt(`${asked} [y/N]`)?.trim() || "")) {
+					return console.log(`Kept ${record.name}.`);
+				}
+			}
 			if (await isHostRunning()) await local({ op: "delete", channel: record.id });
 			else await remove(record.id);
 			return console.log(`Deleted ${record.name}. Its lane branches remain in ${record.project}.`);
