@@ -235,6 +235,9 @@ export function section(room: Room): PromptSection {
 				"changes to something unrelated. Your working directory is your current lane.",
 				"Lanes are lane CLI worktrees: push one for a pull request with `lane push`, which rebases it",
 				"onto its base and commits lane's context memory, not with a plain `git push`.",
+				"If `lane push` refuses because of uncommitted or untracked files, never stage everything",
+				"(`git add -A`, `git add .`, `git commit -a`) to get past it. Commit only files you know belong",
+				"to the work, by path; for the rest, stop, list them, and ask the person what to do.",
 			].join("\n");
 		},
 	};
