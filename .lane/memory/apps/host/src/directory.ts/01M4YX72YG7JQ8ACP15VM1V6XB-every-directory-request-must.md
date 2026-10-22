@@ -4,9 +4,9 @@ anchor: function call
 created: 2026-10-15T04:30:36Z
 norm: '1'
 sig: 3b9d360bb018f164
-body_hash: ed032412ce991b6b
-raw_hash: 17ca2b8a23ffb09d
-vouched: 2026-10-22T14:33:26Z
+body_hash: fd35da8da75facb4
+raw_hash: 366b10d619b52eba
+vouched: 2026-10-22T20:38:32Z
 lines: 97-125
 ---
 
