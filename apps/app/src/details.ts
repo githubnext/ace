@@ -32,8 +32,10 @@ export type Details = {
 	sharedLive?: boolean;
 	desktop?: boolean;
 	desktopLive?: boolean;
-	/** Shows the chat's Diff tab, opening one when none is open. */
-	diff?: () => void;
+	/** Shows the chat's Diff tab, opening one when none is open, at `file` when it changed. */
+	diff?: (file?: string) => void;
+	/** A file the chat's Diff should show once its changes list it; `null` once shown. */
+	reveal?: { chat: number; file: string; key: number } | null;
 };
 
 const EMPTY: Details = {};

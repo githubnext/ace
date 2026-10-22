@@ -87,7 +87,7 @@ function Note({ children }: { children: string }) {
 /** The chat's changes, polled while the tab is visible and the window focused. */
 export function Diff({ channel: listing, chat, user, active }: Props) {
 	const channel = listing.id;
-	const { pull } = useDetails(channel);
+	const { pull, reveal } = useDetails(channel);
 	const git = useGit(listing, chat, user);
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const focused = useSyncExternalStore(subscribe, () => document.hasFocus());
@@ -95,6 +95,7 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 	const [error, setError] = useState<string>();
 	const [loaded, setLoaded] = useState(new Map<string, Loaded>());
 	const [first, setFirst] = useState<string>();
+	const [selected, setSelected] = useState<{ file?: string; key?: number }>({});
 	const inflight = useRef(new Set<string>());
 
 	useEffect(() => {
@@ -120,6 +121,14 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 			clearTimeout(timer);
 		};
 	}, [channel, chat, active, focused, status]);
+
+	// A turn's file card asks for its file before this tab may have read the changes listing it.
+	useEffect(() => {
+		if (!reveal || reveal.chat !== chat || !changes) return;
+		const change = changes.files.find((change) => change.file === reveal.file);
+		if (change) setSelected({ file: key(change.file, group(change)), key: reveal.key });
+		publish(channel, { reveal: null });
+	}, [channel, chat, changes, reveal]);
 
 	// Git actions read the details' changes, so a fetch's new behind count reaches them from here.
 	useEffect(() => {
@@ -229,6 +238,9 @@ export function Diff({ channel: listing, chat, user, active }: Props) {
 			onCreateDraftPr={git.createDraftPr}
 			actions={git.actions}
 			onFileOpen={open}
+			selected={selected.file}
+			selectedKey={selected.key}
+			onSelectedChange={(file) => setSelected({ file })}
 			className="rounded-none border-0"
 		/>
 	);

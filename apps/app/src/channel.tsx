@@ -309,7 +309,12 @@ export function Channel(
 
 	const opener = useRef<() => void>(undefined);
 	useEffect(() => {
-		publish(channel.id, { diff: () => opener.current?.() });
+		publish(channel.id, {
+			diff: (file) => {
+				if (file) publish(channel.id, { reveal: { chat, file, key: Date.now() } });
+				opener.current?.();
+			},
+		});
 		return () => forget(channel.id);
 	}, [channel.id]);
 

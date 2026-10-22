@@ -8,7 +8,7 @@ import { Composer } from "./composer";
 import { DeleteMessage } from "./delete-message";
 import { desktop } from "./desktop";
 import { EditMessage } from "./edit-message";
-import { publish } from "./details";
+import { publish, useDetails } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
 import { OfflineHost } from "./onboarding";
@@ -54,6 +54,7 @@ export function Conversation(
 	// until then is not the user's to retry.
 	const failed = !offline && !transition && transcript.error;
 	const chat = transcript.info?.chats.find((value) => value.id === id);
+	const { diff } = useDetails(channel.id);
 	const model = chat?.model || channel.model;
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
 	// This app's own host, or the peer host relaying this channel to it, stopped answering.
@@ -217,6 +218,9 @@ export function Conversation(
 								return source && (() => onOpen(source));
 							}}
 							intro={{ name: channel.name, createdAt: Math.floor(channel.created / 1000) }}
+							onFileOpen={diff}
+							onDiffFileOpen={diff}
+							onReviewChanges={diff && (() => diff())}
 						/>
 					)
 					: offline
