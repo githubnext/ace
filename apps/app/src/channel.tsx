@@ -9,7 +9,7 @@ import {
 	useSyncExternalStore,
 } from "react";
 
-import type { Changes, GithubPull } from "@ace/channel/protocol";
+import type { Change, Changes, GithubPull } from "@ace/channel/protocol";
 import type { ChannelInfo, Listing } from "@ace/host/protocol";
 import {
 	Badge,
@@ -233,20 +233,27 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 		// Totaled per group as the Diff does, so uncommitted and untracked files never inflate the
 		// committed work a pull request would show.
 		const groups = new Map<string | undefined, DetailsChanges>();
-		const add = (group: string | undefined, adds: number, dels: number, files: number) => {
+		const add = (group: string | undefined, files: number, file?: Change) => {
 			let sum = groups.get(group);
 			if (!sum) {
-				groups.set(group, sum = { ...(group ? { group } : {}), adds: 0, dels: 0, files: 0 });
+				groups.set(
+					group,
+					sum = { ...(group ? { group } : {}), adds: 0, dels: 0, files: 0, lines: false },
+				);
 			}
-			sum.adds += adds;
-			sum.dels += dels;
 			sum.files += files;
+			// Large untracked directories are only counted, so their group's line totals are unknown.
+			if (!file) sum.lines = false;
+			else if (!file.binary) {
+				sum.adds += file.adds;
+				sum.dels += file.dels;
+				sum.lines = true;
+			}
 		};
-		for (const file of changes.files) {
-			add(file.state && GROUPS[file.state], file.adds, file.dels, 1);
-		}
-		for (const { files } of changes.dirs || []) add(GROUPS.untracked, 0, 0, files);
-		return groups.size ? [...groups.values()] : [{ adds: 0, dels: 0, files: 0 }];
+		for (const file of changes.files) add(file.state && GROUPS[file.state], 1, file);
+		// After every file, so no file's lines mark a directory's group known again.
+		for (const { files } of changes.dirs || []) add(GROUPS.untracked, files);
+		return groups.size ? [...groups.values()] : [{ adds: 0, dels: 0, files: 0, lines: true }];
 	}, [changes]);
 	const mentioned = useMemo(() => items && links(items, channel.repo), [items, channel.repo]);
 	const agents = useMemo(() => items && subagents(items, busy), [items, busy]);
