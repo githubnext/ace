@@ -419,7 +419,15 @@ export class Channel {
 				this.#author(request.author);
 				// Whoever can't start a run here can't end the owner's either.
 				await this.#mayInvoke(request.author);
-				return (await this.#conversation(request.chat)).abort(context);
+				const conversation = await this.#conversation(request.chat);
+				const running = this.#runs.has(conversation.id);
+				await conversation.abort(context);
+				if (!running) return;
+				await conversation.submit(
+					{ type: "write", entry: room.stop(request.author, Date.now()) },
+					context,
+				);
+				return;
 			}
 			case "kill":
 				this.#author(request.author);
@@ -1034,6 +1042,7 @@ export class Channel {
 		// a deleted message's content and shows an edited one's newest text.
 		const forward = (event: Event) => {
 			if ((event.kind === "deleted" || event.kind === "edited") && !actions) return;
+			if (event.kind === "stopped" && !request.stops) return;
 			if (event.kind !== "message" || !deleted[event.entry]) return send(event);
 			const { images: _, files: __, edited: ___, ...rest } = event;
 			send({ ...rest, text: "", deleted: true });
@@ -1189,6 +1198,10 @@ function events(entry: EntryRecord): Event[] {
 	if (EditEntry.is(entry)) {
 		const { target, text, at } = entry.data;
 		return [{ kind: "edited", chat, entry: target, text, at }];
+	}
+	if (room.StopEntry.is(entry)) {
+		const at = entry.model![0]!.timestamp;
+		return [{ kind: "stopped", chat, at, author: entry.data.author }];
 	}
 	const human = room.human(entry);
 	if (human) return [{ kind: "message", chat, entry: entry.id, ...human }];

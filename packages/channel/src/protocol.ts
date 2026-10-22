@@ -297,6 +297,8 @@ export type Request =
 		typing?: boolean;
 		/** Include agent events; older clients do not understand them. */
 		agent?: boolean;
+		/** Include stopped events; older clients do not understand them. */
+		stops?: boolean;
 	};
 
 export type Event =
@@ -385,6 +387,8 @@ export type Event =
 	 */
 	| { kind: "recap"; chat: ChatId; calls: string[]; text: string }
 	| { kind: "run"; chat: ChatId; state: "start" | "end" }
+	/** `author` stopped the run, whose aborted reply came before this. */
+	| { kind: "stopped"; chat: ChatId; at: number; author: string }
 	/** The chat's model or effort changed, so the next run uses these. */
 	| { kind: "agent"; chat: ChatId; model: ModelRef; effort: Effort }
 	/**
