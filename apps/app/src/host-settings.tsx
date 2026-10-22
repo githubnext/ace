@@ -194,7 +194,7 @@ export function HostStatus({ active }: { active: boolean }) {
 			)}
 			{checked?.tailscale.state === "running" && !checked.tailscale.loopback && (
 				<Group title="Phone">
-					<Phone web={checked.web} />
+					<Phone web={checked.web} http={checked.http} />
 				</Group>
 			)}
 			<Group
@@ -250,9 +250,13 @@ export function HostStatus({ active }: { active: boolean }) {
 	);
 }
 
-/** This host's HTTPS address, which the owner's phone opens over the tailnet. */
-function Phone({ web }: { web?: string }) {
+/**
+ * The address the owner's phone opens over the tailnet: HTTPS when the tailnet has certificates,
+ * else plain HTTP, which works except for the microphone.
+ */
+function Phone({ web: secure, http }: { web?: string; http?: string }) {
 	const [copied, setCopied] = useState(false);
+	const web = secure || http;
 	if (!web) {
 		return (
 			<Row
@@ -264,7 +268,9 @@ function Phone({ web }: { web?: string }) {
 	return (
 		<Row
 			label="Open on your phone"
-			description="Scan with a phone on your tailnet."
+			description={secure
+				? "Scan with a phone on your tailnet."
+				: "Scan with a phone on your tailnet. Browsers keep the microphone off over HTTP; for voice input, turn on HTTPS in the Tailscale admin console's DNS settings, then restart Ace Helper."}
 			footer={
 				<div className="flex flex-wrap items-center gap-4">
 					<Qr value={web} label={`QR code for ${web}`} className="size-36 rounded-md" />

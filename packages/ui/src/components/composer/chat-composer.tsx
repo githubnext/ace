@@ -17,6 +17,7 @@ import * as fuzzysort from "fuzzysort";
 import type { MarkType, Node as ProseMirrorNode, NodeType } from "prosemirror-model";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
+import { toast } from "sonner";
 
 import { canDictate, useDictation } from "../../hooks/use-dictation";
 import { useDraft } from "../../hooks/use-draft";
@@ -973,6 +974,14 @@ function useComposer({
 	}
 
 	function record() {
+		// Browsers expose the microphone only to secure pages, such as a host's tailnet HTTPS address.
+		if (!window.isSecureContext) {
+			toast("Voice input needs HTTPS", {
+				description:
+					"Browsers keep the microphone off over HTTP. Open Ace at this host's https:// address to dictate.",
+			});
+			return;
+		}
 		let { doc, selection: { from, to } } = view.current!.state;
 		// Like system dictation: replace the selection, and keep spaces between the words already
 		// there and the dictated ones.
@@ -1515,7 +1524,7 @@ function ComposerModel({ state }: { state: ComposerState }) {
 								<Button
 									variant="ghost"
 									size="sm"
-									className="-ml-0.5 h-6.5 px-2 text-muted-foreground"
+									className="-ml-0.5 h-6.5 min-w-0 shrink px-2 text-muted-foreground"
 								/>
 							}
 						/>

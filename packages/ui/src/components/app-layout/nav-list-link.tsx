@@ -87,6 +87,8 @@ function NavListLink(
 					<span
 						className={cn(
 							"relative z-1 text-xs font-medium pr-2 sm:opacity-0 sm:@min-[5rem]/nav:opacity-100 sm:text-sm",
+							// A phone's tab bar fits every icon and the account button by naming only the current page.
+							"max-[26rem]:sr-only max-[26rem]:group-data-[status=active]:not-sr-only",
 							"transition-opacity duration-200 ease-in-out",
 						)}
 					>

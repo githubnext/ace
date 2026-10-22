@@ -71,6 +71,8 @@ export type Diagnostics = {
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
 	/** This host's HTTPS address on the tailnet; unset without a tailnet certificate. */
 	web?: string;
+	/** This host's plain HTTP address on the tailnet; unset off the tailnet. */
+	http?: string;
 };
 
 /** `offline`: the channel's host is unreachable. Hosted channels are never offline. */

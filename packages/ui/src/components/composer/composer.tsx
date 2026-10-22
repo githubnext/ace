@@ -178,7 +178,7 @@ function Body({ className, ref, onFiles, children, ...props }: BodyProps) {
 			<div
 				ref={ref}
 				className={cn(
-					"composer:body relative z-10 overflow-clip rounded-xl squircle bg-background shadow-composer [grid-area:composer]",
+					"composer:body relative z-10 min-w-0 overflow-clip rounded-xl squircle bg-background shadow-composer [grid-area:composer]",
 					className,
 				)}
 				data-dragging={dragging || undefined}
