@@ -3,9 +3,10 @@ id: 01M5J0F003CDDGXJ61TYSB9NQ1
 anchor: function open
 created: 2026-10-22T14:32:55Z
 norm: '1'
-sig: 69741dfdfc216b17
-body_hash: 70f23e213716ef8e
-raw_hash: ee7a4de150371af3
+sig: 2a6b090bac83313c
+body_hash: 9b3ecf598f795095
+raw_hash: b861580496c0d206
+vouched: 2026-10-22T20:44:27Z
 lines: 131-142
 ---
 
