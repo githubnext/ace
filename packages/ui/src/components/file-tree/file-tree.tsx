@@ -160,6 +160,11 @@ function Tree({
 		setTimeout(() => {
 			option.current = undefined;
 		}, 0);
+		// Clicking the selected file changes no selection, so onSelectionChange
+		// stays silent; select it again so callers can scroll back to it.
+		if (!tab && path && path === pathRef.current && lookupRef.current.has(path)) {
+			selectRef.current?.(path);
+		}
 	}
 
 	let sync = useCallback((file: string) => {
