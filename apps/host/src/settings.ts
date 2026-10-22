@@ -7,7 +7,7 @@ import { forget, key, KEYCHAIN_WAITING, latest, overriding, settled, store } fro
 import { models, parseModel } from "./manage";
 import { canonical } from "./move";
 import { isModel, preference, saveCompute, saveFolder, savePreference } from "./preferences";
-import type { Compute, ProviderId, Settings } from "./protocol";
+import type { Compute, Invite, ProviderId, Settings } from "./protocol";
 
 const providers = new Map(
 	[
@@ -173,6 +173,14 @@ export async function forgetKey(name: string): Promise<boolean> {
 			`Could not remove ${name}. Unlock the keychain and allow Ace Helper, then retry.`,
 		);
 	}
+}
+
+/** What a teammate needs to join: this host's directory and the secret it was joined with. */
+export async function invite(): Promise<Invite> {
+	const url = directory.url();
+	const secret = await key("ACE_SECRET");
+	if (!url || !secret) throw new Error("Join the team's directory first");
+	return { url, secret };
 }
 
 /**

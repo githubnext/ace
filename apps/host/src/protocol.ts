@@ -153,7 +153,17 @@ export function isInactive(
 }
 
 /** `github` is the host owner's GitHub login, when its GitHub CLI is signed in. */
-export type Hello = { user: string; host: string; github?: string };
+/** `team` is the host of the directory this host joined, never its secret, so peers can ask to join. */
+export type Hello = { user: string; host: string; github?: string; team?: string };
+
+/** What joining a team takes: its directory URL and the team secret. */
+export type Invite = { url: string; secret: string };
+
+/** A peer whose host is in a team, which this host can ask to join. */
+export type TeamPeer = { host: string; login: string; github?: string; team: string };
+
+/** Someone on the tailnet asking this host's owner to let them into the team. */
+export type TeamAsk = { id: string; login: string; host: string; github?: string; expires: number };
 
 /** GitHub logins by participant (Tailscale login), from this host, its peers, and the directory. */
 export type People = Record<string, string>;
@@ -307,6 +317,18 @@ export type HostRequest =
 	 * account, then join it. Answers with the directory URL and the secret to send teammates.
 	 */
 	| { op: "team-deploy"; hosted: boolean }
+	/** The joined directory's URL and the saved team secret, for the owner to invite a teammate. */
+	| { op: "team-invite" }
+	/** Peers whose hosts are in a team, for a host that isn't in one yet. */
+	| { op: "team-peers" }
+	/**
+	 * Ask a peer's owner to let this host into their team; on approval it answers with the
+	 * directory and secret over the tailnet, and this host joins as with `directory-set`.
+	 */
+	| { op: "team-ask"; host: string }
+	/** Sent by an asking peer host. Answers with the directory URL and secret once the owner approves. */
+	| { op: "team-request" }
+	| { op: "team-answer"; ask: string; approve: boolean }
 	/** Quiesce this helper before replacing its application, or recover a canceled update. */
 	| { op: "update-prepare" }
 	| { op: "update-cancel" }
@@ -372,6 +394,8 @@ export type HostFrame =
 	| { settings: true }
 	/** Opened projects belong to the local owner and are never sent to tailnet peers. */
 	| { projects: Project[] }
+	/** Asks to join the team that wait for the owner, sent to the local app only. */
+	| { asks: TeamAsk[] }
 	/** Sent to local clients when known GitHub logins change. */
 	| { people: People }
 	/**

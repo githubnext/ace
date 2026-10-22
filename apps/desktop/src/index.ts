@@ -35,6 +35,8 @@ const windows = new Set<BrowserWindow>();
 // Menu actions, the dock, and updates go to the window the person used last.
 let focused: BrowserWindow | undefined;
 let ready = false;
+/** An invite link the app was launched with, held until Ace Helper is up. */
+let invited: string | undefined;
 
 function authorize(value: string): void {
 	if (value !== secret) throw new Error("Native controls are only available to Ace's local app");
@@ -100,6 +102,19 @@ function controls(target: () => BrowserWindow) {
 function dispatch(target: BrowserWindow, action: string): void {
 	target.webview.executeJavascript(
 		`window.dispatchEvent(new Event(${JSON.stringify(`ace:${action}`)}))`,
+	);
+}
+
+/** Hands an invite link to the page, which asks before joining. */
+function accept(link: string): void {
+	if (!ready) {
+		invited = link;
+		return;
+	}
+	if (!focused) return open(undefined, `join=${encodeURIComponent(link)}`);
+	focused.activate();
+	focused.webview.executeJavascript(
+		`window.dispatchEvent(new CustomEvent("ace:join", { detail: ${JSON.stringify(link)} }))`,
 	);
 }
 
@@ -214,6 +229,9 @@ ApplicationMenu.setApplicationMenu([
 ]);
 
 Electrobun.events.on("reopen", () => show());
+Electrobun.events.on("open-url", ({ data }: { data: { url: string } }) => {
+	if (URL.parse(data.url)?.host === "join") accept(data.url);
+});
 // The webview only navigates within the app; links that open a new window go to the browser.
 Electrobun.events.on("new-window-open", ({ data }: { data: { detail: { url: string } } }) => {
 	const target = URL.parse(data.detail.url);
@@ -325,7 +343,8 @@ async function start(): Promise<void> {
 		await helper.act("start");
 	}
 	ready = true;
-	show();
+	if (invited) accept(invited);
+	else show();
 	native.start();
 	updates.start();
 }
