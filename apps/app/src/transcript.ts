@@ -63,6 +63,8 @@ export type Transcript = {
 	/** Each tool call's recap of the work it was part of, by call ID. */
 	recaps: Record<string, string>;
 	reactions: Reactions;
+	/** When each person last said they were typing, in ms; their message ends it. */
+	typing: Record<string, number>;
 	/** Text streamed for the reply being generated. */
 	draft: string;
 	busy: boolean;
@@ -80,6 +82,7 @@ const EMPTY: Transcript = {
 	captions: {},
 	recaps: {},
 	reactions: {},
+	typing: {},
 	draft: "",
 	busy: false,
 	live: false,
@@ -98,11 +101,16 @@ export function apply(state: Transcript, event: Event): Transcript {
 			const items = withdraw(state.items, event.withdrawn);
 			return { ...state, queue: event.messages, returned, items };
 		}
-		case "message":
+		case "message": {
+			const { [event.author]: _, ...typing } = state.typing;
 			return {
 				...state,
+				typing,
 				items: [...state.items, { kind: "message", key: `e${event.entry}`, ...pick(event) }],
 			};
+		}
+		case "typing":
+			return { ...state, typing: { ...state.typing, [event.author]: Date.now() } };
 		case "deleted":
 			return {
 				...state,
@@ -271,6 +279,22 @@ function pick(event: Extract<Event, { kind: "message" }>) {
 }
 
 /** Automatic re-watches allowed before a watch stays open for `STABLE` ms. */
+/** Typists send a signal every few seconds while writing; one this old has stopped. */
+const TYPING = 5000;
+
+/** Who said they were typing within the last few seconds, read again as each goes stale. */
+export function useTyping(typing: Record<string, number>): string[] {
+	const [now, setNow] = useState(Date.now);
+	const fresh = Object.entries(typing).filter(([, at]) => at > now - TYPING);
+	const next = Math.min(...fresh.map(([, at]) => at + TYPING));
+	useEffect(() => {
+		if (next === Infinity) return;
+		const timer = setTimeout(() => setNow(Date.now()), next - Date.now());
+		return () => clearTimeout(timer);
+	}, [next]);
+	return fresh.map(([author]) => author);
+}
+
 const RECOVERIES = 3;
 const STABLE = 60_000;
 
@@ -339,6 +363,7 @@ export function useTranscript(
 				captions: true,
 				progress: true,
 				actions: true,
+				typing: true,
 				...(chat === undefined ? {} : { chat }),
 			}, {
 				event(event) {

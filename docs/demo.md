@@ -18,6 +18,7 @@ Seed the channels first with `ace import` (see [channel data](data.md#seeds)).
 	},
 	"steps": [
 		{ "at": 0, "who": "alex", "open": true, "channel": "checkout" },
+		{ "at": 1, "who": "alex", "type": 2, "channel": "checkout" },
 		{ "at": 3, "who": "alex", "say": "pushed a fix, can someone check?", "channel": "checkout" },
 		{
 			"at": 6,
@@ -35,6 +36,7 @@ Seed the channels first with `ace import` (see [channel data](data.md#seeds)).
 
 - `login` is the author their messages carry; `github` picks the avatar and name the app shows.
 - `at` is seconds from the start. `loop` restarts the script that many seconds after its last step.
-- Steps: `open`/`close` a channel (present there), `away` true or false, `leave`, `say`, `ask`, and
-  `react`, which reacts to the chat's newest message or reply. Acting opens the channel first.
+- Steps: `open`/`close` a channel (present there), `away` true or false, `leave`, `type` (shows
+  them typing for that many seconds), `say`, `ask`, and `react`, which reacts to the chat's newest
+  message or reply. Acting opens the channel first.
   `chat` targets a chat other than the root.

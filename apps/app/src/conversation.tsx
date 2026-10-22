@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-import { Button, Timeline, toast } from "@ace/ui";
+import { Button, ChatStatus, Timeline, toast } from "@ace/ui";
 import { channelProject, type Listing } from "@ace/host/protocol";
 
 import { Checks } from "./checks";
@@ -15,7 +15,7 @@ import { OfflineHost, useRoster } from "./onboarding";
 import { present } from "./presence";
 import { pendingQuestion, Question } from "./question";
 import { sources, toEvents } from "./timeline";
-import { useTranscript } from "./transcript";
+import { useTranscript, useTyping } from "./transcript";
 import { Usage } from "./usage";
 
 const stopped = (who: string) => `${who} isn't responding. The chat continues when it answers.`;
@@ -176,6 +176,8 @@ export function Conversation(
 			.filter((name) => name !== self && name !== "ace" && !name.includes("@"))
 			.map((name) => ({ name, avatar: avatars[name] }));
 	}, [people, user, presence, channel, transcript.items, roster, avatars]);
+	const typing = useTyping(transcript.typing).filter((author) => author !== user)
+		.map((author) => people[author] || author);
 	const results = useMemo(
 		() =>
 			transcript.items.reduce(
@@ -274,6 +276,9 @@ export function Conversation(
 				/>
 			)}
 			<div className="utils:max-width relative z-20 shrink-0 px-3 pb-3">
+				{typing.length > 0 && (
+					<ChatStatus className="absolute inset-x-5 bottom-full" typing={typing} disclaimer="" />
+				)}
 				{transcript.live && (notice || transition || transcript.restarting) && (
 					<p className="pb-2 text-center text-xs text-muted-foreground" role="status">
 						{notice || transition || "Channel is restarting…"}

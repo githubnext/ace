@@ -155,6 +155,7 @@ type Listener = {
 	send: Send;
 	captions: boolean;
 	actions: boolean;
+	typing: boolean;
 	reacted?: boolean;
 };
 
@@ -410,6 +411,20 @@ export class Channel {
 				return this.#rename(request);
 			case "watch":
 				return this.#watch(request, send);
+			case "typing": {
+				this.#author(request.author);
+				const { id } = await this.#conversation(request.chat);
+				const event: Event = { kind: "typing", chat: id, author: request.author };
+				for (const listener of this.#listeners) {
+					if (listener.chat !== id || !listener.typing) continue;
+					try {
+						listener.send(event);
+					} catch {
+						this.#listeners.delete(listener);
+					}
+				}
+				return;
+			}
 			case "changes": {
 				const { cwd, lane } = await this.#place(request.chat);
 				return changes(this.#options.env(cwd), cwd, this.#options.project, lane, context);
@@ -951,6 +966,7 @@ export class Channel {
 			send,
 			captions: !!request.captions,
 			actions,
+			typing: !!request.typing,
 		};
 		this.#listeners.add(listener);
 		// Read after the stream's snapshot, so every deletion it holds is here; later ones arrive live.

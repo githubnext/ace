@@ -254,6 +254,8 @@ export type Request =
 	| { op: "share"; author: string; shared: boolean }
 	| { op: "desktop"; author: string; enabled: boolean }
 	| { op: "rename"; author: string; name: string }
+	/** Tell the chat's other watchers that the author is writing. Nothing is stored. */
+	| { op: "typing"; chat?: ChatId; author: string }
 	/** Resolve once the answer to a submission is placed: "done", or "unanswered" when stopped or killed. */
 	| { op: "wait"; submission: number }
 	| { op: "changes"; chat?: ChatId }
@@ -273,6 +275,8 @@ export type Request =
 		progress?: boolean;
 		/** Include deleted, edited, and reactions events; older clients do not understand them. */
 		actions?: boolean;
+		/** Include typing events; older clients do not understand them. */
+		typing?: boolean;
 	};
 
 export type Event =
@@ -368,7 +372,9 @@ export type Event =
 	 */
 	| ({ kind: "metadata"; chat: ChatId; shared?: boolean; desktop?: boolean } & Metadata)
 	/** The replayed transcript has been sent; later events are live. */
-	| { kind: "live"; chat: ChatId };
+	| { kind: "live"; chat: ChatId }
+	/** `author` is writing in the chat; live only, and stale once a few seconds pass without another. */
+	| { kind: "typing"; chat: ChatId; author: string };
 
 export type Frame =
 	| { id: number; ok: true; value: unknown }
