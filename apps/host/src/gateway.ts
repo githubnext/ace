@@ -1092,7 +1092,11 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 				}
 				return serveApp(url);
 			}
-			if (origin === null ? listener.secure : !web.origins(machine, listener).has(origin)) {
+			// A page asks over plain HTTP, without an Origin, why its socket was refused (host.ts).
+			const socket = request.headers.get("upgrade")?.toLowerCase() === "websocket";
+			if (
+				origin === null ? socket && listener.secure : !web.origins(machine, listener).has(origin)
+			) {
 				return new Response("Forbidden", { status: 403 });
 			}
 			const ip = server.requestIP(request);
@@ -1105,10 +1109,12 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 				log("warn", "gateway.whois", { address: ip.address, ...failure(error) });
 				return new Response("Forbidden", { status: 403 });
 			}
-			const browser = origin !== null;
+			const browser = origin !== null || !socket;
 			if (browser && user !== catalog.user) {
 				log("warn", "gateway.browser.refused", { user, origin });
-				return new Response("Open Ace from your own host", { status: 403 });
+				return new Response(`This is ${catalog.user}'s host. Open Ace from your own host.`, {
+					status: 403,
+				});
 			}
 			return server.upgrade(request, { data: client(user, !browser, false, from) })
 				? undefined

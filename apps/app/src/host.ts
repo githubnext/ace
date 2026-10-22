@@ -32,15 +32,17 @@ window.addEventListener("hashchange", () => {
 });
 
 /**
- * Whether the host refuses this page's credentials, as after Ace Helper restarts with a new token.
- * A browser hides a WebSocket's 401, so this asks over HTTP with what the socket sends.
+ * Why the host refuses this page's socket: its credentials (401), as after Ace Helper restarts
+ * with a new token, or because it is a teammate's host (403, whose text names its owner). A
+ * browser hides a WebSocket's status, so this asks over HTTP with what the socket sends.
  */
-export async function refused(): Promise<boolean> {
+export async function refused(): Promise<"signed-out" | { other: string } | undefined> {
 	const response = await fetch(gateway!.replace(/^ws/, "http"), {
 		cache: "no-store",
 		...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
 	}).catch(() => undefined);
-	return response?.status === 401;
+	if (response?.status === 401) return "signed-out";
+	if (response?.status === 403) return { other: await response.text() };
 }
 
 // Phones suspend backgrounded pages; reconnect as soon as the person comes back.

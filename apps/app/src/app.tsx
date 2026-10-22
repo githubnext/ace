@@ -126,8 +126,8 @@ function useAnswers(): boolean | undefined {
 }
 
 /** Asked again while disconnected: a helper that was down can come back with a new token. */
-function useRefused(): boolean {
-	const [value, setValue] = useState(false);
+function useRefused(): Awaited<ReturnType<typeof refused>> {
+	const [value, setValue] = useState<Awaited<ReturnType<typeof refused>>>();
 	useEffect(() => {
 		if (deployed || desktop) return;
 		const check = () => void refused().then(setValue);
@@ -140,9 +140,10 @@ function useRefused(): boolean {
 
 function Disconnected() {
 	const answers = useAnswers();
-	const signedOut = useRefused();
+	const refusal = useRefused();
 	if (desktop) return <>Disconnected from Ace Helper. Open Settings → This Mac to start it.</>;
-	if (signedOut) {
+	if (typeof refusal === "object") return <>{refusal.other}</>;
+	if (refusal === "signed-out") {
 		return (
 			<>
 				This browser isn't signed in to your host. Run <code>ace open</code>{" "}
