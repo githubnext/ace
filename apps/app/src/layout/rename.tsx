@@ -86,6 +86,8 @@ export function Rename(
 						required={required}
 						disabled={busy}
 						aria-invalid={!!error}
+						// The browser blocks a malformed submit before save() could clear a refusal.
+						onChange={() => setError("")}
 						autoCorrect="off"
 						autoCapitalize="off"
 						spellCheck={false}

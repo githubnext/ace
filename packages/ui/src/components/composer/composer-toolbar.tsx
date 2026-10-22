@@ -48,26 +48,39 @@ type Item = {
 	label: string;
 	action: Action;
 	icon: ComponentType<{ className?: string }>;
+	/** The editor's binding (rich-text.tsx), as Mod plus these keys. */
+	keys?: string;
 };
+
+const MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+
+/** `Shift-s` reads ⇧⌘S on a Mac and Ctrl+Shift+S elsewhere. */
+function shortcut(keys: string) {
+	const parts = keys.split("-");
+	const key = parts.pop()!.toUpperCase();
+	if (!MAC) return ["Ctrl", ...parts, key].join("+");
+	const glyphs: Record<string, string> = { Shift: "⇧", Alt: "⌥" };
+	return `${parts.map((part) => glyphs[part]).join("")}⌘${key}`;
+}
 
 const GROUPS: Item[][] = [
 	[
-		{ label: "Bold", action: "bold", icon: BoldIcon },
-		{ label: "Italic", action: "italic", icon: ItalicIcon },
-		{ label: "Underline", action: "underline", icon: UnderlineIcon },
-		{ label: "Strikethrough", action: "strike", icon: StrikeIcon },
+		{ label: "Bold", action: "bold", icon: BoldIcon, keys: "b" },
+		{ label: "Italic", action: "italic", icon: ItalicIcon, keys: "i" },
+		{ label: "Underline", action: "underline", icon: UnderlineIcon, keys: "u" },
+		{ label: "Strikethrough", action: "strike", icon: StrikeIcon, keys: "Shift-s" },
 	],
 	[
 		{ label: "Link", action: "link", icon: LinkIcon },
 	],
 	[
-		{ label: "Ordered list", action: "ordered", icon: OrderedIcon },
-		{ label: "Bullet list", action: "bullet", icon: BulletIcon },
-		{ label: "Blockquote", action: "quote", icon: BlockquoteIcon },
+		{ label: "Ordered list", action: "ordered", icon: OrderedIcon, keys: "Alt-7" },
+		{ label: "Bullet list", action: "bullet", icon: BulletIcon, keys: "Alt-8" },
+		{ label: "Blockquote", action: "quote", icon: BlockquoteIcon, keys: "Shift-." },
 	],
 	[
-		{ label: "Inline code", action: "code", icon: CodeIcon },
-		{ label: "Code block", action: "pre", icon: CodeBlockIcon },
+		{ label: "Inline code", action: "code", icon: CodeIcon, keys: "e" },
+		{ label: "Code block", action: "pre", icon: CodeBlockIcon, keys: "Alt-`" },
 	],
 	[
 		{ label: "Attach", action: "attach", icon: AttachIcon },
@@ -76,7 +89,7 @@ const GROUPS: Item[][] = [
 ];
 
 function ToolbarButton(
-	{ label, action, icon: Icon, active, disabled, onAction }: Item & {
+	{ label, action, icon: Icon, keys, active, disabled, onAction }: Item & {
 		active?: boolean;
 		disabled?: boolean;
 		onAction?: (event: ActionEvent) => void;
@@ -87,6 +100,8 @@ function ToolbarButton(
 			<TooltipTrigger
 				render={
 					<Toolbar.Button
+						aria-label={label}
+						aria-keyshortcuts={keys && `${MAC ? "Meta" : "Control"}+${keys.replaceAll("-", "+")}`}
 						render={
 							<Button
 								variant="ghost"
@@ -110,7 +125,10 @@ function ToolbarButton(
 			>
 				<Icon />
 			</TooltipTrigger>
-			<TooltipContent>{label}</TooltipContent>
+			<TooltipContent>
+				{label}
+				{keys && <kbd data-slot="kbd" className="font-sans opacity-60">{shortcut(keys)}</kbd>}
+			</TooltipContent>
 		</Tooltip>
 	);
 }

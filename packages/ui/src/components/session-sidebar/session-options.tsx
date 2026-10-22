@@ -8,17 +8,23 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { IconDots } from "../../icons";
 
-/** Additional ways to start a repository session, and sharing or removing the project. */
+/**
+ * Additional ways to start a repository session, archiving inactive channels, and sharing or
+ * removing the project: the section's context menu, plus the starts.
+ */
 export function SessionOptions(
-	{ className, onContinuePr, onStartIssue, onShareProject, onRemoveProject }: {
+	{ className, onContinuePr, onStartIssue, onArchiveInactive, onShareProject, onRemoveProject }: {
 		className?: string;
 		onContinuePr?: () => void;
 		onStartIssue?: () => void;
+		onArchiveInactive?: () => void;
 		onShareProject?: () => void;
 		onRemoveProject?: () => void;
 	},
 ) {
-	if (!onContinuePr && !onStartIssue && !onShareProject && !onRemoveProject) return null;
+	if (
+		!onContinuePr && !onStartIssue && !onArchiveInactive && !onShareProject && !onRemoveProject
+	) return null;
 	return (
 		<DropdownMenu>
 			<Tooltip>
@@ -46,6 +52,9 @@ export function SessionOptions(
 				)}
 				{onStartIssue && (
 					<DropdownMenuItem onClick={onStartIssue}>Start from an issue…</DropdownMenuItem>
+				)}
+				{onArchiveInactive && (
+					<DropdownMenuItem onClick={onArchiveInactive}>Archive inactive</DropdownMenuItem>
 				)}
 				{onShareProject && (
 					<DropdownMenuItem onClick={onShareProject}>Share project…</DropdownMenuItem>

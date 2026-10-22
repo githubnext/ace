@@ -689,7 +689,10 @@ function useComposer({
 		let words = before + text + after;
 		v.dispatch(v.state.tr.insertText(words, from, from + size));
 		dictated.current.size = words.length;
-	}, () => setRecording(false));
+	}, (reason) => {
+		setRecording(false);
+		if (reason) toast("Voice input stopped", { description: reason });
+	});
 
 	let view = useRef<EditorView | null>(null);
 	let file = useRef<HTMLInputElement | null>(null);
@@ -1662,6 +1665,7 @@ function ComposerOptions({ state }: { state: ComposerState }) {
 								<TooltipTrigger
 									render={
 										<Toolbar.Button
+											aria-label="Formatting tools"
 											aria-pressed={toolbar}
 											onClick={() => setToolbar(t => !t)}
 											render={

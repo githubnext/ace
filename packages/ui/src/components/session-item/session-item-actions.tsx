@@ -86,7 +86,12 @@ function MoveSection(
 				)}
 				{destinations.state === "ready" && destinations.targets.length === 0 && (
 					<ContextMenu.Item className={MENU_ITEM} disabled>
-						No available destinations
+						<span className="flex min-w-0 flex-1 flex-col">
+							<span className="truncate">Move to… no available destinations</span>
+							<span className="text-muted-foreground">
+								Cloud compute and a GitHub repository let a channel move
+							</span>
+						</span>
 					</ContextMenu.Item>
 				)}
 				{destinations.state === "ready" && destinations.targets.map((target) => {

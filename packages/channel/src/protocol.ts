@@ -184,8 +184,11 @@ export type GithubFile = {
 	error?: string;
 };
 
-/** An image as base64. Clients downscale before sending; see `MAX_IMAGES` in room.ts. */
+/** An image as base64. Clients downscale before sending; see `checkAttachments` in room.ts. */
 export type Image = { mimeType: string; data: string };
+
+/** Images per message; composers refuse more before the channel would. */
+export const MAX_IMAGES = 4;
 
 /** A text file attached to a message; models read its contents beside the message's text. */
 export type TextFile = { name: string; text: string };
