@@ -115,7 +115,9 @@ function where(channel: Listing): DetailsFact[] {
 
 function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 	const root = info?.chats.find((value) => value.id === chat);
-	const model = root?.model || channel.model;
+	const chosen = root?.model || channel.model;
+	// A chat without a model runs what Automatic picks, which a default model change moves.
+	const model = chosen || info?.automatic;
 	// "off" also stands for an always-thinking provider's default, so it isn't shown as a level.
 	const effort = root?.model && root.effort !== "off" ? root.effort : undefined;
 	const usage = info?.chats.reduce(
@@ -136,7 +138,11 @@ function facts(channel: Listing, info?: ChannelInfo): DetailsFact[] {
 		...(model
 			? [{
 				label: "Model",
-				value: effort ? `${model.modelId} · ${EFFORTS[effort]}` : model.modelId,
+				value: effort
+					? `${model.modelId} · ${EFFORTS[effort]}`
+					: chosen
+					? model.modelId
+					: `${model.modelId} (Automatic)`,
 				title: `${model.provider}/${model.modelId}${effort ? `, ${EFFORTS[effort]} effort` : ""}`,
 			}]
 			: []),

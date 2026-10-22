@@ -156,6 +156,7 @@ type Listener = {
 	captions: boolean;
 	actions: boolean;
 	typing: boolean;
+	agent: boolean;
 	reacted?: boolean;
 };
 
@@ -360,6 +361,8 @@ export class Channel {
 				return this.#say(request);
 			case "ask":
 				return this.#ask(request);
+			case "select":
+				return this.#admitted(request.chat, () => this.#pick(request));
 			case "chat":
 				return this.#chat(request);
 			case "answer": {
@@ -483,7 +486,19 @@ export class Channel {
 			if (lane) Object.assign(chat, { lane, cwd });
 			return chat;
 		}));
-		return { id, name, summary, revision, project, owner, ...this.#settings, chats };
+		// Without a usable key there is nothing to name; asking says so.
+		const automatic = await this.#automatic().catch(() => undefined);
+		return {
+			id,
+			name,
+			summary,
+			revision,
+			project,
+			owner,
+			...this.#settings,
+			chats,
+			...(automatic ? { automatic } : {}),
+		};
 	}
 
 	/** The newest response's own token count; providers report what that request carried. */
@@ -661,11 +676,15 @@ export class Channel {
 		return { submission: submission.id };
 	}
 
-	async #ask(request: Extract<Request, { op: "ask" }>) {
-		const chat = request.chat || ROOT_CONVERSATION_ID;
+	#ask(request: Extract<Request, { op: "ask" }>) {
+		return this.#admitted(request.chat, () => this.#admit(request));
+	}
+
+	async #admitted<T>(id: ChatId | undefined, admit: () => Promise<T>): Promise<T> {
+		const chat = id || ROOT_CONVERSATION_ID;
 		const previous = this.#admissions.get(chat) || Promise.resolve();
 		// Selection and submission must stay together across concurrent clients.
-		const pending = previous.catch(() => {}).then(() => this.#admit(request));
+		const pending = previous.catch(() => {}).then(admit);
 		this.#admissions.set(chat, pending);
 		try {
 			return await pending;
@@ -689,6 +708,13 @@ export class Channel {
 		return { submission: submission.id };
 	}
 
+	async #pick(request: Extract<Request, { op: "select" }>) {
+		this.#author(request.author);
+		await this.#mayInvoke(request.author);
+		const conversation = await this.#conversation(request.chat);
+		return this.#select(conversation, {}, request.model, request.effort, request.automatic);
+	}
+
 	async #mayInvoke(author: string) {
 		const settings = await this.#harness.snapshot(SettingsDoc, context);
 		// Hosts rewrite every client's author, so an agent author is another channel's agent on this
@@ -706,16 +732,14 @@ export class Channel {
 		requested: ModelRef | undefined,
 		effort?: Effort,
 		automatic?: boolean,
-	) {
+	): Promise<{ model: ModelRef; effort: Effort }> {
 		const agent = await conversation.agent(context);
 		const current = agent.model;
 		// A chat's inherited model can lose its provider key; only an explicit request must keep it.
 		const kept = !requested && !automatic && current && await usable(this.#options.models, current)
 			? current
 			: undefined;
-		const model = requested || kept || await (
-			this.#options.defaultModel?.() || choose(this.#options.models)
-		);
+		const model = requested || kept || await this.#automatic();
 		const selected = this.#options.models.getModel(model.provider, model.modelId);
 		if (!selected) {
 			throw new Error(`Unknown model ${model.provider}/${model.modelId}`);
@@ -746,8 +770,22 @@ export class Channel {
 				`The ${name} API key is missing. Add it in Provider settings to invoke an agent. Chat is still available.`,
 			);
 		}
-		if (same) return;
+		if (same) return { model, effort: thinkingLevel };
 		await conversation.configure({ model, thinkingLevel }, context);
+		const event: Event = { kind: "agent", chat: conversation.id, model, effort: thinkingLevel };
+		for (const listener of this.#listeners) {
+			if (listener.chat !== conversation.id || !listener.agent) continue;
+			try {
+				listener.send(event);
+			} catch {
+				this.#listeners.delete(listener);
+			}
+		}
+		return { model, effort: thinkingLevel };
+	}
+
+	#automatic(): Promise<ModelRef> {
+		return this.#options.defaultModel?.() || choose(this.#options.models);
 	}
 
 	async #chat(request: Extract<Request, { op: "chat" }>) {
@@ -967,6 +1005,7 @@ export class Channel {
 			captions: !!request.captions,
 			actions,
 			typing: !!request.typing,
+			agent: !!request.agent,
 		};
 		this.#listeners.add(listener);
 		// Read after the stream's snapshot, so every deletion it holds is here; later ones arrive live.

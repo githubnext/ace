@@ -55,6 +55,8 @@ export type ChannelInfo = Metadata & {
 	/** Channel-wide native desktop tools gate, including the owner's agents and child chats. */
 	desktop: boolean;
 	chats: Chat[];
+	/** What a chat without a model, or one handed back with Automatic, runs next; absent without a key. */
+	automatic?: ModelRef;
 };
 
 export type Chat = {
@@ -238,6 +240,19 @@ export type Request =
 		effort?: Effort;
 		requestId?: string;
 	}
+	/**
+	 * Set the model and effort the chat's next run uses, as `ask` would, without posting. Answers
+	 * with the chat's resulting model and effort.
+	 */
+	| {
+		op: "select";
+		chat?: ChatId;
+		author: string;
+		model?: ModelRef;
+		/** Without `model`, replace the chat's model with the channel's choice, as for a new chat. */
+		automatic?: boolean;
+		effort?: Effort;
+	}
 	| { op: "chat"; author: string; model?: ModelRef }
 	/** Answer a pending `question` tool call: each question's chosen option indices or written answer. */
 	| { op: "answer"; chat?: ChatId; call: string; author: string; answers: Answer[] }
@@ -280,6 +295,8 @@ export type Request =
 		actions?: boolean;
 		/** Include typing events; older clients do not understand them. */
 		typing?: boolean;
+		/** Include agent events; older clients do not understand them. */
+		agent?: boolean;
 	};
 
 export type Event =
@@ -368,6 +385,8 @@ export type Event =
 	 */
 	| { kind: "recap"; chat: ChatId; calls: string[]; text: string }
 	| { kind: "run"; chat: ChatId; state: "start" | "end" }
+	/** The chat's model or effort changed, so the next run uses these. */
+	| { kind: "agent"; chat: ChatId; model: ModelRef; effort: Effort }
 	/**
 	 * Channel-wide metadata, sent initially and whenever its name, summary, or settings change.
 	 * `revision` covers only the name and summary. Older hosts omit `shared` and `desktop`;
