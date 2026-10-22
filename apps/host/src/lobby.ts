@@ -13,7 +13,7 @@ import {
 	type Presence,
 } from "@ace/directory/protocol";
 
-import { hostedAuth } from "./client";
+import { directoryAuth } from "./client";
 import * as directory from "./directory";
 import { failure, log } from "./log";
 import { channelProject, type Listing } from "./protocol";
@@ -155,7 +155,7 @@ async function connect(lobby: Lobby) {
 	try {
 		socket = new WebSocket(
 			`${base.replace(/^http/, "ws")}/lobbies/${encodeURIComponent(lobby.project)}`,
-			{ headers: await hostedAuth() } as unknown as string[],
+			{ headers: await directoryAuth() } as unknown as string[],
 		);
 	} catch (error) {
 		return retry(lobby, error);

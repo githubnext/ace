@@ -4,6 +4,7 @@ import { access } from "node:fs/promises";
 import { tailnet as started } from "./catalog";
 import { config } from "./config";
 import * as directory from "./directory";
+import * as served from "./directory-server";
 import { shell as environment } from "./environment";
 import { latest } from "./keys";
 import type { Diagnostics } from "./protocol";
@@ -55,7 +56,12 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 	return {
 		tools,
 		tailscale: config.loopback ? { ...tailscale, loopback: true } : tailscale,
-		directory: { ...directory.status(), secret: await secret, services: { hosted, app, compute } },
+		directory: {
+			...directory.status(),
+			secret: await secret,
+			services: { hosted, app, compute },
+			serving: served.isServing(),
+		},
 		shell: { ...environment },
 		web: web.address,
 	};

@@ -185,7 +185,8 @@ export async function invite(): Promise<Invite> {
 
 /**
  * Join the team's directory, or leave it when `url` is null. A new secret replaces the saved
- * ACE_SECRET only after the directory accepts it; without one, the saved secret must work.
+ * ACE_SECRET only after the directory accepts it; without one, the saved secret is sent if there
+ * is one, and a directory a host serves needs none.
  */
 export async function setDirectory(url: string | null, secret?: string): Promise<void> {
 	if (url === null) return directory.configure(undefined);
@@ -198,8 +199,7 @@ export async function setDirectory(url: string | null, secret?: string): Promise
 		);
 	}
 	const value = secret?.trim() || await key("ACE_SECRET");
-	if (!value) throw new Error("Enter the team's shared secret");
 	await directory.check(base, value);
-	if (secret !== undefined) await storeKey("ACE_SECRET", value);
+	if (secret !== undefined) await storeKey("ACE_SECRET", secret.trim());
 	await directory.configure(base);
 }

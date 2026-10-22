@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, watch } from "node:fs";
+import { isIP } from "node:net";
 import { hostname } from "node:os";
 import { join } from "node:path";
 
@@ -14,6 +15,7 @@ import * as demo from "./demo";
 import { diagnostics } from "./diagnostics";
 import * as asks from "./asks";
 import * as directory from "./directory";
+import * as served from "./directory-server";
 import { retryLoginShell, shell } from "./environment";
 import type { GatewayClient, Watch } from "./gateway-client";
 import * as github from "./github";
@@ -82,9 +84,13 @@ type Client = {
 	remotes: Map<string, GatewayClient>;
 	/** Detaches this client from the terminals it opened; the shells keep running. */
 	terminals: Map<string, () => void>;
+	/** A host's socket to a lobby of the directory this host serves, not a gateway client. */
+	lobby?: served.Seat;
 };
 
 let name = hostname();
+/** Where teammates reach the directory this host serves, once it's on the tailnet. */
+let servedUrl: string | undefined;
 let closing = false;
 let updating = false;
 let update = 0;
@@ -458,6 +464,7 @@ const keychainOps = new Set<HostRequest["op"]>([
 	"key-store",
 	"key-forget",
 	"directory-set",
+	"directory-serve",
 	"team-deploy",
 	"team-invite",
 	"team-ask",
@@ -593,7 +600,7 @@ async function handle(
 				user: client.user,
 				host: name,
 				github: github.login(loginChanged),
-				...(team ? { team: new URL(team).host } : {}),
+				...(team ? { team: new URL(team).host, directory: team } : {}),
 			};
 		}
 		case "project-access":
@@ -681,6 +688,19 @@ async function handle(
 			const removed = await forgetKey(request.name);
 			settingsChanged();
 			return removed;
+		}
+		case "directory-serve": {
+			if (!request.serve) {
+				served.remove();
+				if (directory.url() === servedUrl) await setDirectory(null);
+				return null;
+			}
+			if (!servedUrl) {
+				throw new Error("Connect to Tailscale first: the directory serves your tailnet.");
+			}
+			served.create();
+			await setDirectory(servedUrl);
+			return servedUrl;
 		}
 		case "directory-set":
 			return setDirectory(request.url, request.secret);
@@ -878,6 +898,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 		backpressureLimit: 128 * 1024 * 1024,
 		closeOnBackpressureLimit: true,
 		open(socket) {
+			if (socket.data.lobby) return served.opened(socket);
 			sockets.add(socket);
 			log("info", "gateway.open", { user: socket.data.user, peer: socket.data.peer });
 			if (socket.data.peer) return;
@@ -891,6 +912,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 			});
 		},
 		async message(socket, raw) {
+			if (socket.data.lobby) return served.received(socket, raw);
 			const { id, trace: given, ...request } = JSON.parse(String(raw)) as HostEnvelope;
 			// A peer host's trace continues here, so one request reads across both machines' logs.
 			const trace = given || crypto.randomUUID().slice(0, 8);
@@ -926,6 +948,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 			}
 		},
 		close(socket, code) {
+			if (socket.data.lobby) return served.left(socket);
 			sockets.delete(socket);
 			windows.drop(socket);
 			if (socket.data.peer) asks.drop(socket, asksChanged);
@@ -1030,6 +1053,9 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 		async fetch(request, server) {
 			const url = new URL(request.url);
 			const origin = request.headers.get("origin");
+			if (url.pathname.startsWith("/directory/") && origin === null) {
+				return directoryRequest(url.pathname.slice("/directory".length), request, server);
+			}
 			if (url.pathname !== "/ws") {
 				if (request.method !== "GET" || !hosts.has(request.headers.get("host") ?? "")) {
 					return new Response("Not found", { status: 404 });
@@ -1060,6 +1086,33 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 		},
 		websocket: websocket(),
 	});
+}
+
+/** The directory this host may serve; only hosts reach it, named by Tailscale. */
+async function directoryRequest(
+	path: string,
+	request: Request,
+	server: Server<Client>,
+): Promise<Response | undefined> {
+	const ip = server.requestIP(request);
+	if (!ip) return new Response("Forbidden", { status: 403 });
+	let caller: served.Caller;
+	try {
+		caller = await whois(ip.address, ip.port);
+	} catch (error) {
+		log("warn", "directory.whois", { address: ip.address, ...failure(error) });
+		return new Response("Forbidden", { status: 403 });
+	}
+	const project = served.lobbyOf(path);
+	if (project === undefined) return served.handle(path, request, caller);
+	if (!served.isServing()) return new Response("This host serves no directory", { status: 404 });
+	const data = {
+		...client(caller.login, true, false, caller.host),
+		lobby: { project, caller, presence: null },
+	};
+	return server.upgrade(request, { data })
+		? undefined
+		: new Response("Upgrade failed", { status: 400 });
 }
 
 /** A port already taken names its listener, so the person can tell which Ace holds it. */
@@ -1177,6 +1230,8 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	}
 	if (machine) {
 		servers.push(team(machine, { port, secure: false }));
+		const address = isIP(machine.address) === 6 ? `[${machine.address}]` : machine.address;
+		servedUrl = `http://${address}:${port}/directory`;
 		console.log(`Sharing with the tailnet on ${machine.address}:${port} as ${machine.login}`);
 		console.log(`Your devices can open http://${machine.dns}:${port}`);
 		cleanup.push(peers.watch(() => void ownersChanged()));

@@ -69,6 +69,15 @@ export async function hostedAuth(): Promise<Record<string, string>> {
 	return serviceAuth(secret);
 }
 
+/**
+ * A directory a host serves names callers by Tailscale and needs no secret; a deployed one does.
+ * Without a saved secret, a deployed directory's refusal says what's missing.
+ */
+export async function directoryAuth(): Promise<Record<string, string>> {
+	const secret = await key("ACE_SECRET");
+	return secret ? serviceAuth(secret) : {};
+}
+
 /** The team's services serve one tailnet, so the credential combines the secret with this Mac's. */
 export async function serviceAuth(secret: string): Promise<Record<string, string>> {
 	const domain = await tailnet.domain();
