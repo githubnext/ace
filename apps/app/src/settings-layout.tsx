@@ -178,6 +178,14 @@ export function Confirm({ children, action, busy, onConfirm, onCancel }: {
 	);
 }
 
+/** A time today, or a date and time when older, so a stale sync doesn't read as recent. */
+export function when(time: number) {
+	const date = new Date(time);
+	return date.toDateString() === new Date().toDateString()
+		? date.toLocaleTimeString()
+		: date.toLocaleString();
+}
+
 export function Status({ children }: { children: ReactNode }) {
 	return <p role="status" className="text-xs/relaxed text-muted-foreground">{children}</p>;
 }
