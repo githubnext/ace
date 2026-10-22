@@ -117,10 +117,13 @@ function EmojiPicker({ onSelect, theme }: Props) {
 			s.textContent = shadowCSS();
 			host.shadowRoot.appendChild(s);
 		}
+		// emoji-mart's autoFocus runs before the popover can take focus, so focus search a frame later.
+		let frame = requestAnimationFrame(() => host?.shadowRoot?.querySelector("input")?.focus());
 		picker.current = instance;
 		applyVars();
 
 		return () => {
+			cancelAnimationFrame(frame);
 			picker.current = null;
 			el.replaceChildren();
 		};

@@ -201,7 +201,12 @@ export function Conversation(
 								);
 								act({ op: "react", emoji, remove }, uid);
 							}}
-							onCopy={(uid) => void navigator.clipboard.writeText(byKey.get(uid)!.text)}
+							onCopy={(uid) =>
+								navigator.clipboard.writeText(byKey.get(uid)!.text).then(
+									() => toast("Copied message"),
+									(error) =>
+										toast.error("Could not copy the message", { description: error.message }),
+								)}
 							onDelete={setDeleting}
 							editable={editable}
 							editing={edited?.key}
