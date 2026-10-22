@@ -33,6 +33,7 @@ import {
 	type ProjectAccess,
 	projectId,
 	TEAM,
+	type TerminalShell,
 	type WindowInfo,
 } from "./protocol";
 import { checkModel, setModel } from "./settings";
@@ -635,16 +636,24 @@ async function main() {
 			return;
 		case "fork":
 			return console.log((await fork(record.id, catalog.user)).name);
-		case "kill":
+		case "kill": {
+			const work = record.busy ? "stopped its agent's run" : "no agent was working";
 			// A running host owns the channel's terminals and closes them with it, as for the app.
-			if (await isHostRunning()) {
-				return void (await local({
-					op: "channel",
-					channel: record.id,
-					request: { op: "kill", author: catalog.user },
-				}));
+			if (!await isHostRunning()) {
+				await kill(record.id);
+				return console.log(`Killed ${record.name}: ${work}.`);
 			}
-			return kill(record.id);
+			const shells = await local<TerminalShell[]>({ op: "terminals", channel: record.id });
+			await local({
+				op: "channel",
+				channel: record.id,
+				request: { op: "kill", author: catalog.user },
+			});
+			const closed = shells.length
+				? `closed ${shells.length} terminal${shells.length === 1 ? "" : "s"}`
+				: "no terminals were open";
+			return console.log(`Killed ${record.name}: ${work}; ${closed}.`);
+		}
 		case "move": {
 			// `--hosted <url>` only finishes a move to a hosting service that an earlier version started.
 			if ([flags.hosted, flags.local, flags.compute].filter(Boolean).length !== 1) {

@@ -436,6 +436,8 @@ export type HostRequest =
 	| { op: "terminal-input"; terminal: string; data: string }
 	| { op: "terminal-resize"; terminal: string; cols: number; rows: number }
 	| { op: "terminal-close"; terminal: string }
+	/** A channel's running shells on this host, so a window can show those no tab shows. */
+	| { op: "terminals"; channel: string }
 	/** Drop this client's connection to a channel, ending its watches. */
 	| { op: "release"; channel: string };
 
@@ -478,5 +480,8 @@ export type TerminalFrame =
 	| { terminal: string; exit: number };
 
 export type TerminalOpened = { terminal: string; cwd: string };
+
+/** `attached` while some client shows the shell. */
+export type TerminalShell = { terminal: string; chat?: number; cwd: string; attached: boolean };
 
 export type { ChannelInfo, Event, ModelRef, Presence, Request };

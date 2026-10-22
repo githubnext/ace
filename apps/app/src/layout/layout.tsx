@@ -106,6 +106,8 @@ type Props = {
 	onTabClose?: (uid: string, data: Content) => void;
 	/** Receives the function that shows the chat's Diff tab, opening one beside the chat if needed. */
 	opener?: { current?: () => void };
+	/** Running shells no client shows; each without a tab here opens as a background Terminal tab. */
+	shells?: { terminal: string; chat?: number }[];
 };
 
 const MIN = 350;
@@ -750,7 +752,9 @@ function Pane(props: PaneProps) {
 	);
 }
 
-function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, opener }: Props) {
+function useLayout(
+	{ id, name, icon = ICONS.chat, chat, changed, onTabClose, opener, shells }: Props,
+) {
 	const [data] = useState(() => read(id));
 	const [api] = useState(() => Split.create(data.state, { min: minimum }));
 	const [meta, setMeta] = useState<Meta>(data.meta);
@@ -830,6 +834,26 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 		if (!api.open({ tab: uid, to: { pane }, background: true })) return;
 		setMeta((meta) => ({ ...meta, [uid]: content("diff", chat) }));
 	}, [api, chat, changed, diff, meta]);
+
+	// Tabs are kept per browser window, so a shell whose tab was lost would otherwise run unseen.
+	const adopt = useEffectEvent((shells: { terminal: string; chat?: number }[]) => {
+		const shown = new Set(
+			Object.values(meta).map((value) => value.type === "terminal" && value.terminal),
+		);
+		const pane = Split.host(api.get(), CHAT)?.uid;
+		const added: Meta = {};
+		for (const shell of shells) {
+			if (shown.has(shell.terminal)) continue;
+			const uid = `tab-${api.get().seq + 1}`;
+			if (!api.open({ tab: uid, to: { pane }, background: true })) break;
+			added[uid] = { type: "terminal", chat: shell.chat ?? chat, terminal: shell.terminal };
+		}
+		setMeta((meta) => ({ ...meta, ...added }));
+	});
+
+	useEffect(() => {
+		if (shells?.length) adopt(shells);
+	}, [shells]);
 
 	const reveal = useEffectEvent(() => {
 		const tabs = api.get().tabs;
