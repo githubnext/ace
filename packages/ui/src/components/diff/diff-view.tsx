@@ -643,27 +643,30 @@ function DiffViewContent(props: DiffViewProps & { kept: Kept }) {
 						<span className="shrink-0 text-muted-foreground">-&gt;</span>
 						<span className="min-w-0 truncate text-muted-foreground">{base}</span>
 					</div>
-					{summary.map(sum => (
-						<div
-							key={sum.group || ""}
-							className="flex shrink-0 items-center gap-2 text-xs font-medium tabular-nums"
-						>
-							{sum.group ? <span className="text-muted-foreground">{sum.group}</span> : null}
-							{sum.fixed
-								? (
-									<span className="font-normal text-muted-foreground">
-										{plural(sum.files, "file", "files")}
-									</span>
-								)
-								: null}
-							{sum.fixed && !sum.adds && !sum.dels ? null : (
-								<>
-									<span className="text-accent">+{sum.adds}</span>
-									<span className="text-destructive">-{sum.dels}</span>
-								</>
-							)}
-						</div>
-					))}
+					{/* One line tall, so totals that don't fit wrap out of sight instead of under the toolbar. */}
+					<div className="flex h-4 min-w-0 flex-1 basis-0 flex-wrap items-center gap-x-4 overflow-hidden">
+						{summary.map(sum => (
+							<div
+								key={sum.group || ""}
+								className="flex shrink-0 items-center gap-2 text-xs font-medium tabular-nums"
+							>
+								{sum.group ? <span className="text-muted-foreground">{sum.group}</span> : null}
+								{sum.fixed
+									? (
+										<span className="font-normal text-muted-foreground">
+											{plural(sum.files, "file", "files")}
+										</span>
+									)
+									: null}
+								{sum.fixed && !sum.adds && !sum.dels ? null : (
+									<>
+										<span className="text-accent">+{sum.adds}</span>
+										<span className="text-destructive">-{sum.dels}</span>
+									</>
+								)}
+							</div>
+						))}
+					</div>
 				</div>
 				<TooltipProvider>
 					<div className="flex shrink-0 items-center gap-1.5">
