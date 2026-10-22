@@ -133,6 +133,9 @@ function clip(text: string, length: number): string {
 	return line.length > length ? `${line.slice(0, length - 1)}…` : line;
 }
 
+/** Whether `(run ended)` already printed, so `ask` doesn't print a second ending. */
+let ended = false;
+
 function render(event: Event, info: ChannelInfo) {
 	const tag = event.chat === 1 && info.chats.length === 1 ? "" : dim(`[${event.chat}] `);
 	switch (event.kind) {
@@ -151,7 +154,9 @@ function render(event: Event, info: ChannelInfo) {
 		case "result":
 			return console.log(dim(`${tag}  ${event.error ? "✗" : "←"} ${clip(event.text, 100)}`));
 		case "run":
-			return event.state === "end" && console.log(dim(`${tag}  (run ended)`));
+			if (event.state !== "end") return;
+			ended = true;
+			return console.log(dim(`${tag}  (run ended)`));
 	}
 }
 
@@ -536,7 +541,7 @@ async function main() {
 						process.exit(130);
 					});
 					const status = await session.request<string>({ op: "wait", submission });
-					if (status === "unanswered") console.log(dim("  (stopped before answering)"));
+					if (status === "unanswered" && !ended) console.log(dim("  (stopped before answering)"));
 					return;
 				}
 				case "watch":

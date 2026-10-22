@@ -252,9 +252,12 @@ export function Composer(
 			const sent = new Set(attached);
 			setAttached((current) => current.filter((value) => !sent.has(value)));
 		} catch (error) {
+			const { message } = error as Error;
+			// Only a missing key is fixed in Providers; busy, access and size errors are not.
+			const keys = invoke && onProviders && /provider key/i.test(message);
 			toast.error(invoke ? "Could not invoke agent" : "Could not send message", {
-				description: (error as Error).message,
-				...(invoke && onProviders ? { action: { label: "Providers", onClick: onProviders } } : {}),
+				description: message,
+				...(keys ? { action: { label: "Providers", onClick: onProviders } } : {}),
 			});
 		} finally {
 			sending.current = false;

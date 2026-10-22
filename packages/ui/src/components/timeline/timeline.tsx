@@ -441,7 +441,7 @@ function AgentWorkingContextView(
 						...workingTextFont,
 					}}
 				>
-					{turn.recap && <span className="text-foreground/80">{turn.recap}</span>}
+					{turn.recap && <span className="text-foreground/80">{codeSpans(turn.recap)}</span>}
 					<span
 						className={cn("flex min-w-0 items-center gap-1.5", turn.recap && "text-xs")}
 						style={{ blockSize: WORKING_SUMMARY_HEIGHT }}
@@ -486,6 +486,13 @@ function AgentWorkingContextView(
 				</div>
 			)}
 		</div>
+	);
+}
+
+/** Recaps are plain text, but models still wrap commands and paths in backticks. */
+function codeSpans(text: string) {
+	return text.split(/`([^`]+)`/).map((part, i) =>
+		i % 2 ? <code key={i} className="font-mono text-[0.92em]">{part}</code> : part
 	);
 }
 

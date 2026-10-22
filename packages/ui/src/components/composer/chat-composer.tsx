@@ -1071,7 +1071,7 @@ function useComposer({
 				return true;
 			}
 		}
-		return history.handleKey(v, e, m => updateMode(m || ms[0]!.id));
+		return history.handleKey(v, e, m => updateMode(m || ms[0]!.id), modeRef.current);
 	}
 
 	function update(v: EditorView) {
@@ -1717,7 +1717,8 @@ function ComposerButtons({ state }: { state: ComposerState }) {
 	let { terminal, sendable, send, tip, stop, onStop, exit, edit, cancel, accessory } = state;
 	return (
 		<Composer.End>
-			{accessory}
+			{/* Above the actions' hover halo, which reaches over it. */}
+			{accessory && <span className="relative z-10 flex">{accessory}</span>}
 			<TooltipProvider>
 				{terminal
 					? (
