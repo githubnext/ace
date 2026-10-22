@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { Button, Timeline, toast } from "@ace/ui";
-import type { Listing } from "@ace/host/protocol";
+import { channelProject, type Listing } from "@ace/host/protocol";
 
 import { Checks } from "./checks";
 import { Composer } from "./composer";
@@ -11,7 +11,8 @@ import { EditMessage } from "./edit-message";
 import { publish, useDetails } from "./details";
 import { host } from "./host";
 import { MessageQueue } from "./message-queue";
-import { OfflineHost } from "./onboarding";
+import { OfflineHost, useRoster } from "./onboarding";
+import { present } from "./presence";
 import { pendingQuestion, Question } from "./question";
 import { sources, toEvents } from "./timeline";
 import { useTranscript } from "./transcript";
@@ -158,6 +159,23 @@ export function Conversation(
 			),
 		[people],
 	);
+	const presence = useSyncExternalStore(host.subscribe, () => host.presence);
+	const roster = useRoster();
+	// Mentions name people by GitHub login. A name still holding @ is a Tailscale login with no
+	// GitHub account, or an agent from another channel (`agent@<prefix>`), and can't be mentioned.
+	const members = useMemo(() => {
+		const self = people[user] || user;
+		const names = new Set([
+			...present(presence[channelProject(channel)], self, channel.id).map((value) => value.name),
+			...transcript.items.flatMap((item) =>
+				item.kind === "message" ? [people[item.author] || item.author] : []
+			),
+			...(roster || []).map((member) => member.github || member.login),
+		]);
+		return [...names]
+			.filter((name) => name !== self && name !== "ace" && !name.includes("@"))
+			.map((name) => ({ name, avatar: avatars[name] }));
+	}, [people, user, presence, channel, transcript.items, roster, avatars]);
 	const results = useMemo(
 		() =>
 			transcript.items.reduce(
@@ -304,6 +322,7 @@ export function Conversation(
 						failure={failure}
 						onProviders={onProviders}
 						accessory={chat?.usage && <Usage value={chat.usage} context={chat.context} />}
+						members={members}
 					/>
 				</div>
 			</div>
