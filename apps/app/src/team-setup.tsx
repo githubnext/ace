@@ -580,7 +580,7 @@ function Join({ initial, onJoined, back }: {
 	);
 }
 
-function Checks({ github }: { github?: string }) {
+export function Checks({ github }: { github?: string }) {
 	const { value } = useDiagnostics(true);
 	const tailscale = value?.tailscale;
 	return (
@@ -632,7 +632,7 @@ function Steps({ current }: { current: Step }) {
 	);
 }
 
-function Header({ title, description }: { title: string; description: ReactNode }) {
+export function Header({ title, description }: { title: string; description: ReactNode }) {
 	return (
 		<DialogHeader>
 			<DialogTitle>{title}</DialogTitle>
@@ -641,7 +641,7 @@ function Header({ title, description }: { title: string; description: ReactNode 
 	);
 }
 
-function Footer({ back, next }: { back?: ReactNode; next: ReactNode }) {
+export function Footer({ back, next }: { back?: ReactNode; next: ReactNode }) {
 	return (
 		<DialogFooter className="flex-row items-center justify-between sm:justify-between">
 			<div className="flex items-center gap-1">{back}</div>
@@ -650,7 +650,7 @@ function Footer({ back, next }: { back?: ReactNode; next: ReactNode }) {
 	);
 }
 
-function Choice({ selected, onSelect, title, children }: {
+export function Choice({ selected, onSelect, title, children }: {
 	selected: boolean;
 	onSelect: () => void;
 	title: ReactNode;
@@ -703,7 +703,7 @@ function Toggle({ checked, onChange, disabled, title, description }: {
 	);
 }
 
-function Pill({ recommended, children }: { recommended?: boolean; children: ReactNode }) {
+export function Pill({ recommended, children }: { recommended?: boolean; children: ReactNode }) {
 	return (
 		<span
 			className={`rounded-full px-2 text-[0.6875rem] font-medium leading-5 ${
@@ -723,7 +723,7 @@ function Invite({ children }: { children: ReactNode }) {
 	);
 }
 
-function Link({ href, children }: { href: string; children: ReactNode }) {
+export function Link({ href, children }: { href: string; children: ReactNode }) {
 	return (
 		<a
 			href={href}
@@ -737,7 +737,9 @@ function Link({ href, children }: { href: string; children: ReactNode }) {
 }
 
 /** `label` shows in place of a value that carries a secret. */
-function Copyable({ value, secret, label }: { value: string; secret?: boolean; label?: string }) {
+export function Copyable(
+	{ value, secret, label }: { value: string; secret?: boolean; label?: string },
+) {
 	const [copied, setCopied] = useState(false);
 	return (
 		<div className="flex min-w-0 items-center gap-2 rounded-md border bg-card py-1 pr-1 pl-3 font-mono text-xs">

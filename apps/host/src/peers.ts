@@ -1,4 +1,5 @@
 /** Other hosts on the tailnet: found through Tailscale, reached on their gateway's tailnet listener. */
+import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
 
 import { config } from "./config";
@@ -26,6 +27,16 @@ const remembered = new Map<string, Listing[]>();
 const stalled = new Map<string, number>();
 /** Peer owners' GitHub logins by Tailscale login, from their last hello, so remembered channels keep their owner's name and avatar. */
 const named: People = {};
+
+/**
+ * Design lane only: teammates' hosts for screenshots, since one machine can't be its own peer.
+ * `ACE_DESIGN_PEERS` names a JSON file of `{ people, online, offline }`.
+ */
+const design: { people: People; online: Listing[]; offline: Listing[] } =
+	process.env.ACE_DESIGN_PEERS
+		? JSON.parse(readFileSync(process.env.ACE_DESIGN_PEERS, "utf8"))
+		: { people: {}, online: [], offline: [] };
+Object.assign(named, design.people);
 
 function emit() {
 	for (const listener of listeners) listener();
@@ -108,21 +119,27 @@ export function relay(machine: Machine): GatewayClient {
 
 /** Every reachable peer's channels. */
 export function listings(): Listing[] {
-	return [...hosts.values()].flatMap(({ machine, client }) => {
-		if (client.status !== "open") return [];
-		if (!stalled.has(machine.name)) return client.channels;
-		// A hosted channel is reached at its service, never through the peer.
-		return client.channels.map((channel) =>
-			channel.hosted ? channel : { ...channel, stalled: true }
-		);
-	});
+	return [
+		...design.online,
+		...[...hosts.values()].flatMap(({ machine, client }) => {
+			if (client.status !== "open") return [];
+			if (!stalled.has(machine.name)) return client.channels;
+			// A hosted channel is reached at its service, never through the peer.
+			return client.channels.map((channel) =>
+				channel.hosted ? channel : { ...channel, stalled: true }
+			);
+		}),
+	];
 }
 
 /** Channels of peers that answered before but are unreachable now. */
 export function unreachable(): Listing[] {
-	return [...remembered].flatMap(([name, channels]) =>
-		hosts.get(name)?.client.status === "open" ? [] : channels
-	);
+	return [
+		...design.offline,
+		...[...remembered].flatMap(([name, channels]) =>
+			hosts.get(name)?.client.status === "open" ? [] : channels
+		),
+	];
 }
 
 /** Peers' owners' GitHub logins as they last answered, reachable or not. */

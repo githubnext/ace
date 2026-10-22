@@ -40,6 +40,7 @@ import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
 import { DeleteChannel } from "./delete-channel";
+import { shows } from "./design";
 import { Github, GithubSidebar } from "./github";
 import { useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
@@ -47,6 +48,7 @@ import { host } from "./host";
 import { type Invite, parse } from "./invite";
 import { Rename } from "./layout/rename";
 import { MoveChannel } from "./move-channel";
+import { AddTeammate, CreateDirectory, DirectoryCard, Welcome } from "./local-first";
 import { Navigation, type Page, WindowControls } from "./navigation";
 import { EmptyProjects, InitGit, OpenProject } from "./open-project";
 import { Palette } from "./palette";
@@ -292,7 +294,9 @@ export function App() {
 		project?: AppProject & { repo: string };
 		start?: { text?: string; onCreated?: () => void };
 	}>();
-	const [settings, setSettings] = useState<boolean | Section>(false);
+	const [settings, setSettings] = useState<boolean | Section>(
+		shows("settings-team") ? "team" : false,
+	);
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
@@ -304,6 +308,27 @@ export function App() {
 	// Offered once on first run; Settings → Team opens it again.
 	const [offered, setOffered] = useLocalStorage("ace:team-setup", false);
 	const [teaming, setTeaming] = useState<boolean | "inviting" | Invite>(false);
+	const [welcome, setWelcome] = useState(
+		shows("welcome-key") ? "key" : shows("welcome-team") ? "team" : "",
+	);
+	const [directory, setDirectory] = useState(
+		["where", "fly", "deploying", "done"].find(step => shows(`dir-${step}`)) || "",
+	);
+	const [teammate, setTeammate] = useState(shows("add-teammate"));
+	const [card, setCard] = useState(shows("card"));
+	useEffect(() => {
+		const create = () => setDirectory("where");
+		window.addEventListener("ace:create-directory", create);
+		if (shows("joined")) {
+			setTimeout(() =>
+				toast("Your team has a directory", {
+					description:
+						"nate created it on ace-directory. Channels on sleeping Macs now stay listed.",
+					duration: 60_000,
+				}), 300);
+		}
+		return () => window.removeEventListener("ace:create-directory", create);
+	}, []);
 	const [collapsed, setCollapsed] = useState<Record<SessionSidebarGroupId, boolean>>({
 		pinned: false,
 		mine: false,
@@ -777,7 +802,7 @@ export function App() {
 							side="left"
 							id="sidebar"
 							className="-my-2 h-[calc(100%+1rem)]"
-							innerClassName="h-full min-h-0"
+							innerClassName={card ? "flex h-full min-h-0 flex-col" : "h-full min-h-0"}
 						>
 							{page === "channels"
 								? (
@@ -863,6 +888,12 @@ export function App() {
 										onClone={cloneUrl}
 									/>
 								)}
+							{card && (
+								<DirectoryCard
+									onCreate={() => setDirectory("where")}
+									onDismiss={() => setCard(false)}
+								/>
+							)}
 						</Sidebar>
 					)}
 					<Main
@@ -1066,7 +1097,25 @@ export function App() {
 						onClose={() => setSettings(false)}
 					/>
 				)}
-				{(teaming || (!offered && connected && !current)) && (
+				{welcome && (
+					<Welcome
+						github={hello.github}
+						initial={welcome as "key" | "team"}
+						onClose={() => setWelcome("")}
+					/>
+				)}
+				{directory && (
+					<CreateDirectory
+						initial={directory as "where"}
+						onAdd={() => {
+							setDirectory("");
+							setTeammate(true);
+						}}
+						onClose={() => setDirectory("")}
+					/>
+				)}
+				{teammate && <AddTeammate onClose={() => setTeammate(false)} />}
+				{!shows("design") && (teaming || (!offered && connected && !current)) && (
 					<TeamSetup
 						key={typeof teaming === "object" ? teaming.url : String(teaming)}
 						github={hello.github}

@@ -24,7 +24,9 @@ import type { ProviderSettings, Settings as HostSettings } from "@ace/host/proto
 
 import { useCompute } from "./compute";
 import { desktop } from "./desktop";
+import { shows } from "./design";
 import { TeamSettings } from "./directory-settings";
+import { AddTeammate, Sandboxes, TeamAfter } from "./local-first";
 import { useFolder } from "./folder";
 import { host } from "./host";
 import { HostStatus } from "./host-settings";
@@ -326,6 +328,7 @@ export function Settings(
 	{ onClose, initialSection }: { onClose: () => void; initialSection?: Section },
 ) {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
+	const [dialog, setDialog] = useState(shows("sandboxes") ? "sandboxes" : "");
 	const [section, setSection] = useState<Section>(
 		// Updates exist only in the desktop app; browsers keep their usual first section.
 		(initialSection !== "updates" || desktop ? initialSection : undefined)
@@ -513,7 +516,16 @@ export function Settings(
 						)}
 						{visited.has("team") && (
 							<div hidden={section !== "team"}>
-								<TeamSettings active={section === "team"} />
+								{shows("settings-team")
+									? (
+										<TeamAfter
+											onAdd={() => setDialog("add")}
+											onSandboxes={() => setDialog("sandboxes")}
+										/>
+									)
+									: <TeamSettings active={section === "team"} />}
+								{dialog === "add" && <AddTeammate onClose={() => setDialog("")} />}
+								{dialog === "sandboxes" && <Sandboxes onClose={() => setDialog("")} />}
 							</div>
 						)}
 						{visited.has("beta") && (

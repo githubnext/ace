@@ -6,10 +6,12 @@ import type { Listing } from "@ace/host/protocol";
 import { Checks } from "./checks";
 import { Composer } from "./composer";
 import { DeleteMessage } from "./delete-message";
+import { shows } from "./design";
 import { desktop } from "./desktop";
 import { EditMessage } from "./edit-message";
 import { publish } from "./details";
 import { host } from "./host";
+import { Asleep } from "./local-first";
 import { MessageQueue } from "./message-queue";
 import { pendingQuestion, Question } from "./question";
 import { sources, toEvents } from "./timeline";
@@ -211,6 +213,14 @@ export function Conversation(
 								return source && (() => onOpen(source));
 							}}
 							intro={{ name: channel.name, createdAt: Math.floor(channel.created / 1000) }}
+						/>
+					)
+					: offline && shows("asleep")
+					? (
+						<Asleep
+							name={channel.name}
+							host={channel.host}
+							onCreate={() => window.dispatchEvent(new Event("ace:create-directory"))}
 						/>
 					)
 					: (
