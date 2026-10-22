@@ -444,11 +444,12 @@ export function App() {
 		host.request<Hello>({ op: "hello" }).then(setHello, () => {});
 	}, [status]);
 
-	const available = useMemo(() => projects(opened, channels, hello.host), [
-		opened,
-		channels,
-		hello.host,
-	]);
+	// Until this host names itself and lists its projects, its own channels read as a teammate's.
+	const loaded = !!opened && !!hello.host;
+	const available = useMemo(
+		() => opened && hello.host ? projects(opened, channels, hello.host) : [],
+		[opened, channels, hello.host],
+	);
 	useGithubRefresh(available);
 	const listings = new Map(channels.map((channel) => [channel.id, channel]));
 	const byId = useMemo(() => {
@@ -464,9 +465,10 @@ export function App() {
 	const repo = useGithub<string | null>(
 		current && { op: "project-repo", project: current.path, host: current.host },
 	);
-	// Only a definite answer hides GitHub, so the lists can still say why a lookup failed.
-	const linked = repo.value !== null;
-	const page = !linked && (saved === "issues" || saved === "prs") ? "channels" : saved;
+	// Only a definite answer hides GitHub, so the lists can still say why a lookup failed; Issues and
+	// PRs appear once the lookup answers either way, so they never show and then vanish.
+	const linked = !!repo.value || (status === "open" && !!repo.error);
+	const page = repo.value === null && (saved === "issues" || saved === "prs") ? "channels" : saved;
 	function go(next: Page) {
 		if (linked || (next !== "issues" && next !== "prs")) setPage(next);
 	}
@@ -613,7 +615,7 @@ export function App() {
 
 	// Declared, not a const: the picker and All Projects groups above call it during render.
 	function removable(value: AppProject) {
-		return connected && opened.some((checkout) => isLocal(checkout, value));
+		return connected && !!opened?.some((checkout) => isLocal(checkout, value));
 	}
 
 	function remove(value: AppProject) {
@@ -623,7 +625,7 @@ export function App() {
 
 	async function forget(value: AppProject) {
 		try {
-			for (const checkout of opened.filter((checkout) => isLocal(checkout, value))) {
+			for (const checkout of opened?.filter((checkout) => isLocal(checkout, value)) || []) {
 				await host.request({ op: "project-remove", path: checkout.path });
 			}
 		} catch (error) {
@@ -872,7 +874,7 @@ export function App() {
 							page={page}
 							user={hello.user}
 							github={people[hello.user]}
-							repo={linked}
+							repo={linked || page === "issues" || page === "prs"}
 							onPage={go}
 							onSettings={() => setSettings(true)}
 						/>
@@ -999,7 +1001,7 @@ export function App() {
 								<Disconnected />
 							</p>
 						)}
-						{!current && !connected
+						{!current && (!connected || !loaded)
 							? null
 							: !current
 							? (
