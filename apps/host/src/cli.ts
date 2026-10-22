@@ -57,6 +57,7 @@ const HELP = `ace — channels on this host
   ace say <channel> [--chat <id>] <text…>        post without invoking the agent
   ace ask <channel> [--chat <id>] [--model <provider/id>] [--detach] <text…>
   ace watch <channel> [--chat <id>]
+  ace answer <channel> [--chat <id>] <text…>     answer the chat's waiting question in writing
   ace chat <channel> [--model <provider/id>]     open another chat
   ace stop <channel> [--chat <id>]               stop the chat's current run
   ace kill <channel>                             stop all work in the channel now
@@ -83,7 +84,7 @@ const HELP = `ace — channels on this host
   ace open [--port 4140]                          open this host's authenticated app
   ace archive <channel> | unarchive <channel> | delete <channel>
 
-info, say, ask, watch, chat and stop also take a teammate's channel, by name or ID, through this
+info, say, ask, answer, watch, chat and stop also take a teammate's channel, by name or ID, through this
 host's running gateway (open Ace or run ace serve). Their host decides who may invoke its agents.
 
 Models are provider/id, such as openai/gpt-6-astra or anthropic/claude-opus-5-5.
@@ -150,8 +151,20 @@ function render(event: Event, info: ChannelInfo) {
 				: "";
 			return console.log(`${tag}${bold(event.model)}: ${event.text}${ending}`);
 		}
-		case "tool":
-			return console.log(dim(`${tag}  → ${event.name} ${clip(JSON.stringify(event.args), 100)}`));
+		case "tool": {
+			if (event.name !== "question") {
+				return console.log(dim(`${tag}  → ${event.name} ${clip(JSON.stringify(event.args), 100)}`));
+			}
+			const { questions } = event.args as {
+				questions: { question: string; options: { label: string }[] }[];
+			};
+			for (const item of questions) {
+				console.log(`${tag}  ? ${item.question}`);
+				console.log(dim(`${tag}    ${item.options.map((option) => option.label).join(" · ")}`));
+			}
+			const flag = event.chat === 1 ? "" : ` --chat ${event.chat}`;
+			return console.log(dim(`${tag}  (answer with: ace answer ${info.name}${flag} <text…>)`));
+		}
 		case "result":
 			return console.log(dim(`${tag}  ${event.error ? "✗" : "←"} ${clip(event.text, 100)}`));
 		case "run":
@@ -206,7 +219,7 @@ async function isHostRunning(): Promise<boolean> {
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
 const SWITCH = new Set(["on", "off"]);
 
-const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
+const participant = new Set(["info", "say", "ask", "answer", "watch", "chat", "stop"]);
 
 /** What only a channel's owner can do, phrased for refusing a teammate's channel. */
 /** A project by its folder on this host, by GitHub owner/name, or by the name it was opened as. */
@@ -570,6 +583,10 @@ async function main() {
 					if (status === "unanswered" && !ended) console.log(dim("  (stopped before answering)"));
 					return;
 				}
+				case "answer":
+					if (!text) throw new Error("Nothing to answer");
+					await session.request({ op: "answer", chat: chat(), author: catalog.user, text });
+					return;
 				case "watch":
 					return await (await watch(session)).ended;
 				case "chat": {

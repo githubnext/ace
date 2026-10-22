@@ -27,11 +27,14 @@ type Item = {
 
 type Answered = { question: string; choices: string[] } | { question: string; custom: string };
 
+/** Who answered, or with `skipped`, who declined to; a skip records no answers. */
+type Recorded = { author: string; at: number; answers: Answered[]; skipped?: true };
+
 /** Each `question` call's items and, once someone submits, their answers; keyed by call ID. */
 export const QuestionsDoc = defineDoc<{
 	questions: Record<string, {
 		items: Item[];
-		answer?: { author: string; at: number; answers: Answered[] };
+		answer?: Recorded;
 	}>;
 }>({
 	kind: "ace.questions",
@@ -160,7 +163,16 @@ export class Questions {
 	});
 }
 
-function answered(answer: { author: string; answers: Answered[] }): ToolExecutionResult {
+function answered(answer: Recorded): ToolExecutionResult {
+	if (answer.skipped) {
+		return {
+			content: [{
+				type: "text",
+				text:
+					`Not answered: ${answer.author} skipped the question. Continue without their answer, or explain what you need before asking again.`,
+			}],
+		};
+	}
 	return {
 		content: [{
 			type: "text",
@@ -169,38 +181,55 @@ function answered(answer: { author: string; answers: Answered[] }): ToolExecutio
 	};
 }
 
-/** Record `answers` to a pending question; the first submission wins. */
+/**
+ * Record `answers` to a pending question, or with `answers` null, that `author` skipped it; the
+ * first submission wins. A written `answers` string answers every item with that text, and with no
+ * `call`, the chat's newest open question.
+ */
 export async function answer(
 	harness: Harness,
 	chat: ConversationId,
-	call: string,
+	call: string | undefined,
 	author: string,
-	answers: readonly Answer[],
+	answers: readonly Answer[] | string | null,
 	context: Context,
 ): Promise<void> {
 	const live = await harness.snapshot(LiveDoc, chat, context);
-	const slot = live?.tools?.find((value) => value.callId === call);
 	// A slot pi has not resumed yet after a restart still takes the answer its rerun will find.
-	if (slot?.name !== "question" || slot.status === "done") {
-		throw new Error("This question is no longer open");
+	const open = (value: { name: string; status: string }) =>
+		value.name === "question" && value.status !== "done";
+	const slot = call === undefined
+		? live?.tools?.findLast(open)
+		: live?.tools?.find((value) => value.callId === call);
+	if (!slot || !open(slot)) {
+		throw new Error(
+			call === undefined ? "No question is waiting" : "This question is no longer open",
+		);
 	}
 	await harness.commit(async (tx) => {
 		const doc = await tx.doc(QuestionsDoc, chat);
-		const pending = doc.questions[call];
+		const pending = doc.questions[slot.callId];
 		if (!pending) throw new Error("This question is no longer open");
 		if (pending.answer) throw new Error(`Already answered by ${pending.answer.author}`);
-		if (answers.length !== pending.items.length) throw new Error("Answer every question");
+		if (answers === null) {
+			pending.answer = { author, at: Date.now(), answers: [], skipped: true };
+			return;
+		}
+		const given = typeof answers === "string"
+			? pending.items.map((): Answer => ({ custom: answers }))
+			: answers;
+		if (given.length !== pending.items.length) throw new Error("Answer every question");
 		const recorded = pending.items.map((item, index): Answered => {
-			const given = answers[index]!;
-			if ("custom" in given) {
-				const custom = given.custom.trim();
+			const value = given[index]!;
+			if ("custom" in value) {
+				const custom = value.custom.trim();
 				if (!custom) throw new Error(`${item.header} needs an answer`);
 				if (custom.length > MAX_CUSTOM) {
 					throw new Error(`${item.header} is longer than ${MAX_CUSTOM} characters`);
 				}
 				return { question: item.question, custom };
 			}
-			const choices = [...new Set(given.choices)].map((choice) => item.options[choice]?.label);
+			const choices = [...new Set(value.choices)].map((choice) => item.options[choice]?.label);
 			if (!choices.length || choices.some((label) => label === undefined)) {
 				throw new Error(`${item.header} needs an answer`);
 			}
