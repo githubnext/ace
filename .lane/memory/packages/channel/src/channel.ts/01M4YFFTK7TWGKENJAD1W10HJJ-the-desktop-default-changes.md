@@ -4,9 +4,9 @@ anchor: class Channel
 created: 2026-10-15T00:30:42Z
 norm: '1'
 sig: c905677fa4be33c1
-body_hash: e05cfd4b5bb4c4b3
-raw_hash: aeb6b16210ed310a
-vouched: 2026-10-22T14:35:52Z
+body_hash: 64e6dacda54276dc
+raw_hash: 6d689f07f518e3a9
+vouched: 2026-10-22T15:03:17Z
 lines: 114-792
 ---
 
