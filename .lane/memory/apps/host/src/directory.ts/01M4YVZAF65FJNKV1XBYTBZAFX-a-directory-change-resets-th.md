@@ -4,9 +4,9 @@ anchor: function configure
 created: 2026-10-15T04:08:53Z
 norm: '1'
 sig: f3e1bf286b59976d
-body_hash: b0b93d13e4ac000b
-raw_hash: 46e2e589b2f3a6ff
-vouched: 2026-10-19T20:58:11Z
+body_hash: 6b5edb5d1c039626
+raw_hash: 5154b99e7146ea7b
+vouched: 2026-10-22T14:33:26Z
 lines: 46-54
 ---
 

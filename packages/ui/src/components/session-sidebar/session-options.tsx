@@ -8,14 +8,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { IconDots } from "../../icons";
 
-/** Additional ways to start a repository session, and sharing the project. */
-export function SessionOptions({ className, onContinuePr, onStartIssue, onShareProject }: {
-	className?: string;
-	onContinuePr?: () => void;
-	onStartIssue?: () => void;
-	onShareProject?: () => void;
-}) {
-	if (!onContinuePr && !onStartIssue && !onShareProject) return null;
+/** Additional ways to start a repository session, and sharing or removing the project. */
+export function SessionOptions(
+	{ className, onContinuePr, onStartIssue, onShareProject, onRemoveProject }: {
+		className?: string;
+		onContinuePr?: () => void;
+		onStartIssue?: () => void;
+		onShareProject?: () => void;
+		onRemoveProject?: () => void;
+	},
+) {
+	if (!onContinuePr && !onStartIssue && !onShareProject && !onRemoveProject) return null;
 	return (
 		<DropdownMenu>
 			<Tooltip>
@@ -46,6 +49,9 @@ export function SessionOptions({ className, onContinuePr, onStartIssue, onShareP
 				)}
 				{onShareProject && (
 					<DropdownMenuItem onClick={onShareProject}>Share project…</DropdownMenuItem>
+				)}
+				{onRemoveProject && (
+					<DropdownMenuItem onClick={onRemoveProject}>Remove project…</DropdownMenuItem>
 				)}
 			</DropdownMenuContent>
 		</DropdownMenu>

@@ -71,7 +71,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 		name: string,
 		reachable: boolean,
 		repo?: string,
-		git?: false,
+		opened?: Project,
 	) {
 		const id = projectId(at, path, repo);
 		const checkout = checkoutId(at, path);
@@ -88,7 +88,8 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 				checkouts: new Set([checkout]),
 			};
 			if (repo) created.repo = repo;
-			if (git === false) created.git = git;
+			if (opened?.git === false) created.git = false;
+			if (opened?.ignored) created.ignored = true;
 			return void values.set(id, created);
 		}
 		value.hosts.add(at);
@@ -100,7 +101,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 	}
 	if (host) {
 		for (const project of opened) {
-			add(host, project.path, project.name, true, project.repo, project.git);
+			add(host, project.path, project.name, true, project.repo, project);
 		}
 	}
 	for (const channel of channels) {

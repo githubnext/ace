@@ -268,6 +268,7 @@ export function Dashboard(
 		onSetup,
 		onInit,
 		onProject,
+		onRemove,
 		onOpen,
 		onClone,
 		onChannel,
@@ -288,6 +289,7 @@ export function Dashboard(
 		onSetup?: () => void;
 		onInit: () => Promise<void>;
 		onProject: (id: string) => void;
+		onRemove: (repo: SessionSidebarRepo) => void;
 		onOpen: () => void;
 		onClone: () => void;
 		onChannel: (channel: Listing) => void;
@@ -381,6 +383,7 @@ export function Dashboard(
 					repos={repos}
 					selectedRepoId={project.id}
 					onRepoChange={(repo) => onProject(repo.id)}
+					onRepoRemove={onRemove}
 					onAddRepo={connected ? onOpen : undefined}
 					onCloneRepo={connected ? onClone : undefined}
 					trigger={
@@ -414,7 +417,12 @@ export function Dashboard(
 			</section>
 			{needsGit && (
 				<div className="mx-auto mt-9 max-w-[39rem]">
-					<InitGit name={project.label} disabled={!connected} onInit={onInit} />
+					<InitGit
+						name={project.label}
+						ignored={project.ignored}
+						disabled={!connected}
+						onInit={onInit}
+					/>
 				</div>
 			)}
 			{creatable && (

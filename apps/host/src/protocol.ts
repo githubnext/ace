@@ -244,6 +244,8 @@ export type Project = {
 	repo?: string;
 	/** False until the folder is a Git repository with a commit, which lanes start from. */
 	git?: false;
+	/** The folder without a commit already has a `.gitignore`, so Ace leaves initializing it to its owner. */
+	ignored?: true;
 };
 
 export type ProviderId = "anthropic" | "openai";

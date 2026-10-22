@@ -53,6 +53,7 @@ import { Palette } from "./palette";
 import { placement } from "./placement";
 import { present } from "./presence";
 import { type AppProject, label, projects, title } from "./projects";
+import { RemoveProject } from "./remove-project";
 import { type Section, Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { ShareProject, useCanShare } from "./share-project";
@@ -305,6 +306,8 @@ export function App() {
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
 	const [sharing, setSharing] = useState(false);
+	const [removing, setRemoving] = useState<AppProject>();
+	const [askRemove, setAskRemove] = useLocalStorage("ace:remove-project-ask", true);
 	const [moving, setMoving] = useState<{ item: SidebarRow; target: MoveTarget }>();
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
@@ -318,13 +321,16 @@ export function App() {
 	const [dismissed, setDismissed] = useLocalStorage("ace:directory-card", false);
 	const directory = useDirectory();
 	const card = !!directory && !directory.url && !dismissed;
-	const [collapsed, setCollapsed] = useState<Record<SessionSidebarGroupId, boolean>>({
-		pinned: false,
-		mine: false,
-		team: false,
-		inactive: true,
-		archived: true,
-	});
+	const [collapsed, setCollapsed] = useLocalStorage<Record<SessionSidebarGroupId, boolean>>(
+		"ace:collapsed-groups",
+		{
+			pinned: false,
+			mine: false,
+			team: false,
+			inactive: true,
+			archived: true,
+		},
+	);
 	const [now, setNow] = useState(Date.now);
 	const picking = useRef(false);
 	const creating = useRef(false);
@@ -438,6 +444,7 @@ export function App() {
 			name: label(value, hello.host),
 			org: value.repo?.split("/")[0] || "",
 			title: title(value, hello.host),
+			removable: removable(value),
 		})),
 	];
 	const { attention, pulse } = useAttention(
@@ -448,6 +455,11 @@ export function App() {
 	const online = (channel: Listing) =>
 		present(presence[channelProject(channel)], people[hello.user], channel.id);
 	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins, online);
+	if (!allProjects && current && removable(current)) {
+		groups = groups.map((group) =>
+			group.id === "mine" ? { ...group, onRemove: () => remove(current) } : group
+		);
+	}
 
 	if (allProjects) {
 		const byProject = new Map<string, Listing[]>();
@@ -494,9 +506,7 @@ export function App() {
 					onNewSession: connected && (value.host === hello.host || value.repo)
 						? () => void create(undefined, undefined, value)
 						: undefined,
-					onRemove: connected && opened.some((checkout) => isLocal(checkout, value))
-						? () => void remove(value)
-						: undefined,
+					onRemove: removable(value) ? () => remove(value) : undefined,
 				},
 				...[...team].map(([owner, rows]) => ({ owner, name: person(people, owner), rows }))
 					.sort((a, b) => a.name.localeCompare(b.name))
@@ -539,7 +549,17 @@ export function App() {
 		return projectId(hello.host, checkout.path, checkout.repo) === value.id;
 	}
 
-	async function remove(value: AppProject) {
+	// Declared, not a const: the picker and All Projects groups above call it during render.
+	function removable(value: AppProject) {
+		return connected && opened.some((checkout) => isLocal(checkout, value));
+	}
+
+	function remove(value: AppProject) {
+		if (askRemove) setRemoving(value);
+		else void forget(value);
+	}
+
+	async function forget(value: AppProject) {
 		try {
 			for (const checkout of opened.filter((checkout) => isLocal(checkout, value))) {
 				await host.request({ op: "project-remove", path: checkout.path });
@@ -547,6 +567,11 @@ export function App() {
 		} catch (error) {
 			toast.error("Could not remove project", { description: (error as Error).message });
 		}
+	}
+
+	function removeRepo(repo: SessionSidebarRepo) {
+		const value = available.find((project) => project.id === repo.id);
+		if (value) remove(value);
 	}
 
 	async function choose() {
@@ -566,6 +591,9 @@ export function App() {
 	async function init(path: string) {
 		try {
 			await host.request<Project>({ op: "project-init", path });
+			toast.success("Initialized Git", {
+				description: "Committed the folder's files as Initial commit. Channels can start here now.",
+			});
 		} catch (error) {
 			toast.error("Could not initialize Git", { description: (error as Error).message });
 		}
@@ -816,6 +844,7 @@ export function App() {
 										selectedUid={channel?.id}
 										loading={status === "connecting" && !channels.length}
 										onRepoChange={(repo) => chooseProject(repo.id)}
+										onRepoRemove={removeRepo}
 										onAddRepo={connected ? () => void choose() : undefined}
 										onCloneRepo={connected ? cloneUrl : undefined}
 										onSelect={(item) => {
@@ -853,7 +882,7 @@ export function App() {
 										onArchiveInactive={!allProjects && local && connected
 											? () => void archiveInactive(current.path)
 											: undefined}
-										onShareProject={!allProjects && canShare && connected
+										onShareProject={!allProjects && canShare && connected && directory?.url
 											? () => setSharing(true)
 											: undefined}
 										onCompute={connected
@@ -882,6 +911,7 @@ export function App() {
 										repos={repos}
 										connected={connected}
 										onProject={chooseProject}
+										onRemove={removeRepo}
 										onOpen={() => void choose()}
 										onClone={cloneUrl}
 									/>
@@ -931,6 +961,7 @@ export function App() {
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}
 									onInit={() => init(current.path)}
 									onProject={chooseProject}
+									onRemove={removeRepo}
 									onOpen={() => void choose()}
 									onClone={cloneUrl}
 									onChannel={select}
@@ -987,6 +1018,7 @@ export function App() {
 										<div className="w-full max-w-[34rem]">
 											<InitGit
 												name={current.label}
+												ignored={current.ignored}
 												disabled={!connected}
 												onInit={() => init(current.path)}
 											/>
@@ -1059,6 +1091,18 @@ export function App() {
 						user={hello.user}
 						channels={visible}
 						onClose={() => setSharing(false)}
+					/>
+				)}
+				{removing && (
+					<RemoveProject
+						name={label(removing, hello.host)}
+						path={removing.path}
+						onRemove={async (ask) => {
+							setAskRemove(ask);
+							await forget(removing);
+							setRemoving(undefined);
+						}}
+						onCancel={() => setRemoving(undefined)}
 					/>
 				)}
 				{deleting && (

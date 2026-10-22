@@ -48,8 +48,10 @@ export function EmptyProjects({ onOpen, onClone, disabled }: {
 }
 
 /** Lanes are Git worktrees, so a folder needs a commit before it can start channels. */
-export function InitGit({ name, disabled, onInit }: {
+export function InitGit({ name, ignored, disabled, onInit }: {
 	name: string;
+	/** Ace won't commit under a folder's own `.gitignore`, so the person commits it themselves. */
+	ignored?: boolean;
 	disabled: boolean;
 	onInit: () => Promise<void>;
 }) {
@@ -68,17 +70,31 @@ export function InitGit({ name, disabled, onInit }: {
 		<div className="flex w-full flex-col items-center gap-3 rounded-lg border border-border/70 bg-muted/30 px-5 py-6 text-center">
 			<IconBranch className="size-5 text-muted-foreground" aria-hidden />
 			<h2 className="text-sm font-medium">Initialize a Git repository to get started</h2>
-			<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
-				Channels work in lanes, which are Git worktrees. Ace will run <code>git init</code> in{" "}
-				{name}, add a <code>.gitignore</code> that leaves out secrets such as{" "}
-				<code>.env</code>, dependencies, and build output, and commit the rest.
-			</p>
-			<Button
-				disabled={disabled || busy}
-				onClick={() => void init()}
-			>
-				{busy ? "Initializing…" : "Initialize Git"}
-			</Button>
+			{ignored
+				? (
+					<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
+						Channels work in lanes, which are Git worktrees. {name} already has a{" "}
+						<code>.gitignore</code>, so Ace won't commit under its rules. Run <code>git init</code>
+						{" "}
+						and commit its files yourself, then channels can start here.
+					</p>
+				)
+				: (
+					<>
+						<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
+							Channels work in lanes, which are Git worktrees. Ace will run <code>git init</code> in
+							{" "}
+							{name}, add a <code>.gitignore</code> that leaves out secrets such as{" "}
+							<code>.env</code>, dependencies, and build output, and commit the rest.
+						</p>
+						<Button
+							disabled={disabled || busy}
+							onClick={() => void init()}
+						>
+							{busy ? "Initializing…" : "Initialize Git"}
+						</Button>
+					</>
+				)}
 		</div>
 	);
 }
