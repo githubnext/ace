@@ -34,6 +34,7 @@ const BLOCKED_MODES = [{
 	name: "Chat",
 	placeholder: "Message the channel (agent access is off)",
 }];
+const UNKNOWN_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }];
 const ACE_MENTION = { name: "ace", avatar: aceAvatar };
 export const EFFORTS: Record<Effort, string> = {
 	off: "Off",
@@ -122,8 +123,10 @@ export function Composer(
 	const [stored, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
 	// The channel refuses a blocked teammate's ask, stop, and kill too.
 	const blocked = shared === false && channel.owner !== user;
-	const mode = blocked ? "chat" : stored;
-	const mentions = useMemo(() => blocked ? members : [ACE_MENTION, ...members], [blocked, members]);
+	// Agent mode only once a teammate's access is known to be on, as it isn't while their Mac is offline.
+	const agents = channel.owner === user || shared === true;
+	const mode = agents ? stored : "chat";
+	const mentions = useMemo(() => agents ? [ACE_MENTION, ...members] : members, [agents, members]);
 	const [models, setModels] = useState<ModelOption[]>();
 	const [modelError, setModelError] = useState<string>();
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
@@ -349,7 +352,7 @@ export function Composer(
 				scope={scope}
 				tools={!phone}
 				mic
-				modes={blocked ? BLOCKED_MODES : MODES}
+				modes={agents ? MODES : blocked ? BLOCKED_MODES : UNKNOWN_MODES}
 				mode={mode}
 				onModeChange={changeMode}
 				mentions={mentions}
