@@ -13,7 +13,7 @@ it. pi-durable owns the database format, messages, runs, tool results, chats, an
 | A checkout's development build               | `~/.local/state/ace-dev-<hash>/channels/<id>/`        |
 | Opened projects                              | `<ACE_HOME>/projects.json`                            |
 | Preferences on macOS                         | `~/Library/Application Support/Ace/settings.json`     |
-| Team directory URL                           | `<ACE_HOME>/directory.json`                           |
+| Team directory URL and services              | `<ACE_HOME>/directory.json`                           |
 | Provider credentials and `ACE_SECRET`        | OS Keychain; never in channel metadata or preferences |
 
 `ACE_HOME` overrides the host data directory. Canary and development preferences have the same
