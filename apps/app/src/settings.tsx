@@ -233,7 +233,7 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 	const [action, setAction] = useState<{ busy?: boolean; error?: string }>({});
 	const chosen = settings?.modelOverride || settings?.model;
 	const value = chosen ? `${chosen.provider}/${chosen.modelId}` : "";
-	const available = settings?.models.map((model) => `${model.provider}/${model.modelId}`) || [];
+	const available = new Set(settings?.models.map((model) => `${model.provider}/${model.modelId}`));
 
 	async function save(value: string) {
 		const split = value.indexOf("/");
@@ -269,10 +269,32 @@ function DefaultModel({ settings, disabled }: { settings?: HostSettings; disable
 				onChange={(event) => void save(event.target.value)}
 			>
 				<option value="">{settings ? "Automatic" : "Loading…"}</option>
-				{value && !available.includes(value) && (
+				{value && !available.has(value) && (
 					<option value={value} disabled>{value} (unavailable)</option>
 				)}
-				{available.map((model) => <option key={model} value={model}>{model}</option>)}
+				{settings?.providers.map((provider) => {
+					const models = settings.models.filter((model) => model.provider === provider.id);
+					if (models.length) {
+						return (
+							<optgroup key={provider.id} label={provider.name}>
+								{models.map(({ modelId }) => (
+									<option key={modelId} value={`${provider.id}/${modelId}`}>{modelId}</option>
+								))}
+							</optgroup>
+						);
+					}
+					const missing = provider.source === "missing";
+					return (
+						<optgroup
+							key={provider.id}
+							label={`${provider.name} (${missing ? "no key" : "unavailable"})`}
+						>
+							<option disabled>
+								{missing ? "Add a key" : "Check its key"} in Providers to use {provider.name} models
+							</option>
+						</optgroup>
+					);
+				})}
 			</Select>
 		</Row>
 	);

@@ -301,6 +301,8 @@ export type Settings = {
 	model: ModelRef | null;
 	modelOverride?: ModelRef;
 	models: ModelRef[];
+	/** What a new chat on Automatic runs: `modelOverride`, a usable `model`, or Ace's pick. */
+	automatic?: ModelRef;
 	/** Some keychain reads behind `models` are still under way; `models` uses their last finished reads. */
 	waiting?: string;
 	error?: string;

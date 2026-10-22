@@ -15,7 +15,7 @@ import {
 	settled,
 	store,
 } from "./keys";
-import { models, parseModel } from "./manage";
+import { defaultModel, models, parseModel } from "./manage";
 import { canonical } from "./move";
 import {
 	compute,
@@ -48,7 +48,7 @@ function provider(id: ProviderId) {
 /** Settings never waits on a keychain prompt; `fresh` reads again names whose last read prompted. */
 export async function settings(fresh?: boolean): Promise<Settings> {
 	const catalog = settled(fresh);
-	const [statuses, usable] = await Promise.all([
+	const [statuses, usable, automatic] = await Promise.all([
 		Promise.all(
 			[...providers].map(async ([id, { name, key }]) =>
 				Object.assign(
@@ -59,12 +59,14 @@ export async function settings(fresh?: boolean): Promise<Settings> {
 			),
 		),
 		available(catalog.models).catch((error: Error) => error),
+		defaultModel(catalog.models).catch(() => undefined),
 	]);
 	return {
 		providers: statuses,
 		model: preference(),
 		modelOverride: config.model ? parseModel(config.model) : undefined,
 		models: usable instanceof Error ? [] : usable,
+		...(automatic ? { automatic } : {}),
 		waiting: catalog.waiting() ? KEYCHAIN_WAITING : undefined,
 		error: usable instanceof Error ? usable.message : undefined,
 	};
