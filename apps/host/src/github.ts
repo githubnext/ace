@@ -10,7 +10,7 @@ import type {
 } from "@ace/channel/protocol";
 
 import { githubEnv } from "./keys";
-import { githubRepo, type HostRequest } from "./protocol";
+import { githubRepo, type HostRequest, NOT_GITHUB } from "./protocol";
 
 const REPO = /^[a-z\d][a-z\d-]*\/[a-z\d_.-]+$/i;
 const FIELDS = "number,title,url,state,author,createdAt,updatedAt,labels";
@@ -123,11 +123,7 @@ export async function found(repo: string): Promise<boolean> {
 /** A GitHub repository URL, SSH remote, or owner/name, as a valid owner/name. */
 export function parse(value: string): string {
 	const repo = githubRepo(value);
-	if (!repo) {
-		throw new Error(
-			"Ace clones GitHub repositories. Enter one such as https://github.com/owner/name or owner/name.",
-		);
-	}
+	if (!repo) throw new Error(NOT_GITHUB);
 	return repository(repo);
 }
 

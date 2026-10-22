@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import {
 	Button,
@@ -13,6 +13,7 @@ import {
 import { IconArrowDownToLine, IconBranch, IconFolderSearch } from "@ace/ui/icons";
 
 import { desktop } from "./desktop";
+import { host } from "./host";
 
 export function EmptyProjects({ onOpen, onClone, disabled }: {
 	onOpen: () => void;
@@ -48,7 +49,8 @@ export function EmptyProjects({ onOpen, onClone, disabled }: {
 }
 
 /** Lanes are Git worktrees, so a folder needs a commit before it can start channels. */
-export function InitGit({ name, ignored, disabled, onInit }: {
+export function InitGit({ path, name, ignored, disabled, onInit }: {
+	path: string;
 	name: string;
 	/** Ace won't commit under a folder's own `.gitignore`, so the person commits it themselves. */
 	ignored?: boolean;
@@ -56,6 +58,15 @@ export function InitGit({ name, ignored, disabled, onInit }: {
 	onInit: () => Promise<void>;
 }) {
 	const [busy, setBusy] = useState(false);
+	// A commit made outside Ace, say in a terminal, shows once the host reads the folder again, as
+	// opening it does; listings alone don't.
+	useEffect(() => {
+		if (disabled) return;
+		const check = () => void host.request({ op: "project-open", path }).catch(() => {});
+		check();
+		addEventListener("focus", check);
+		return () => removeEventListener("focus", check);
+	}, [path, disabled]);
 
 	async function init() {
 		setBusy(true);
@@ -148,9 +159,14 @@ export function OpenProject({ onOpen, onClose }: {
 						placeholder="~/code/project"
 						value={path}
 						disabled={busy}
-						onChange={(event) => setPath(event.target.value)}
+						onChange={(event) => {
+							setPath(event.target.value);
+							setError("");
+						}}
 					/>
-					{error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+					{error && (
+						<p role="alert" className="mt-2 text-xs text-destructive wrap-anywhere">{error}</p>
+					)}
 				</form>
 				<DialogFooter>
 					<Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>

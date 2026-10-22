@@ -10,7 +10,7 @@ import {
 	DialogTitle,
 	Input,
 } from "@ace/ui";
-import { githubRepo } from "@ace/host/protocol";
+import { githubRepo, NOT_GITHUB, type Project } from "@ace/host/protocol";
 
 import { desktop, here } from "./desktop";
 import { useFolder } from "./folder";
@@ -21,8 +21,10 @@ import type { AppProject } from "./projects";
  * project, or opens the matching checkout already at the chosen folder. Nothing is cloned until
  * the person confirms the destination.
  */
-export function SetupProject({ project, starting, onSetup, onClose }: {
+export function SetupProject({ project, opened, starting, onSetup, onClose }: {
 	project?: AppProject & { repo: string };
+	/** This host's projects, to say when a cloned repository already is one. */
+	opened: Project[];
 	starting: boolean;
 	onSetup: (repo: string, path: string) => Promise<void>;
 	onClose: () => void;
@@ -37,7 +39,10 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const repo = project?.repo || url.trim();
-	const name = githubRepo(repo)?.split("/")[1];
+	const full = githubRepo(repo);
+	const name = full?.split("/")[1];
+	const existing = !project && full
+		&& opened.find((value) => value.repo?.toLowerCase() === full.toLowerCase());
 	// The host expands `~`, so the app never assumes where this machine's home folder is.
 	const base = (parent ?? folder)?.replace(/\/$/, "");
 	const path = edited ?? (base && name ? `${base}/${name}` : "");
@@ -62,6 +67,7 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 			if (!chosen) return;
 			setParent(chosen);
 			setEdited(undefined);
+			setError("");
 		} catch (error) {
 			setError((error as Error).message);
 		}
@@ -94,7 +100,7 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 						event.preventDefault();
 						void setup();
 					}}
-					className="flex flex-col gap-3"
+					className="flex min-w-0 flex-col gap-3"
 				>
 					{!project && (
 						<div>
@@ -108,8 +114,20 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 								disabled={busy}
 								spellCheck={false}
 								placeholder="https://github.com/owner/name"
-								onChange={(event) => setUrl(event.target.value)}
+								onChange={(event) => {
+									setUrl(event.target.value);
+									setError("");
+								}}
 							/>
+							{url.trim() && !full && (
+								<p className="mt-1.5 text-xs text-muted-foreground">{NOT_GITHUB}</p>
+							)}
+							{existing && (
+								<p className="mt-1.5 text-xs text-muted-foreground wrap-anywhere">
+									{full} is already a project at{" "}
+									{existing.path}. Another copy won't add a second project.
+								</p>
+							)}
 						</div>
 					)}
 					<div>
@@ -123,7 +141,10 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 								disabled={busy}
 								spellCheck={false}
 								placeholder={base && `${base}/name`}
-								onChange={(event) => setEdited(event.target.value)}
+								onChange={(event) => {
+									setEdited(event.target.value);
+									setError("");
+								}}
 							/>
 							{desktop && (
 								<Button
@@ -138,12 +159,12 @@ export function SetupProject({ project, starting, onSetup, onClose }: {
 						</div>
 					</div>
 					{error && (
-						<p role="alert" className="whitespace-pre-wrap text-xs text-destructive">
+						<p role="alert" className="whitespace-pre-wrap text-xs text-destructive wrap-anywhere">
 							{error}
 						</p>
 					)}
 				</form>
-				<DialogFooter>
+				<DialogFooter className="min-w-0">
 					<Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
 					<Button
 						type="submit"
