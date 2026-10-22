@@ -618,8 +618,17 @@ export function App() {
 		return connected && !!opened?.some((checkout) => isLocal(checkout, value));
 	}
 
+	/** This host's channels in the project, archived ones too, which the host refuses to orphan. */
+	function held(value: AppProject) {
+		const paths = new Set(
+			opened?.flatMap((checkout) => isLocal(checkout, value) ? [checkout.path] : []),
+		);
+		return channels.filter((channel) => channel.host === hello.host && paths.has(channel.project))
+			.length;
+	}
+
 	function remove(value: AppProject) {
-		if (askRemove) setRemoving(value);
+		if (askRemove || held(value)) setRemoving(value);
 		else void forget(value);
 	}
 
@@ -1165,6 +1174,7 @@ export function App() {
 					<RemoveProject
 						name={label(removing, hello.host)}
 						path={removing.path}
+						channels={held(removing)}
 						onRemove={async (ask) => {
 							setAskRemove(ask);
 							await forget(removing);
