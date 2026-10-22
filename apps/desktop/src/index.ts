@@ -226,6 +226,17 @@ ApplicationMenu.setApplicationMenu([
 			},
 		],
 	},
+	// The collapsed navigation rail hides the minimize and zoom buttons, so the menu keeps both.
+	{
+		label: "Window",
+		submenu: [
+			{ role: "minimize", accelerator: "CmdOrCtrl+m" },
+			{ role: "zoom" },
+			{ role: "toggleFullScreen" },
+			{ type: "divider" },
+			{ role: "bringAllToFront" },
+		],
+	},
 ]);
 
 Electrobun.events.on("reopen", () => show());
@@ -294,9 +305,11 @@ Electrobun.events.on("application-menu-clicked", ({ data }) => {
 		if (!ready || !updates.busy()) return Utils.quit();
 		return show("updates");
 	}
+	// Ace Helper's settings live in Ace; Login Items only matters when macOS asks for approval.
+	if (data.action === "helper-settings") return show("helper");
 	if (!data.action.startsWith("helper-")) return;
 	const action = data.action.slice("helper-".length);
-	if (action !== "start" && action !== "restart" && action !== "settings" && action !== "log") {
+	if (action !== "start" && action !== "restart" && action !== "log") {
 		return;
 	}
 	if (updates.busy() && (action === "start" || action === "restart")) return show("updates");

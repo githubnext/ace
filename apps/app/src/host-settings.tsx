@@ -72,6 +72,12 @@ function describe(helper?: HelperState) {
 	return "Stopped";
 }
 
+const busy: Partial<Record<HelperAction, string>> = {
+	start: "Starting Ace Helper…",
+	restart: "Restarting Ace Helper…",
+	stop: "Stopping Ace Helper…",
+};
+
 export function HostStatus({ active }: { active: boolean }) {
 	const checks = useDiagnostics(active);
 	const [tick, setTick] = useState(0);
@@ -137,7 +143,7 @@ export function HostStatus({ active }: { active: boolean }) {
 										Channels on this Mac go offline until you start Ace Helper again.
 									</Confirm>
 								)}
-								{action.busy && <Status>Updating Ace Helper…</Status>}
+								{action.busy && busy[action.busy] && <Status>{busy[action.busy]}</Status>}
 								{(action.error || helper.error) && (
 									<Problem>{action.error || helper.error}</Problem>
 								)}

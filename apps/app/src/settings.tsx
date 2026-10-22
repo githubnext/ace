@@ -351,6 +351,7 @@ export function Settings(
 	const [retry, setRetry] = useState(0);
 	/** Only Refresh reads again a key whose last read waited on a Keychain prompt. */
 	const refreshing = useRef(false);
+	const [again, setAgain] = useState<"busy" | "done">();
 	const [result, setResult] = useState<{ settings?: HostSettings; error?: string }>({});
 	const { theme, set: setTheme } = useTheme();
 	const { folder, error: folderError } = useFolder();
@@ -365,8 +366,13 @@ export function Settings(
 	useEffect(() => {
 		if (!desktop) return;
 		const updates = () => show("updates");
+		const helper = () => show("host");
 		window.addEventListener("ace:updates", updates);
-		return () => window.removeEventListener("ace:updates", updates);
+		window.addEventListener("ace:helper", helper);
+		return () => {
+			window.removeEventListener("ace:updates", updates);
+			window.removeEventListener("ace:helper", helper);
+		};
 	}, []);
 
 	// Reading provider settings touches Keychain, so pages that don't show it never request it.
@@ -378,11 +384,15 @@ export function Settings(
 		refreshing.current = false;
 		host.request<HostSettings>({ op: "settings", ...(fresh ? { fresh } : {}) }).then(
 			(settings) => {
-				if (active) setResult({ settings });
+				if (!active) return;
+				setResult({ settings });
+				if (fresh) setAgain("done");
 			},
 			(error: Error) => {
+				if (!active) return;
 				// Keep the last snapshot so mounted provider rows keep their drafts and busy state.
-				if (active) setResult((last) => ({ settings: last.settings, error: error.message }));
+				setResult((last) => ({ settings: last.settings, error: error.message }));
+				if (fresh) setAgain(undefined);
 			},
 		);
 		return () => {
@@ -405,13 +415,14 @@ export function Settings(
 		<Button
 			variant="ghost"
 			size="sm"
-			disabled={offline}
+			disabled={offline || again === "busy"}
 			onClick={() => {
 				refreshing.current = true;
+				setAgain("busy");
 				setRetry((value) => value + 1);
 			}}
 		>
-			{label}
+			{again === "busy" ? "Refreshing…" : label}
 		</Button>
 	);
 	const problems = (
@@ -523,6 +534,7 @@ export function Settings(
 											<Provider key={provider.id} provider={provider} disabled={offline} />
 										))}
 									</Group>
+									{again === "done" && <Status>Read the keys again.</Status>}
 									{problems}
 								</Page>
 							</div>
