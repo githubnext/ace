@@ -564,18 +564,25 @@ export function App() {
 				if (rows) rows.push(next);
 				else team.set(channel.owner, [next]);
 			}
+			// A project known only through teammates' channels, such as after removing your copy, shows
+			// just their groups; an empty one of yours would read as a project you still have.
+			const yours = mine.length > 0 || !!opened?.some((checkout) => isLocal(checkout, value));
 			return [
-				{
-					id,
-					label: name,
-					rows: mine,
-					sort: "none",
-					collapsed: collapsed[id],
-					onNewSession: connected && (value.host === hello.host || value.repo)
-						? () => void create(undefined, undefined, value)
-						: undefined,
-					onRemove: removable(value) ? () => remove(value) : undefined,
-				},
+				...(yours
+					? [
+						{
+							id,
+							label: name,
+							rows: mine,
+							sort: "none",
+							collapsed: collapsed[id],
+							onNewSession: connected && (value.host === hello.host || value.repo)
+								? () => void create(undefined, undefined, value)
+								: undefined,
+							onRemove: removable(value) ? () => remove(value) : undefined,
+						} satisfies SessionSidebarGroup,
+					]
+					: []),
 				...[...team].map(([owner, rows]) => ({ owner, name: person(people, owner), rows }))
 					.sort((a, b) => a.name.localeCompare(b.name))
 					.map(({ owner, name: teammate, rows }): SessionSidebarGroup => {
