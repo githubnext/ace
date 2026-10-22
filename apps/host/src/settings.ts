@@ -114,16 +114,17 @@ export async function removeKey(id: ProviderId): Promise<void> {
 	}
 }
 
-export async function setModel(model: ModelRef | null): Promise<void> {
-	if (model !== null) {
-		if (!isModel(model)) throw new Error("Choose a provider and model");
-		const found = await models();
-		if (
-			!found.some((item) => item.provider === model.provider && item.modelId === model.modelId)
-		) {
-			throw new Error("This model is unavailable. Add its provider key first.");
-		}
+/** A model this host has credentials for, as the default and `ace new --model` both need. */
+export async function checkModel(model: ModelRef): Promise<void> {
+	if (!isModel(model)) throw new Error("Choose a provider and model");
+	const found = await models();
+	if (!found.some((item) => item.provider === model.provider && item.modelId === model.modelId)) {
+		throw new Error("This model is unavailable. Add its provider key first.");
 	}
+}
+
+export async function setModel(model: ModelRef | null): Promise<void> {
+	if (model !== null) await checkModel(model);
 	savePreference(model);
 }
 

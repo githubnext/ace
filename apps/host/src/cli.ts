@@ -29,12 +29,13 @@ import {
 	type HostRequest,
 	type Listing,
 	type Person,
+	type Project,
 	type ProjectAccess,
 	projectId,
 	TEAM,
 	type WindowInfo,
 } from "./protocol";
-import { setModel } from "./settings";
+import { checkModel, setModel } from "./settings";
 import { archive, fork, isRunning, kill, models, parseModel, project, remove } from "./manage";
 import { move } from "./move";
 
@@ -203,17 +204,29 @@ async function isHostRunning(): Promise<boolean> {
 }
 
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
+const SWITCH = new Set(["on", "off"]);
+
 const participant = new Set(["info", "say", "ask", "watch", "chat", "stop"]);
 
 /** What only a channel's owner can do, phrased for refusing a teammate's channel. */
-/** A project by its folder on this host, or by GitHub owner/name. */
+/** A project by its folder on this host, by GitHub owner/name, or by the name it was opened as. */
 async function projectRef(value: string): Promise<string> {
-	if (!existsSync(value)) {
+	let path = existsSync(value) ? value : undefined;
+	if (!path) {
 		const repo = githubRepo(value);
-		if (!repo) throw new Error(`${value} is neither a folder here nor a GitHub owner/name`);
-		return projectId("", "", repo);
+		if (repo) return projectId("", "", repo);
+		const named = (await local<Project[]>({ op: "projects" })).filter((project) =>
+			project.name.toLowerCase() === value.toLowerCase()
+		);
+		if (named.length > 1) {
+			throw new Error(`More than one project is named ${value}; use its folder`);
+		}
+		if (!named[0]) {
+			throw new Error(`${value} is neither a project, a folder here, nor a GitHub owner/name`);
+		}
+		path = named[0].path;
 	}
-	const { root, repo } = await projects.checkout(realpathSync(resolve(value)));
+	const { root, repo } = await projects.checkout(realpathSync(resolve(path)));
 	const { host } = await local<Hello>({ op: "hello" });
 	return projectId(host, root, repo);
 }
@@ -365,7 +378,12 @@ async function main() {
 			}
 			if (flags.trace) filter.trace = flags.trace;
 			if (flags.level) filter.level = flags.level;
-			if (flags.since) filter.since = since(flags.since);
+			if (flags.since) {
+				filter.since = since(flags.since);
+				if (Number.isNaN(filter.since)) {
+					throw new Error("--since takes a duration such as 10m, 2h or 1d, or a date");
+				}
+			}
 			if (flags.grep) filter.grep = flags.grep;
 			if (flags.follow) return follow(filter, !!flags.json);
 			print(filter, Number(flags.lines || 200), !!flags.json);
@@ -375,6 +393,7 @@ async function main() {
 		case "new": {
 			const dir = await project(resolve(flags.project || "."));
 			const model = flags.model ? parseModel(flags.model) : undefined;
+			if (model) await checkModel(model);
 			const record = catalog.create(dir, model, flags.name);
 			return console.log(`${record.name}\t${record.id}`);
 		}
@@ -437,7 +456,11 @@ async function main() {
 			const person = who === "team" ? TEAM : findPerson(access.people, who).person;
 			const shared = ref === "share";
 			await local({ op: "project-share", project, person, shared });
-			if (!shared) return;
+			if (!shared) {
+				return console.log(
+					`${person === TEAM ? "The team" : who} no longer sees it through a share.`,
+				);
+			}
 			const channels = await local<Listing[]>({ op: "channels" });
 			const others = new Set(
 				channels.filter((value) => channelProject(value) === project).map((value) => value.owner),
@@ -509,6 +532,9 @@ async function main() {
 		}
 	}
 
+	if (!participant.has(command) && !owned[command]) {
+		throw new Error(`Unknown command ${command}\n\n${HELP}`);
+	}
 	if (!ref) throw new Error(`ace ${command} needs a channel`);
 	const text = rest.join(" ");
 	if (participant.has(command)) {
@@ -561,9 +587,7 @@ async function main() {
 			session.close();
 		}
 	}
-	const action = owned[command];
-	if (!action) throw new Error(`Unknown command ${command}\n\n${HELP}`);
-	const record = await own(ref, action);
+	const record = await own(ref, owned[command]!);
 	switch (command) {
 		case "backup":
 			if (rest.length !== 1) throw new Error("ace backup <channel> <new-directory>");
@@ -593,6 +617,9 @@ async function main() {
 			);
 		}
 		case "agents": {
+			if (rest.length !== 1 || !SWITCH.has(rest[0]!)) {
+				throw new Error("ace agents <channel> on|off");
+			}
 			const shared = rest[0] === "on";
 			await request(record.id, { op: "share", author: catalog.user, shared });
 			if (!shared) return;
@@ -601,6 +628,9 @@ async function main() {
 			);
 		}
 		case "desktop": {
+			if (rest.length !== 1 || !SWITCH.has(rest[0]!)) {
+				throw new Error("ace desktop <channel> on|off");
+			}
 			const enabled = rest[0] === "on";
 			await request(record.id, { op: "desktop", author: catalog.user, enabled });
 			if (!enabled) return;
