@@ -15,6 +15,7 @@ import { cn } from "../../lib/utils";
 
 const EMPTY: scroll.Frame = { items: [], total: 0 };
 const INTENT = 500;
+const QUIET = 200;
 
 /** Imperative handle exposed via ref. */
 type ScrollViewHandle = {
@@ -244,14 +245,20 @@ function ScrollView(
 				project.current(true);
 			});
 		};
+		// Browsers send no scrollend when they clamp scrollTop after content shrinks, so a
+		// quiet period also ends a scroll; otherwise onScrollEnd never runs.
+		let quiet: ReturnType<typeof setTimeout> | undefined;
 		let onscroll = () => {
 			if (!scrolling.current) {
 				scrolling.current = true;
 				started.current?.();
 			}
+			clearTimeout(quiet);
+			quiet = setTimeout(done, QUIET);
 			schedule();
 		};
 		let done = () => {
+			clearTimeout(quiet);
 			if (!scrolling.current) return;
 			scrolling.current = false;
 			settled.current?.();
@@ -294,6 +301,7 @@ function ScrollView(
 
 		return () => {
 			active = false;
+			clearTimeout(quiet);
 			observer.disconnect();
 			el.removeEventListener("scroll", onscroll);
 			el.removeEventListener("scrollend", done);
