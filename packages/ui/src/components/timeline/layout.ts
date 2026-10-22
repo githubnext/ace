@@ -476,7 +476,9 @@ function textBlocks(
 		return hit;
 	}
 
-	if (!parsed.get(k)?.promise && !seen.has(k) && (!streaming || !stream.has(slot))) {
+	// Queue in-flight parses too: start() reuses their promise, and this render's tick must not
+	// depend on an earlier render whose effect may already have been cancelled.
+	if (!seen.has(k)) {
 		jobs.push({ key: k, raw: chunk.raw, sig, mentions, plan, compact, streaming, slot });
 		seen.add(k);
 	}
