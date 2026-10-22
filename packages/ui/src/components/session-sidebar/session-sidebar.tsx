@@ -231,7 +231,7 @@ function RepoRow({ repo, selected, onRepoChange, onRepoRemove }: {
 			<RepoName name={repo.name} title={repo.title} />
 			<span className="relative grid size-5 shrink-0 place-items-center">
 				{selected && (
-					<IconCheck className="size-3.5 transition-opacity duration-150 ease-out group-hover/repo:opacity-0 group-focus/repo:opacity-0 group-focus-within/repo:opacity-0" />
+					<IconCheck className="size-3.5 transition-opacity duration-150 ease-out group-hover/repo:opacity-0" />
 				)}
 				{onRepoRemove && (
 					<Tooltip>
@@ -240,7 +240,7 @@ function RepoRow({ repo, selected, onRepoChange, onRepoRemove }: {
 								<button
 									type="button"
 									aria-label={`Remove ${repo.name}`}
-									className="absolute grid size-5 place-items-center rounded-md squircle text-muted-foreground opacity-0 outline-2 outline-offset-[-1px] outline-transparent transition-[background-color,color,opacity,transform] duration-150 ease-out hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground focus-visible:outline-ring/50 active:translate-y-px group-hover/repo:text-foreground/80 group-hover/repo:opacity-100 group-focus/repo:text-foreground/80 group-focus/repo:opacity-100 group-focus-within/repo:text-foreground/80 group-focus-within/repo:opacity-100"
+									className="pointer-events-none absolute grid size-5 place-items-center rounded-md squircle text-muted-foreground opacity-0 outline-2 outline-offset-[-1px] outline-transparent transition-[background-color,color,opacity,transform] duration-150 ease-out hover:bg-foreground/10 hover:text-foreground focus-visible:bg-foreground/10 focus-visible:text-foreground focus-visible:outline-ring/50 active:translate-y-px group-hover/repo:text-foreground/80 group-hover/repo:pointer-events-auto group-hover/repo:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
 									onPointerDown={(event) => event.stopPropagation()}
 									onMouseUp={(event) => event.stopPropagation()}
 									onKeyDown={event => {
