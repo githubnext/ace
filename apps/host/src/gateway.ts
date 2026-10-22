@@ -51,7 +51,7 @@ import {
 	projectId,
 	type WorkerRequest,
 } from "./protocol";
-import { type Machine, self, whois } from "./tailnet";
+import { type Machine, self, watch as tailscale, whois } from "./tailnet";
 import {
 	checkKey,
 	forgetKey,
@@ -1231,7 +1231,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 		tick = now;
 	}, 1000);
 	cleanup.push(() => clearInterval(stalls));
-	async function stop() {
+	async function stop(code = 0) {
 		if (closing) return;
 		closing = true;
 		log("info", "host.stop", { pending: pending.size });
@@ -1244,10 +1244,17 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 				log("error", "host.shutdown.failed", failure(result.reason));
 			}
 		}
-		process.exit(results.some((result) => result.status === "rejected") ? 1 : 0);
+		process.exit(results.some((result) => result.status === "rejected") ? 1 : code);
 	}
 	process.on("SIGTERM", () => void stop());
 	process.on("SIGINT", () => void stop());
+	// The owner's login, the channels' tailnet, and every tailnet listener are read once at startup.
+	cleanup.push(tailscale(catalog.tailnet, (tailnet) => {
+		log("info", "host.tailnet.moved", { from: catalog.tailnet, to: tailnet });
+		// launchd starts Ace Helper again after a failed exit, which picks up the new tailnet.
+		if (config.helper) void stop(75);
+		else console.log(`Tailscale is on ${tailnet} now. Restart ace serve to use it.`);
+	}));
 	console.log(`Ace on http://${server.hostname}:${server.port}`);
 	// Ace Helper's console is its log file, which must not hold the token.
 	if (!config.helper) {

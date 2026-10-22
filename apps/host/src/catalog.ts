@@ -199,12 +199,13 @@ export function fork(source: Listing, model: ModelRef | undefined, branches: Set
 /** A new channel's record, not yet saved: a hosted channel saves it once the service has it. */
 export function draft(project: string, model?: ModelRef, name?: string, hosted?: string): Listing {
 	if (!tailnet) {
-		// The tailnet is read once at startup, so Tailscale started later needs a restart.
-		const host = config.helper ? "Ace Helper" : "ace serve";
+		// The tailnet is read once at startup; Ace Helper restarts itself when Tailscale starts later.
 		throw new Error(
-			identity().tailnet
-				? `Restart ${host}: it started before Tailscale was running.`
-				: "Start Tailscale first: every channel belongs to a tailnet.",
+			!identity().tailnet
+				? "Start Tailscale first: every channel belongs to a tailnet."
+				: config.helper
+				? "Ace Helper is restarting to use Tailscale. Try again in a moment."
+				: "Restart ace serve: it started before Tailscale was running.",
 		);
 	}
 	const names = taken();
