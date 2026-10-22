@@ -238,6 +238,10 @@ export type Request =
 	| { op: "chat"; author: string; model?: ModelRef }
 	/** Answer a pending `question` tool call: each question's chosen option indices or written answer. */
 	| { op: "answer"; chat?: ChatId; call: string; author: string; answers: Answer[] }
+	/** Answer every item of `call`, or of the chat's newest open question, with one written answer. */
+	| { op: "answer"; chat?: ChatId; call?: string; author: string; text: string }
+	/** Decline a pending `question` tool call; the agent hears that no answer was given. */
+	| { op: "skip"; chat?: ChatId; call: string; author: string }
 	/** Add, or `remove`, the author's reaction to a human message or agent reply. */
 	| { op: "react"; chat?: ChatId; author: string; entry: EntryId; emoji: string; remove?: boolean }
 	/** Replace the author's own human message with a tombstone, for people and later model context. */

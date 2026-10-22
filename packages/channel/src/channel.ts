@@ -365,7 +365,14 @@ export class Channel {
 				this.#author(request.author);
 				await this.#mayInvoke(request.author);
 				const { id } = await this.#conversation(request.chat);
-				return answer(this.#harness, id, request.call, request.author, request.answers, context);
+				const answers = "text" in request ? request.text : request.answers;
+				return answer(this.#harness, id, request.call, request.author, answers, context);
+			}
+			case "skip": {
+				this.#author(request.author);
+				await this.#mayInvoke(request.author);
+				const { id } = await this.#conversation(request.chat);
+				return answer(this.#harness, id, request.call, request.author, null, context);
 			}
 			case "react": {
 				this.#author(request.author);

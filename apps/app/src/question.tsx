@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import {
+	Button,
 	isAnswered,
 	type QuestionDraft,
 	QuestionInput,
@@ -65,6 +66,17 @@ export function Question({ channel, chat, call, user, mayAnswer }: {
 			return { ...value, [id]: { ...current, ...change(current) } };
 		});
 
+	async function send(request: { op: "answer"; answers: Answer[] } | { op: "skip" }) {
+		setSubmitting(true);
+		setError(undefined);
+		try {
+			await host.channel(channel.id, { ...request, chat, call: call.call, author: user });
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : String(cause));
+			setSubmitting(false);
+		}
+	}
+
 	async function submit() {
 		const missing = questions.find((question) => !isAnswered(question, draft[question.id]));
 		if (missing) return handle.current?.invalid(missing.id);
@@ -79,20 +91,7 @@ export function Question({ channel, chat, call, user, mayAnswer }: {
 				),
 			};
 		});
-		setSubmitting(true);
-		setError(undefined);
-		try {
-			await host.channel(channel.id, {
-				op: "answer",
-				chat,
-				call: call.call,
-				author: user,
-				answers,
-			});
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : String(cause));
-			setSubmitting(false);
-		}
+		await send({ op: "answer", answers });
 	}
 
 	return (
@@ -108,6 +107,16 @@ export function Question({ channel, chat, call, user, mayAnswer }: {
 				submitting,
 				error,
 				...(mayAnswer ? {} : { status: "Only the channel owner can answer here" }),
+				actions: (
+					<Button
+						size="sm"
+						variant="secondary"
+						disabled={!mayAnswer || submitting}
+						onClick={() => void send({ op: "skip" })}
+					>
+						Skip
+					</Button>
+				),
 				choose: (id, option, multiple, checked) =>
 					update(id, (current) =>
 						multiple
