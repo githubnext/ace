@@ -12,7 +12,8 @@
 	"excludes": [
 		"**/node_modules",
 		"**/*.lock",
-		"**/*.patch"
+		"**/*.patch",
+		"**/*.icon"
 	],
 
 	"plugins": [
