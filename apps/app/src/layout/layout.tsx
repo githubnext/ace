@@ -9,6 +9,7 @@ import {
 	useEffect,
 	useEffectEvent,
 	useLayoutEffect,
+	useRef,
 	useState,
 	useSyncExternalStore,
 } from "react";
@@ -34,6 +35,7 @@ import {
 	TooltipTrigger,
 } from "@ace/ui";
 import {
+	IconChevronDown,
 	IconFileDiff,
 	IconMessage,
 	IconPencil,
@@ -258,6 +260,61 @@ function Add({ onAdd }: { onAdd: (choice: Choice) => void }) {
 									className="size-3.5 text-muted-foreground group-focus/dropdown-menu-item:text-popover-foreground"
 								/>
 								<span className="min-w-0 flex-1 truncate">{TITLES[choice]}</span>
+							</DropdownMenuItem>
+						);
+					})}
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function More({
+	pane,
+	items,
+	onSelect,
+}: {
+	pane: Split.Pane;
+	items: Map<string, Item>;
+	onSelect: (id: string) => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						aria-label={`All ${pane.tabs.length} tabs`}
+						className="ml-0.5 shrink-0 text-muted-foreground electrobun-webkit-app-region-no-drag"
+					/>
+				}
+			>
+				<IconChevronDown aria-hidden />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="end"
+				sideOffset={6}
+				className="scrollbar-muted max-h-80 w-56 overflow-y-auto"
+			>
+				<DropdownMenuGroup>
+					{pane.tabs.map((id) => {
+						const item = items.get(id);
+						if (!item) return null;
+						const Icon = item.icon;
+						return (
+							<DropdownMenuItem
+								key={id}
+								data-active={pane.active === id || undefined}
+								className="data-active:font-medium"
+								onClick={() => onSelect(id)}
+							>
+								<Icon
+									aria-hidden
+									className="size-3.5 text-muted-foreground group-focus/dropdown-menu-item:text-popover-foreground"
+								/>
+								<span className="min-w-0 flex-1 truncate">{item.name}</span>
 							</DropdownMenuItem>
 						);
 					})}
@@ -543,6 +600,31 @@ function Bar({
 	onNav,
 }: BarProps) {
 	const before = drop?.kind === "tab" ? drop.before : undefined;
+	const strip = useRef<HTMLDivElement>(null);
+	const [more, setMore] = useState(false);
+
+	// Keep the active tab in view, and offer every tab in a menu once the strip overflows.
+	useLayoutEffect(() => {
+		const el = strip.current;
+		if (!el) return;
+
+		function fit() {
+			if (!el) return;
+			setMore(el.scrollWidth > el.clientWidth + 1);
+			if (!pane.active) return;
+			const tab = el.querySelector(`[data-layout-tab="${CSS.escape(pane.active)}"]`);
+			if (!tab) return;
+			const box = el.getBoundingClientRect();
+			const rect = tab.getBoundingClientRect();
+			if (rect.left < box.left) el.scrollLeft -= box.left - rect.left;
+			else if (rect.right > box.right) el.scrollLeft += rect.right - box.right;
+		}
+
+		fit();
+		const observer = new ResizeObserver(fit);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [pane.active, pane.tabs]);
 
 	return (
 		<div
@@ -558,7 +640,11 @@ function Bar({
 				data-layout-tabs
 				data-axis="x"
 				data-layout-pane={pane.uid}
+				ref={strip}
 				className="scroll-fade scrollbar-none flex h-full min-w-0 flex-1 items-center contain-style"
+				onWheel={(event) => {
+					if (!event.deltaX) event.currentTarget.scrollLeft += event.deltaY;
+				}}
 			>
 				{pane.tabs.map((id) => {
 					const item = items.get(id);
@@ -587,6 +673,7 @@ function Bar({
 					/>
 				)}
 			</div>
+			{more && <More pane={pane} items={items} onSelect={onSelect} />}
 			{actions}
 			<Add onAdd={onAdd} />
 			{!flat && <Tools split={onFork} can={can} />}
@@ -671,7 +758,7 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 	const state = useSyncExternalStore(api.subscribe, api.get, api.get);
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const focused = useSyncExternalStore(onFocus, isFocused);
-	const { view, css, grips, grid, flat, desktop, box, start: resize } = useResize(
+	const { view, css, grips, grid, flat, desktop, box, start: resize, key: nudge } = useResize(
 		api,
 		state,
 		minimum,
@@ -868,6 +955,7 @@ function useLayout({ id, name, icon = ICONS.chat, chat, changed, onTabClose, ope
 		flat,
 		desktop,
 		resize,
+		nudge,
 		dnd,
 		items,
 		ghost,
@@ -897,6 +985,7 @@ export function Layout(props: Props) {
 		flat,
 		desktop,
 		resize,
+		nudge,
 		dnd,
 		items,
 		ghost,
@@ -969,7 +1058,13 @@ export function Layout(props: Props) {
 					))}
 					{desktop
 						&& grips.map((handle) => (
-							<Grip key={handle.uid} handle={handle} frozen={!!ghost} onStart={resize} />
+							<Grip
+								key={handle.uid}
+								handle={handle}
+								frozen={!!ghost}
+								onStart={resize}
+								onKey={nudge}
+							/>
 						))}
 				</div>
 				{drag && ghost
