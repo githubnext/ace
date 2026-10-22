@@ -26,6 +26,23 @@ if (fragment.has("token")) {
 // main.tsx loads the app only once there is a gateway to reach.
 export const host = new GatewayClient(gateway!, token);
 
+// A sign-in link opened in a tab already on this origin changes only the hash, so nothing reads it.
+window.addEventListener("hashchange", () => {
+	if (new URLSearchParams(location.hash.slice(1)).has("token")) location.reload();
+});
+
+/**
+ * Whether the host refuses this page's credentials, as after Ace Helper restarts with a new token.
+ * A browser hides a WebSocket's 401, so this asks over HTTP with what the socket sends.
+ */
+export async function refused(): Promise<boolean> {
+	const response = await fetch(gateway!.replace(/^ws/, "http"), {
+		cache: "no-store",
+		...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+	}).catch(() => undefined);
+	return response?.status === 401;
+}
+
 // Phones suspend backgrounded pages; reconnect as soon as the person comes back.
 for (const event of ["visibilitychange", "online", "pageshow"]) {
 	window.addEventListener(event, () => {

@@ -43,7 +43,7 @@ import { DeleteChannel } from "./delete-channel";
 import { Github, GithubSidebar } from "./github";
 import { useGithub, useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
-import { host } from "./host";
+import { host, refused } from "./host";
 import { type Invite, parse } from "./invite";
 import { Rename } from "./layout/rename";
 import { MoveChannel } from "./move-channel";
@@ -125,9 +125,31 @@ function useAnswers(): boolean | undefined {
 	return answers;
 }
 
+/** Asked again while disconnected: a helper that was down can come back with a new token. */
+function useRefused(): boolean {
+	const [value, setValue] = useState(false);
+	useEffect(() => {
+		if (deployed || desktop) return;
+		const check = () => void refused().then(setValue);
+		check();
+		const interval = setInterval(check, 5000);
+		return () => clearInterval(interval);
+	}, []);
+	return value;
+}
+
 function Disconnected() {
 	const answers = useAnswers();
+	const signedOut = useRefused();
 	if (desktop) return <>Disconnected from Ace Helper. Open Settings → This Mac to start it.</>;
+	if (signedOut) {
+		return (
+			<>
+				This browser isn't signed in to your host. Run <code>ace open</code>{" "}
+				on that Mac, or open its sign-in link again.
+			</>
+		);
+	}
 	if (!deployed) return <>Disconnected from your host. Reconnecting…</>;
 	return (
 		<>
