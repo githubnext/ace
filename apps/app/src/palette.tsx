@@ -31,13 +31,13 @@ const ACTIONS = [
 	action("dashboard", "Dashboard", "Go to", "1"),
 	action("channels", "Channels", "Go to", "2"),
 	action("issues", "Issues", "Go to", "3"),
-	action("prs", "Pull Requests", "Go to", "4"),
-	action("project-open", "Open Folder…", "Project", "o"),
+	action("prs", "Pull requests", "Go to", "4"),
+	action("project-open", "Open folder…", "Project", "o"),
 	action("project-clone", "Clone from URL…", "Project"),
 	action("settings", "Settings", "Ace", ","),
-	...(desktop ? [action("updates", "Check for Updates…", "Ace")] : []),
-	action("nav-toggle", "Toggle Navigation", "View", "b"),
-	action("channels-toggle", "Toggle Channels Sidebar", "View", "b", true),
+	...(desktop ? [action("updates", "Check for updates…", "Ace")] : []),
+	action("nav-toggle", "Toggle navigation", "View", "b"),
+	action("channels-toggle", "Toggle channels sidebar", "View", "b", true),
 ];
 
 const CREATE = "channel-new";
@@ -52,6 +52,7 @@ function channelItems(
 	const names = new Map(projects.map((project) => [project.id, label(project, host)]));
 	return channels.map((channel) => {
 		const project = channelProject(channel);
+		const outcome = attention.get(channel.id);
 		return {
 			kind: "session",
 			id: `channel:${channel.id}`,
@@ -61,9 +62,12 @@ function channelItems(
 			archived: channel.state === "archived",
 			// Other projects' channels wait for a search so the current project's stay in reach.
 			hiddenUntilSearch: project !== current,
-			status: channel.state === "running" && channel.busy
+			// A run waiting on a question is still busy, but it waits on them, as in the sidebar.
+			status: outcome === "question" || outcome === "failed"
+				? "attention"
+				: channel.state === "running" && channel.busy
 				? "busy"
-				: attention.get(channel.id) === "done"
+				: outcome === "done"
 				? "unread"
 				: undefined,
 		};
@@ -112,7 +116,7 @@ export function Palette({ channels, projects, host, project, attention, onChanne
 
 	if (!open) return null;
 	const items: CommandPaletteItem[] = [
-		...(onCreate ? [action(CREATE, `New Channel in ${onCreate.name}`, "Channel")] : []),
+		...(onCreate ? [action(CREATE, `New channel in ${onCreate.name}`, "Channel")] : []),
 		...ACTIONS,
 		...tabs,
 		...channelItems(channels, projects, host, project, attention),

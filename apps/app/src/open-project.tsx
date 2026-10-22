@@ -137,6 +137,7 @@ export function OpenProject({ onOpen, onClose }: {
 					{error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
 				</form>
 				<DialogFooter>
+					<Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
 					<Button type="submit" form={id} disabled={busy || !path.trim()}>
 						{busy ? "Opening…" : "Open folder"}
 					</Button>

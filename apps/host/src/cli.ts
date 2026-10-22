@@ -510,8 +510,11 @@ async function main() {
 		const { name, session } = await join(ref);
 		try {
 			switch (command) {
-				case "info":
-					return console.log(JSON.stringify(await session.request({ op: "info" }), null, 2));
+				case "info": {
+					// docs/terms.md names it agent access, after `ace agents`; `shared` is the wire name.
+					const { shared, ...info } = await session.request<ChannelInfo>({ op: "info" });
+					return console.log(JSON.stringify({ ...info, agents: shared }, null, 2));
+				}
 				case "say":
 					if (!text) throw new Error("Nothing to say");
 					await session.request({ op: "say", chat: chat(), author: catalog.user, text });

@@ -45,6 +45,7 @@ function shortcutLabel(shortcut?: CommandPaletteShortcut) {
 function statusLabel(item: CommandPaletteItem) {
 	if (item.kind !== "session") return shortcutLabel(item.shortcut);
 	if (item.archived) return "Archived";
+	if (item.status === "attention") return "Needs you";
 	if (item.status === "mention") return "Mention";
 	if (item.status === "unread") return "Unread";
 	if (item.status === "busy") return "Busy";
@@ -163,7 +164,7 @@ function Palette({ items, onOpenChange, onSelect, placeholder, emptyLabel, title
 					aria-activedescendant={results[index]
 						? `command-palette-${results[index]!.item.id}`
 						: undefined}
-					className="block inline-size-full bg-transparent px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+					className="block w-full bg-transparent px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
 				/>
 			</div>
 
@@ -171,7 +172,7 @@ function Palette({ items, onOpenChange, onSelect, placeholder, emptyLabel, title
 				ref={list}
 				id="command-palette-results"
 				role="listbox"
-				className="min-block-size-0 overflow-y-auto p-2 overscroll-contain"
+				className="min-h-0 overflow-y-auto p-2 overscroll-contain"
 			>
 				{results.length
 					? (
@@ -190,7 +191,7 @@ function Palette({ items, onOpenChange, onSelect, placeholder, emptyLabel, title
 										onClick={() => choose(item)}
 										onPointerEnter={() => !item.disabled && setSelected(item.id)}
 										className={cn(
-											"group grid inline-size-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm/5 outline-none transition-[background-color,color,transform] duration-150 ease-out",
+											"group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm/5 outline-none transition-[background-color,color,transform] duration-150 ease-out",
 											selected && "bg-accent text-accent-foreground",
 											!selected && "text-foreground",
 											item.disabled && "cursor-not-allowed opacity-45",
@@ -211,7 +212,8 @@ function Palette({ items, onOpenChange, onSelect, placeholder, emptyLabel, title
 											<span
 												className={cn(
 													"shrink-0 rounded border border-border/70 bg-background/80 px-1.5 py-0.5 font-mono text-[0.625rem]/none text-muted-foreground",
-													item.kind === "session" && item.status === "mention"
+													item.kind === "session"
+														&& (item.status === "mention" || item.status === "attention")
 														&& "border-amber-500/30 text-amber-600 dark:text-amber-300",
 													item.kind === "session" && item.status === "unread"
 														&& "border-sky-500/30 text-sky-600 dark:text-sky-300",

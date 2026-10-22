@@ -21,7 +21,7 @@ import { host } from "./host";
 import { placement } from "./placement";
 
 /**
- * What collaborators' runs can reach. A cloud container has no desktop tools and no macOS
+ * What teammates' runs can reach. A cloud container has no desktop tools and no macOS
  * permissions, so its copy names neither.
  */
 function reach(channel: Listing): { agents: string; confirm: string; desktop: boolean } {
@@ -29,7 +29,7 @@ function reach(channel: Listing): { agents: string; confirm: string; desktop: bo
 	if (place.kind === "cloud") {
 		return {
 			agents:
-				`Allow collaborators to invoke agents, which run commands in this channel's cloud container on ${place.service}, with its GitHub access to the repository. No macOS permissions apply. Turning this off leaves chat available and active runs continue.`,
+				`Let teammates invoke this channel's agents, which run commands in this channel's cloud container on ${place.service}, with its GitHub access to the repository. No macOS permissions apply. Turning this off leaves chat available and active runs continue.`,
 			confirm:
 				"Teammates can run commands in this channel's cloud container, with its GitHub access to the repository. No macOS permissions apply.",
 			desktop: false,
@@ -37,7 +37,7 @@ function reach(channel: Listing): { agents: string; confirm: string; desktop: bo
 	}
 	return {
 		agents:
-			"Allow collaborators to invoke agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue.",
+			"Let teammates invoke this channel's agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue.",
 		confirm:
 			"Teammates can run commands as you on this machine, with Ace's macOS permissions such as Screen Recording.",
 		desktop: true,
@@ -102,7 +102,7 @@ function AccessToggle({ label, value, live, owner, pending, description, childre
 					</span>
 				}
 			/>
-			<TooltipContent className="max-w-72">
+			<TooltipContent className="max-w-72 flex-col items-start">
 				<p className="font-medium">{label}: {state}</p>
 				<p>{description}</p>
 				{!owner && <p>Only the channel owner can change this.</p>}
@@ -146,7 +146,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 		>
 			<Machine channel={channel} />
 			<AccessToggle
-				label="Collaborator agent access"
+				label="Agent access"
 				value={shared}
 				live={sharedLive}
 				owner={owner}
@@ -163,7 +163,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 					live={desktopLive}
 					owner={owner}
 					pending={changingDesktop}
-					description="Allow native computer use in this channel, including owner and collaborator runs. Turning this off refuses new desktop calls only. Shell commands keep Ace's macOS permissions, such as Screen Recording, so this isn't a security boundary."
+					description="Allow native computer use in this channel, including the owner's and teammates' runs. Turning this off refuses new desktop calls only. Shell commands keep Ace's macOS permissions, such as Screen Recording, so this isn't a security boundary."
 					onClick={computer}
 				>
 					<IconMonitor aria-hidden />
@@ -172,7 +172,7 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 			<Dialog open={confirming} onOpenChange={setConfirming}>
 				<DialogContent className="gap-3 sm:max-w-80" showCloseButton={false}>
 					<DialogHeader>
-						<DialogTitle>Let collaborators invoke agents?</DialogTitle>
+						<DialogTitle>Let teammates invoke agents?</DialogTitle>
 						<DialogDescription>
 							{copy.confirm}
 							{copy.desktop && desktop
