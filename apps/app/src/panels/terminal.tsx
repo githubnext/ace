@@ -10,7 +10,16 @@ import { FitAddon } from "@xterm/addon-fit";
 import { type ITheme, Terminal as Xterm } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
-import { useResolvedTheme } from "@ace/ui";
+import {
+	Button,
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	useResolvedTheme,
+} from "@ace/ui";
 import type { TerminalOpened } from "@ace/host/protocol";
 
 import { host, onOpen } from "../host";
@@ -54,6 +63,8 @@ const FALLBACK = {
 	brightCyan: "rgb(49 146 170)",
 	brightWhite: "rgb(31 35 40)",
 } satisfies ITheme;
+
+const lines = (text: string) => text.trimEnd().split("\n").length;
 
 let canvas: HTMLCanvasElement | undefined;
 
@@ -130,6 +141,7 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 	const replaying = useRef(0);
 	const [node, setNode] = useState<HTMLDivElement | null>(null);
 	const [state, setState] = useState<State>({ status: "idle" });
+	const [pasting, setPasting] = useState<string>();
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
 	const scheme = useResolvedTheme();
 	const schemeRef = useRef(scheme);
@@ -161,14 +173,19 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 		fit.current = addon;
 		replaying.current = 0;
 
-		term.attachCustomKeyEventHandler((event) => {
-			if (event.type !== "keydown" || event.key !== "k") return true;
-			if (!(MAC ? event.metaKey : event.ctrlKey)) return true;
-			// Claims the key from the window's command palette shortcut.
+		// Left to the window, so the command palette opens from a focused terminal too.
+		term.attachCustomKeyEventHandler((event) =>
+			event.key !== "k" || !(MAC ? event.metaKey : event.ctrlKey)
+		);
+		// Without bracketed paste the shell runs each pasted line as it arrives, so several lines ask first.
+		const paste = (event: ClipboardEvent) => {
+			const text = event.clipboardData?.getData("text/plain") || "";
+			if (term.modes.bracketedPasteMode || !text.trimEnd().includes("\n")) return;
 			event.preventDefault();
-			term.clear();
-			return false;
-		});
+			event.stopImmediatePropagation();
+			setPasting(text);
+		};
+		node.addEventListener("paste", paste, true);
 		const input = term.onData((data) => {
 			// xterm answers queries in replayed output (cursor position, colors) as if they were live,
 			// and the shell would read those answers as typed input.
@@ -184,6 +201,7 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 		observer.observe(node);
 
 		return () => {
+			node.removeEventListener("paste", paste, true);
 			observer.disconnect();
 			input.dispose();
 			size.dispose();
@@ -289,6 +307,35 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 				<div className="pointer-events-none absolute top-2 right-3 z-10 max-w-[calc(100%-1.5rem)] truncate rounded-md border border-border/70 bg-popover/95 px-2 py-1 text-xs text-muted-foreground shadow-popover backdrop-blur">
 					{notice}
 				</div>
+			)}
+			{pasting !== undefined && (
+				<Dialog
+					open
+					onOpenChange={next => next || setPasting(undefined)}
+				>
+					<DialogContent className="gap-3 sm:max-w-80" showCloseButton={false}>
+						<DialogHeader>
+							<DialogTitle>Paste {lines(pasting)} lines?</DialogTitle>
+							<DialogDescription>
+								The shell runs each line as a command as soon as it's pasted.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button type="button" variant="outline" onClick={() => setPasting(undefined)}>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								onClick={() => {
+									shell.current?.paste(pasting);
+									setPasting(undefined);
+								}}
+							>
+								Paste
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			)}
 			<div className="min-h-0 flex-1 p-3">
 				<div

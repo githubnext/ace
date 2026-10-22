@@ -486,6 +486,13 @@ export type TerminalFrame =
 export type TerminalOpened = { terminal: string; cwd: string };
 
 /** `attached` while some client shows the shell. */
-export type TerminalShell = { terminal: string; chat?: number; cwd: string; attached: boolean };
+export type TerminalShell = {
+	terminal: string;
+	chat?: number;
+	cwd: string;
+	attached: boolean;
+	/** What the shell is running, when a command is in progress. */
+	command?: string;
+};
 
 export type { ChannelInfo, Event, ModelRef, Presence, Request };

@@ -109,7 +109,7 @@ export function Palette(
 	useEffect(() => {
 		function key(event: KeyboardEvent) {
 			if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.shiftKey) return;
-			// The composer links and the terminal clears with the same keys while they have focus.
+			// The composer links with the same keys while it has focus.
 			if (event.key.toLowerCase() !== "k" || event.defaultPrevented) return;
 			event.preventDefault();
 			const state = switcher.current?.window();

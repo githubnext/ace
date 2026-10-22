@@ -32,10 +32,12 @@ import {
 	type People,
 	type Project,
 	projectId,
+	type TerminalShell,
 } from "@ace/host/protocol";
 
 import { chosen, deployed, gateway, remember } from "./address";
 import { type Attention, glow, useAttention } from "./attention";
+import { ArchiveChannel } from "./archive-channel";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
@@ -355,6 +357,7 @@ export function App() {
 	const [draft, setDraft] = useState<ChannelDraft>();
 	const [renaming, setRenaming] = useState<{ id: string; name: string }>();
 	const [deleting, setDeleting] = useState<{ id: string; name: string }>();
+	const [archiving, setArchiving] = useState<{ id: string; name: string; commands: string[] }>();
 	const [sharing, setSharing] = useState(false);
 	const [removing, setRemoving] = useState<AppProject>();
 	const [askRemove, setAskRemove] = useLocalStorage("ace:remove-project-ask", true);
@@ -842,6 +845,18 @@ export function App() {
 		}
 	}
 
+	async function archive(id: string, name: string) {
+		let shells: TerminalShell[];
+		try {
+			shells = await host.request<TerminalShell[]>({ op: "terminals", channel: id });
+		} catch (error) {
+			return toast.error("Could not update channel", { description: (error as Error).message });
+		}
+		const commands = shells.flatMap((shell) => shell.command ? [shell.command] : []);
+		if (commands.length) return setArchiving({ id, name, commands });
+		await change({ op: "archive", channel: id, archived: true });
+	}
+
 	async function archiveInactive(project: string) {
 		try {
 			const count = await host.request<number>({ op: "archive-inactive", project });
@@ -977,11 +992,9 @@ export function App() {
 											setCollapsed((value) => ({ ...value, [id]: !folded(value, id) }))}
 										onArchive={(allProjects || local) && connected
 											? (item) =>
-												void change({
-													op: "archive",
-													channel: item.uid,
-													archived: item.lifecycle !== "archived",
-												})
+												void (item.lifecycle === "archived"
+													? change({ op: "archive", channel: item.uid, archived: false })
+													: archive(item.uid, item.name))
 											: undefined}
 										onArchiveInactive={!allProjects && local && connected
 											? () => void archiveInactive(current.path)
@@ -1220,6 +1233,17 @@ export function App() {
 							setRemoving(undefined);
 						}}
 						onCancel={() => setRemoving(undefined)}
+					/>
+				)}
+				{archiving && (
+					<ArchiveChannel
+						name={archiving.name}
+						commands={archiving.commands}
+						onArchive={() => {
+							setArchiving(undefined);
+							void change({ op: "archive", channel: archiving.id, archived: true });
+						}}
+						onCancel={() => setArchiving(undefined)}
 					/>
 				)}
 				{deleting && (
