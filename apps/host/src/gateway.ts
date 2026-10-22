@@ -642,7 +642,7 @@ async function handle(
 		}
 		case "project-repo": {
 			if (request.host && request.host !== name && !client.peer) {
-				return (await remote(client, request.host)).request(
+				const repo = await (await remote(client, request.host)).request<string | null>(
 					{
 						op: "project-repo",
 						project: request.project,
@@ -650,6 +650,7 @@ async function handle(
 					undefined,
 					trace,
 				);
+				return repo && await github.found(repo) ? repo : null;
 			}
 			const known = client.peer
 				? (await Promise.all(catalog.list().map((channel) => projects.checkout(channel.project))))
@@ -661,7 +662,9 @@ async function handle(
 			if (client.peer && client.user !== catalog.user && !await access.canAccess(client.user, id)) {
 				throw new Error("You don't have access to this project");
 			}
-			return repo;
+			// A peer's host answers only what the remote names; GitHub reads stay on the asking host.
+			if (client.peer) return repo;
+			return repo && await github.found(repo) ? repo : null;
 		}
 		case "github-list":
 			return github.list(request);

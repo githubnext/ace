@@ -16,11 +16,13 @@ import { share } from "./window-storage";
 
 export type Page = "dashboard" | "channels" | "issues" | "prs";
 
-export function Navigation({ page, user, github, onPage, onSettings }: {
+export function Navigation({ page, user, github, repo, onPage, onSettings }: {
 	page: Page;
 	user: string;
 	/** Shows the owner's GitHub avatar; initials without one. */
 	github?: string;
+	/** Whether the current project has a GitHub repository for Issues and Pull requests. */
+	repo: boolean;
 	onPage: (page: Page) => void;
 	onSettings: () => void;
 }) {
@@ -55,30 +57,34 @@ export function Navigation({ page, user, github, onPage, onSettings }: {
 				>
 					Channels
 				</NavListLink>
-				<NavListLink
-					href="#issues"
-					icon={<IconIssue className="size-4" />}
-					active={page === "issues"}
-					shortcut="⌘3"
-					onClick={(event) => {
-						event.preventDefault();
-						onPage("issues");
-					}}
-				>
-					Issues
-				</NavListLink>
-				<NavListLink
-					href="#prs"
-					icon={<IconPullRequest className="size-4" />}
-					active={page === "prs"}
-					shortcut="⌘4"
-					onClick={(event) => {
-						event.preventDefault();
-						onPage("prs");
-					}}
-				>
-					PRs
-				</NavListLink>
+				{repo && (
+					<>
+						<NavListLink
+							href="#issues"
+							icon={<IconIssue className="size-4" />}
+							active={page === "issues"}
+							shortcut="⌘3"
+							onClick={(event) => {
+								event.preventDefault();
+								onPage("issues");
+							}}
+						>
+							Issues
+						</NavListLink>
+						<NavListLink
+							href="#prs"
+							icon={<IconPullRequest className="size-4" />}
+							active={page === "prs"}
+							shortcut="⌘4"
+							onClick={(event) => {
+								event.preventDefault();
+								onPage("prs");
+							}}
+						>
+							PRs
+						</NavListLink>
+					</>
+				)}
 			</NavList>
 		</Nav>
 	);
