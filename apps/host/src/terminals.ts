@@ -137,22 +137,51 @@ export function close(id: string) {
 	}
 }
 
-/** A channel's running shells, including those no tab shows any more. */
-export function list(channel: string): TerminalShell[] {
-	const shells: TerminalShell[] = [];
-	for (const terminal of terminals.values()) {
-		if (terminal.channel !== channel) continue;
-		const attached = terminal.listeners.size > 0;
-		shells.push({ terminal: terminal.id, chat: terminal.chat, cwd: terminal.cwd, attached });
+/** Each process's terminal foreground group and command, by pid. */
+async function processes(): Promise<Map<number, { foreground: number; command: string }>> {
+	const ps = Bun.spawn(["ps", "-axo", "pid=,tpgid=,comm="], { stdout: "pipe", stderr: "ignore" });
+	const table = new Map<number, { foreground: number; command: string }>();
+	for (const line of (await new Response(ps.stdout).text()).split("\n")) {
+		const match = /^\s*(\d+)\s+(-?\d+)\s+(.+)$/.exec(line);
+		if (match) {
+			table.set(Number(match[1]), {
+				foreground: Number(match[2]),
+				command: match[3]!.split("/").at(-1)!,
+			});
+		}
 	}
-	return shells;
+	return table;
+}
+
+/** A channel's running shells, including those no tab shows any more, with any command in progress. */
+export async function list(channel: string): Promise<TerminalShell[]> {
+	const owned = [...terminals.values()].filter((terminal) => terminal.channel === channel);
+	if (!owned.length) return [];
+	const table = await processes();
+	return owned.map((terminal) => {
+		// The shell leads its own process group, so another foreground group is a command it started.
+		const foreground = table.get(terminal.process.pid)?.foreground;
+		const command = foreground && foreground !== terminal.process.pid
+			? table.get(foreground)?.command
+			: undefined;
+		return Object.assign({
+			terminal: terminal.id,
+			chat: terminal.chat,
+			cwd: terminal.cwd,
+			attached: terminal.listeners.size > 0,
+		}, command ? { command } : {});
+	});
 }
 
 /** Every terminal of a channel, when the channel is killed, archived or deleted; returns how many. */
 export function closeChannel(channel: string): number {
-	const running = list(channel);
-	for (const terminal of running) close(terminal.terminal);
-	return running.length;
+	let count = 0;
+	for (const terminal of terminals.values()) {
+		if (terminal.channel !== channel) continue;
+		close(terminal.id);
+		count++;
+	}
+	return count;
 }
 
 export async function closeAll(): Promise<void> {
