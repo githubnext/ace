@@ -4,9 +4,9 @@ anchor: function useComposer
 created: 2026-10-16T22:41:13Z
 norm: '1'
 sig: 381929b0cbaf2245
-body_hash: 17515b9210059870
-raw_hash: 30786624d9379566
-vouched: 2026-10-22T15:02:44Z
+body_hash: f4f3cc3dac113b90
+raw_hash: 1066200fbc3f634c
+vouched: 2026-10-22T15:29:58Z
 lines: 597-1226
 ---
 
