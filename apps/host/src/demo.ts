@@ -33,6 +33,8 @@ type Step =
 		| ({ close: true } & Target)
 		| { away: boolean }
 		| { leave: true }
+		/** Shows as typing in the chat for this many seconds. */
+		| ({ type: number } & Target)
 		| ({ say: string } & Target)
 		| ({ ask: string } & Target)
 		/** Reacts to the chat's newest message or reply. */
@@ -137,6 +139,14 @@ async function run(step: Step) {
 	}
 	const id = await present(step.who, step);
 	const chat = step.chat === undefined ? {} : { chat: step.chat };
+	if ("type" in step) {
+		// The app drops a typist 5 s after their last signal.
+		for (let left = step.type; left > 0; left -= 3) {
+			await request(id, { op: "typing", author, ...chat });
+			await Bun.sleep(Math.min(left, 3) * 1000);
+		}
+		return;
+	}
 	if ("say" in step) return void await request(id, { op: "say", author, text: step.say, ...chat });
 	// An ask returns once admitted; the run continues in the channel as anyone's would.
 	if ("ask" in step) return void await request(id, { op: "ask", author, text: step.ask, ...chat });

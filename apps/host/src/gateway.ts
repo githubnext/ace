@@ -959,7 +959,8 @@ function websocket(): Bun.WebSocketHandler<Client> {
 				|| request.op === "hello" || request.op === "models"
 				|| request.op === "release" || request.op === "terminal-input"
 				|| request.op === "terminal-resize"
-				|| (request.op === "channel" && ["watch", "info", "models"].includes(request.request.op));
+				|| (request.op === "channel"
+					&& ["watch", "info", "models", "typing"].includes(request.request.op));
 			const handling = handle(socket, request, send, id, trace);
 			pending.add(handling);
 			try {

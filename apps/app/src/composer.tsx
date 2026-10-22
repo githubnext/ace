@@ -104,6 +104,7 @@ export function Composer(
 ) {
 	const composer = useRef<ChatComposerHandle>(null);
 	const sending = useRef(false);
+	const typed = useRef(0);
 	const [pending, setPending] = useState(false);
 	const [attached, setAttached] = useState<Attachment[]>([]);
 	// Kept beside the channel's draft so a deliberate mode and an unsent model pick survive relaunch.
@@ -334,6 +335,12 @@ export function Composer(
 				busy={busy}
 				submitBusy={pending}
 				submitLabel={waiting}
+				onTypingChange={(value) => {
+					// Watchers drop a typist after 5 s without a signal, so one every 3 s keeps them shown.
+					if (!value || !ready || Date.now() - typed.current < 3000) return;
+					typed.current = Date.now();
+					host.channel(channel.id, { op: "typing", chat: id, author: user }).catch(() => {});
+				}}
 				canStop={busy && !blocked}
 				onStop={() => void host.channel(channel.id, { op: "stop", chat: id, author: user })}
 				canSend={ready && status === "open" && !pending}
