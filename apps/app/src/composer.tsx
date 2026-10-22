@@ -29,7 +29,11 @@ const MODES = [
 	ACE_MODE,
 ];
 // A teammate the owner hasn't let invoke sees no @ace; the stored mode brings it back with access.
-const BLOCKED_MODES = [{ id: "chat", name: "Chat", placeholder: "Message the channel" }];
+const BLOCKED_MODES = [{
+	id: "chat",
+	name: "Chat",
+	placeholder: "Message the channel (agent access is off)",
+}];
 const ACE_MENTION = { name: "ace", avatar: aceAvatar };
 export const EFFORTS: Record<Effort, string> = {
 	off: "Off",
@@ -241,7 +245,14 @@ export function Composer(
 
 	async function send(text: string, mode: string, attached: Attachment[]) {
 		if (sending.current) return;
-		// A blocked teammate's typed "@ace" is just text.
+		// Posted, a blocked teammate's "@ace" would read as an ask nobody answers.
+		if (blocked && ACE.test(text)) {
+			toast.error("Agent access is off", {
+				description:
+					"The owner hasn't let teammates ask this channel's agent. Remove @ace to send this as a message.",
+			});
+			return;
+		}
 		const invoke = !blocked && (mode === "ace" || ACE.test(text));
 		const body = text.trim();
 		if (!body && !attached.length) return;
