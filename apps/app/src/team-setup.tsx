@@ -10,7 +10,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 	Input,
-	Switch,
 } from "@ace/ui";
 import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons";
 import type { TeamPeer } from "@ace/host/protocol";
@@ -29,10 +28,9 @@ const PROVIDERS = {
 const RAW = { autoCorrect: "off", autoCapitalize: "off", spellCheck: false } as const;
 
 type Provider = keyof typeof PROVIDERS;
-type Step = "fork" | "join" | "directory" | "remote" | "setup" | "invite" | "solo";
+type Step = "fork" | "join" | "directory" | "setup" | "invite" | "solo";
 const STEPS: Partial<Record<Step, string>> = {
 	directory: "Directory",
-	remote: "Remote channels",
 	setup: "Set up",
 	invite: "Invite",
 };
@@ -52,7 +50,6 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	const [starting, setStarting] = useState(true);
 	const [listed, setListed] = useState<"hosted" | "peers">("hosted");
 	const [provider, setProvider] = useState<Provider>("cloudflare");
-	const [hosted, setHosted] = useState(false);
 	const [joined, setJoined] = useState<Team>();
 	const [error, setError] = useState("");
 
@@ -157,7 +154,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 								title="Peer to peer only"
 							>
 								Nothing to deploy. Teammates on the tailnet see your channels only while your Mac is
-								awake, with no shared projects, presence, or remote channels.
+								awake, with no shared projects or presence.
 							</Choice>
 						</div>
 						<Footer
@@ -175,50 +172,17 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 								</>
 							}
 							next={
-								<Button onClick={() => setStep(listed === "hosted" ? "remote" : "solo")}>
+								<Button onClick={() => setStep(listed === "hosted" ? "setup" : "solo")}>
 									Continue
 								</Button>
 							}
 						/>
 					</>
 				)}
-				{step === "remote" && (
-					<>
-						<Header
-							title="Allow channels that run off your Mac"
-							description="Channels run on your Mac by default. Turn on what your team may move elsewhere, now or later."
-						/>
-						<div className="flex flex-col gap-2">
-							<Toggle
-								checked={hosted}
-								onChange={setHosted}
-								title="Hosted channels"
-								description={`Chat keeps going while your Mac sleeps; tools still run on it. Adds a channel service on ${
-									PROVIDERS[provider].label
-								}.`}
-							/>
-							<Toggle
-								checked={false}
-								disabled
-								title={
-									<>
-										Cloud workspaces <Pill>Soon</Pill>
-									</>
-								}
-								description="Chat and tools run in containers from a fresh clone, billed per container minute."
-							/>
-						</div>
-						<Footer
-							back={<Button variant="ghost" onClick={() => setStep("directory")}>Back</Button>}
-							next={<Button onClick={() => setStep("setup")}>Continue</Button>}
-						/>
-					</>
-				)}
 				{step === "setup" && (
 					<Setup
 						provider={provider}
-						hosted={hosted}
-						back={() => setStep("remote")}
+						back={() => setStep("directory")}
 						onJoined={(url, secret) => {
 							setJoined({ url, secret });
 							setStep("invite");
@@ -269,16 +233,15 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	);
 }
 
-function Setup({ provider, hosted, back, onJoined }: {
+function Setup({ provider, back, onJoined }: {
 	provider: Provider;
-	hosted: boolean;
 	back: () => void;
 	onJoined: (url: string, secret: string) => void;
 }) {
-	const command = `bun services/deploy.ts ${provider}${hosted ? " --hosted" : ""}`;
+	const command = `bun services/deploy.ts ${provider}`;
 	// Ace deploys Cloudflare's bundled services itself; Fly.io still needs a checkout and flyctl.
 	if (provider === "cloudflare") {
-		return <Deploy hosted={hosted} command={command} back={back} onJoined={onJoined} />;
+		return <Deploy command={command} back={back} onJoined={onJoined} />;
 	}
 	return (
 		<>
@@ -297,8 +260,7 @@ function Setup({ provider, hosted, back, onJoined }: {
 	);
 }
 
-function Deploy({ hosted, command, back, onJoined }: {
-	hosted: boolean;
+function Deploy({ command, back, onJoined }: {
 	command: string;
 	back: () => void;
 	onJoined: (url: string, secret: string) => void;
@@ -309,7 +271,6 @@ function Deploy({ hosted, command, back, onJoined }: {
 	const [commands, setCommands] = useState(false);
 	const stages = [
 		{ label: "Sign in to Cloudflare", from: "Checking your Cloudflare" },
-		...hosted ? [{ label: "Deploy hosted channels", from: "Deploying hosted" }] : [],
 		{ label: "Deploy the directory", from: "Deploying the directory" },
 		{ label: "Join this Mac", from: "Joining" },
 	];
@@ -320,7 +281,7 @@ function Deploy({ hosted, command, back, onJoined }: {
 		setError("");
 		setStage(0);
 		try {
-			const { url, secret } = await host.deployTeam(hosted, (text) => {
+			const { url, secret } = await host.deployTeam((text) => {
 				setWaiting(text);
 				const next = stages.findIndex(({ from }) => text?.startsWith(from));
 				if (next >= 0) setStage(next);
@@ -427,8 +388,7 @@ function Members({ team }: { team: Team }) {
 			</Invite>
 			<p className="rounded-md bg-muted px-3 py-2 text-xs leading-5">
 				<b className="font-medium">Send it privately.</b>{" "}
-				The link holds the team secret: anyone with it can read every channel's name and summary and
-				post in hosted channels.
+				The link holds the team secret: anyone with it can read every channel's name and summary.
 			</p>
 		</>
 	);
@@ -674,31 +634,6 @@ function Choice({ selected, onSelect, title, children }: {
 		>
 			<div className="flex items-center gap-2 text-sm font-medium">{title}</div>
 			<div className="mt-0.5 text-xs leading-5 text-muted-foreground">{children}</div>
-		</div>
-	);
-}
-
-function Toggle({ checked, onChange, disabled, title, description }: {
-	checked: boolean;
-	onChange?: (checked: boolean) => void;
-	disabled?: boolean;
-	title: ReactNode;
-	description: string;
-}) {
-	const id = useId();
-	return (
-		<div className="flex gap-3 rounded-lg border bg-card px-3.5 py-3">
-			<Switch
-				id={id}
-				checked={checked}
-				disabled={disabled}
-				onCheckedChange={onChange}
-				className="mt-0.5"
-			/>
-			<label htmlFor={id} className={`flex flex-col gap-0.5 ${disabled ? "opacity-60" : ""}`}>
-				<span className="flex items-center gap-2 text-sm font-medium">{title}</span>
-				<span className="text-xs leading-5 text-muted-foreground">{description}</span>
-			</label>
 		</div>
 	);
 }

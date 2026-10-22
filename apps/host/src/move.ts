@@ -1,10 +1,9 @@
 /**
- * Moving an idle channel between this host and a hosting service, or from either to a cloud
+ * Moving an idle channel back from a hosting service, or from either place to a cloud
  * workspace. The channel keeps its ID and lanes; its pi store travels as one verified snapshot. A `moving` fence on the record keeps
  * both copies from running while the move is under way, and an unknown activation keeps it.
  */
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { renameSync, rmSync } from "node:fs";
 
 import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite/node";
 
@@ -14,24 +13,11 @@ import type { ChannelInfo } from "@ace/channel/protocol";
 import * as catalog from "./catalog";
 import { Connection, hostedAuth } from "./client";
 import { adoption, available, listed, start, type Unready, unready } from "./compute";
-import * as directory from "./directory";
 import { refusal } from "./http";
 import { KEYCHAIN_WAITING } from "./keys";
 import { log } from "./log";
 import { hostedConfig, isWorkerAlive } from "./manage";
 import type { MoveTarget } from "./protocol";
-
-/** Services this host has moved channels to, so a channel that came back can leave again. */
-const services = join(catalog.home, "services.json");
-
-function known(): string[] {
-	return existsSync(services) ? JSON.parse(readFileSync(services, "utf8")).hosted : [];
-}
-
-function remember(url: string): void {
-	const hosted = known();
-	if (!hosted.includes(url)) writeFileSync(services, JSON.stringify({ hosted: [...hosted, url] }));
-}
 
 /** A service base URL without a trailing slash, as hosted records store it. */
 export function canonical(url: string): string {
@@ -78,19 +64,8 @@ export async function targets(id: string, host: string): Promise<MoveTarget[]> {
 		const local: MoveTarget = { target: "local", label: `this host (${host})`, place: "local" };
 		return await available(record.project) ? [local, WORKSPACE] : [local];
 	}
-	const team = directory.read().hosted;
-	const hosted = new Set([
-		...(team ? [canonical(team)] : []),
-		...catalog.list().flatMap((r) => r.hosted && !r.compute ? [r.hosted] : []),
-		...known(),
-	]);
-	const services: MoveTarget[] = [...hosted].map((url) => ({
-		target: url,
-		label: hosted.size > 1 ? `cloud (${new URL(url).host})` : "cloud",
-		place: "hosted",
-	}));
-	if (!(await available(record.project))) return services;
-	return [...services, WORKSPACE];
+	// New hosted channels aren't offered: a channel runs on its host or in a cloud workspace.
+	return await available(record.project) ? [WORKSPACE] : [];
 }
 
 /** A transfer whose answer never arrived may still have taken effect at the service. */
@@ -255,7 +230,6 @@ async function toHosted(auth: Auth, record: catalog.Listing, url: string): Promi
 	}
 	catalog.write({ ...catalog.read(id), hosted: url, moving: undefined, busy: false });
 	catalog.unlock(id);
-	remember(url);
 }
 
 /**
@@ -422,7 +396,12 @@ async function push(
 function ready(id: string, to: string): catalog.Listing {
 	const record = catalog.read(id);
 	// Only an outbound move whose activation went unanswered resumes; anything else starts fresh.
-	if (!(record.moving?.digest && record.moving.to === to)) movable(record);
+	const resuming = !!record.moving?.digest && record.moving.to === to;
+	if (!resuming) movable(record);
+	// A move to a hosting service only finishes; new ones are no longer offered.
+	if (to !== "local" && to !== COMPUTE && !resuming) {
+		throw new Error("Channels no longer move to a hosting service; move it to a cloud workspace");
+	}
 	if (to === "local" && !record.hosted) throw new Error("The channel is already on this host");
 	if (to !== "local" && to !== COMPUTE && record.hosted) {
 		throw new Error("Move the channel to this host first");

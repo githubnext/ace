@@ -7,20 +7,15 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { config } from "./config";
-import { key } from "./keys";
 import { setDirectory } from "./settings";
 import * as tailnet from "./tailnet";
 
 /** Matches the repository's catalog, so a source run and the app deploy with the same wrangler. */
 const WRANGLER = "wrangler@4.140.0";
-const MODEL_KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
 
 export type Deployed = { url: string; secret: string };
 
-export async function deploy(
-	hosted: boolean,
-	waiting: (text: string | null) => void,
-): Promise<Deployed> {
+export async function deploy(waiting: (text: string | null) => void): Promise<Deployed> {
 	const domain = await tailnet.domain();
 	if (!domain) throw new Error("Connect to Tailscale first: the services serve only your tailnet.");
 	// The services serve one tailnet, so its name names them, as tail1234 in tail1234.ts.net.
@@ -33,19 +28,8 @@ export async function deploy(
 	}
 
 	const secret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
-	const shared = { ACE_SECRET: secret, TAILNET: domain };
-	const vars: Record<string, string> = { ...shared };
-	if (hosted) {
-		waiting("Deploying hosted channels…");
-		const models: Record<string, string> = {};
-		for (const name of MODEL_KEYS) {
-			const value = await key(name);
-			if (value) models[name] = value;
-		}
-		vars.HOSTED = await worker("channel", team, { ...shared, ...models });
-	}
 	waiting("Deploying the directory…");
-	const url = await worker("directory", team, vars);
+	const url = await worker("directory", team, { ACE_SECRET: secret, TAILNET: domain });
 
 	waiting("Joining this Mac to the directory…");
 	// A Worker serves its new secrets a few seconds after they're set.

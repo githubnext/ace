@@ -35,22 +35,12 @@ import {
 	type WindowInfo,
 } from "./protocol";
 import { setModel } from "./settings";
-import {
-	archive,
-	fork,
-	host,
-	isRunning,
-	kill,
-	models,
-	parseModel,
-	project,
-	remove,
-} from "./manage";
+import { archive, fork, isRunning, kill, models, parseModel, project, remove } from "./manage";
 import { move } from "./move";
 
 const HELP = `ace — channels on this host
 
-  ace new [--project <dir>] [--name <name>] [--model <provider/id>] [--hosted <url>]
+  ace new [--project <dir>] [--name <name>] [--model <provider/id>]
   ace ls [--all] [--team]                        --team adds reachable teammates' channels
   ace info <channel>
   ace rename <channel> <name>                   rename without changing its lanes
@@ -69,8 +59,7 @@ const HELP = `ace — channels on this host
   ace chat <channel> [--model <provider/id>]     open another chat
   ace stop <channel> [--chat <id>]               stop the chat's current run
   ace kill <channel>                             stop all work in the channel now
-  ace move <channel> --hosted <url> | --local | --compute
-                                                move an idle channel to a hosting service, back, or to a cloud workspace
+  ace move <channel> --local | --compute         move an idle hosted channel back, or a channel to a cloud workspace
   ace agents <channel> on|off                    let others invoke agents
   ace project access <project>                   who can see a project, by folder or owner/name
   ace project share|unshare <project> team|<github login>
@@ -381,9 +370,7 @@ async function main() {
 		case "new": {
 			const dir = await project(resolve(flags.project || "."));
 			const model = flags.model ? parseModel(flags.model) : undefined;
-			const record = flags.hosted
-				? await host(dir, model, flags.name, flags.hosted)
-				: catalog.create(dir, model, flags.name);
+			const record = catalog.create(dir, model, flags.name);
 			return console.log(`${record.name}\t${record.id}`);
 		}
 		case "ls": {
@@ -587,8 +574,9 @@ async function main() {
 		case "kill":
 			return kill(record.id);
 		case "move": {
+			// `--hosted <url>` only finishes a move to a hosting service that an earlier version started.
 			if ([flags.hosted, flags.local, flags.compute].filter(Boolean).length !== 1) {
-				throw new Error("ace move <channel> --hosted <url> | --local | --compute");
+				throw new Error("ace move <channel> --local | --compute");
 			}
 			await move(record.id, flags.local ? "local" : flags.compute ? "compute" : flags.hosted!);
 			const moved = catalog.read(record.id);

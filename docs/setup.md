@@ -64,11 +64,10 @@ same secret and your tailnet's MagicDNS suffix. The services then serve only tha
 One command does every step below for Cloudflare or Fly.io, signed in to `wrangler` or `fly`,
 with Tailscale on. It names the services for your tailnet (`ace-directory-tail1234` for
 `tail1234.ts.net`), deploys the directory with a new team secret, and prints the directory's URL
-and the secret to join with. `--hosted` adds hosted channels, with `ANTHROPIC_API_KEY` and
-`OPENAI_API_KEY` from your environment or the checkout's `.env`.
+and the secret to join with.
 
 ```sh
-bun services/deploy.ts <cloudflare|fly> [--hosted]
+bun services/deploy.ts <cloudflare|fly>
 ```
 
 By hand, on Cloudflare:
@@ -76,22 +75,21 @@ By hand, on Cloudflare:
 ```sh
 SECRET=$(openssl rand -hex 32)
 TAILNET=$(tailscale status --json | jq -r .MagicDNSSuffix)
-for s in channel directory; do (cd services/$s && bunx wrangler deploy && printf %s "$SECRET" | bunx wrangler secret put ACE_SECRET && printf %s "$TAILNET" | bunx wrangler secret put TAILNET); done
-(cd services/channel && bunx wrangler secret put ANTHROPIC_API_KEY)   # and any other model keys
+cd services/directory && bunx wrangler deploy && printf %s "$SECRET" | bunx wrangler secret put ACE_SECRET && printf %s "$TAILNET" | bunx wrangler secret put TAILNET
 ```
 
 Then name the other services in the directory, from `services/directory`, so every host that joins
 picks them up. `Settings → Team → Team services` shows which ones a host's directory names:
 
-- `HOSTED`: the channel service (`https://ace-channel.<your-subdomain>.workers.dev`), offered in a
-  channel's `Move to` menu.
+- `HOSTED`: the channel service that earlier hosted channels run on. Ace no longer moves channels
+  there, but a host still moves an idle one back with `ace move <channel> --local`.
 - `APP`: the web app, deployed with `bun --filter @ace/app deploy`. A host without a directory uses
   `bun ace web <url>` instead.
 - `COMPUTE`: the [compute service](../services/compute/README.md), which turns on `Run in cloud`
   for every host that hasn't saved its own `Settings → Beta` choice.
 
 ```sh
-printf %s https://ace-channel.<your-subdomain>.workers.dev | bunx wrangler secret put HOSTED
+printf %s https://ace-app.<your-subdomain>.workers.dev | bunx wrangler secret put APP
 ```
 
 ### From the app
@@ -102,11 +100,9 @@ no checkout. **Deploy** does this, and nothing else:
 - Signs in with your own `wrangler login`. If you aren't signed in, it opens Cloudflare's sign-in
   page in your browser. Ace never sees a Cloudflare password or token.
 - Creates `ace-directory-<tailnet>` in that account, named for the first label of your tailnet's
-  MagicDNS name (`tail1234` in `tail1234.ts.net`). With hosted channels on, it also creates
-  `ace-channel-<tailnet>`. Each is a Worker with SQLite-backed Durable Objects, served at
+  MagicDNS name (`tail1234` in `tail1234.ts.net`). It is a Worker with SQLite-backed Durable Objects, served at
   `https://<name>.<your-subdomain>.workers.dev`, with Workers Logs on.
-- Gives each Worker a new random team secret and your tailnet's name. The channel service also gets
-  the model keys saved in this Mac's Keychain.
+- Gives the Worker a new random team secret and your tailnet's name.
 - Saves the secret in this Mac's Keychain and joins the directory. It shows the URL and the secret
   once, for you to send teammates privately.
 
@@ -181,7 +177,6 @@ To try the services locally, put `ACE_SECRET`, `TAILNET`, and a model key in
 bun --filter @ace/channel-service dev                     # http://localhost:8787
 bun --filter @ace/directory dev --port 8788               # point hosts at http://localhost:8788
 printf %s "$SECRET" | bun ace key set ACE_SECRET          # the value in .dev.vars
-bun ace new --hosted http://localhost:8787 --project ~/code/my-repo
 ```
 
 `bun services/celld.ts <channel|directory> dev --port <port>` runs a service on celld instead, reading

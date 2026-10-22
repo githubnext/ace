@@ -685,7 +685,7 @@ async function handle(
 		case "directory-set":
 			return setDirectory(request.url, request.secret);
 		case "team-deploy":
-			return deployTeam(request.hosted, (waiting) => send({ id, waiting }));
+			return deployTeam((waiting) => send({ id, waiting }));
 		case "team-invite":
 			return invite();
 		case "team-peers":
