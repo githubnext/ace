@@ -8,8 +8,8 @@ import { join } from "node:path";
 import type { Lifecycle, Share } from "@ace/directory/protocol";
 
 import * as catalog from "./catalog";
-import { hostedAuth, rejection, serviceAuth } from "./client";
-import { refusal } from "./http";
+import { hostedAuth, serviceAuth } from "./client";
+import { refusal, rejection } from "./http";
 import { failure, log } from "./log";
 import type { Listing } from "./protocol";
 

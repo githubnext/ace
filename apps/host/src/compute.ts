@@ -8,7 +8,7 @@ import { realpathSync } from "node:fs";
 import type { ModelRef } from "@ace/channel/protocol";
 
 import * as catalog from "./catalog";
-import { hostedAuth, rejection } from "./client";
+import { hostedAuth } from "./client";
 import { project as repoOf } from "./github";
 import { refusal } from "./http";
 import { project } from "./manage";
@@ -30,7 +30,6 @@ async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
 			cause: error,
 		});
 	}
-	if (response.status === 401) throw new Error(await rejection(response, "Cloud compute"));
 	if (!response.ok) throw new Error(await refusal(response, "Cloud compute"));
 	return await response.json() as T;
 }
