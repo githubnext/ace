@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 
+import { tailnet as started } from "./catalog";
 import { config } from "./config";
 import * as directory from "./directory";
 import { shell as environment } from "./environment";
@@ -47,7 +48,7 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 	}
 	const [tools, tailscale] = await Promise.all([
 		Promise.all([git(), shell()]),
-		tailnet.diagnostics(),
+		tailnet.diagnostics(started),
 	]);
 	return {
 		tools,
