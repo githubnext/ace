@@ -198,7 +198,8 @@ function Provider({ provider, disabled }: { provider: ProviderSettings; disabled
 					Check
 				</Button>
 			)}
-			{!editing && (
+			{/* A saved key would go unused while the environment overrides it. */}
+			{!editing && !provider.override && (
 				<Button
 					variant="outline"
 					aria-label={`${provider.stored ? "Replace" : "Add"} ${provider.name} key`}

@@ -672,6 +672,7 @@ function Group({
 										className={actionButtonClassName}
 										onContinuePr={onContinuePr}
 										onStartIssue={onStartIssue}
+										onArchiveInactive={archiveInactive}
 										onShareProject={shareProject}
 										onRemoveProject={group.onRemove}
 									/>

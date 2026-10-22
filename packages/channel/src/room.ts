@@ -15,7 +15,7 @@ import {
 } from "@earendil-works/pi-durable";
 
 import { MetadataDoc } from "./metadata";
-import type { Image, TextFile } from "./protocol";
+import { type Image, MAX_IMAGES, type TextFile } from "./protocol";
 
 /** A human message that did not invoke an agent. */
 export const MessageEntry = defineEntry<{ author: string; text: string }>("ace.message");
@@ -65,7 +65,6 @@ function wrap(file: TextFile) {
  * Attachments live in the transcript so every model sees them. A hosted channel stores an entry in
  * one SQLite row, which Durable Objects cap at 2 MB, so a message's attachments must fit under that.
  */
-export const MAX_IMAGES = 4;
 const MAX_FILES = 10;
 const MAX_BYTES = 1_500_000;
 const TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);

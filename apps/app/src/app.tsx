@@ -34,7 +34,7 @@ import {
 	projectId,
 } from "@ace/host/protocol";
 
-import { chosen, deployed, remember } from "./address";
+import { chosen, deployed, gateway, remember } from "./address";
 import { type Attention, glow, useAttention } from "./attention";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
 import { useCompute } from "./compute";
@@ -107,12 +107,38 @@ function ChannelsSidebar(props: SessionSidebarProps) {
 	);
 }
 
+/**
+ * Whether the deployed app's host answers HTTP at all. A browser hides why a WebSocket failed, but
+ * an opaque no-cors response still proves the host is reachable, so its gateway refused this app.
+ */
+function useAnswers(): boolean | undefined {
+	const [answers, setAnswers] = useState<boolean>();
+	useEffect(() => {
+		if (!deployed || !gateway) return;
+		const url = new URL(gateway.replace(/^ws/, "http"));
+		url.pathname = "/";
+		fetch(url, { mode: "no-cors", cache: "no-store" }).then(
+			() => setAnswers(true),
+			() => setAnswers(false),
+		);
+	}, []);
+	return answers;
+}
+
 function Disconnected() {
+	const answers = useAnswers();
 	if (desktop) return <>Disconnected from Ace Helper. Open Settings → This Mac to start it.</>;
 	if (!deployed) return <>Disconnected from your host. Reconnecting…</>;
 	return (
 		<>
-			Can't reach {chosen}. Check that Tailscale is on.{" "}
+			{answers
+				? (
+					<>
+						{chosen} refused this web app. On that host, run{" "}
+						<code>ace web {location.origin}</code>, then reload.
+					</>
+				)
+				: <>Can't reach {chosen}. Check that Tailscale is on.</>}{" "}
 			<button
 				type="button"
 				className="underline underline-offset-2"

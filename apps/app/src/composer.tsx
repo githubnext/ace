@@ -11,7 +11,13 @@ import {
 	useLocalStorage,
 	useMedia,
 } from "@ace/ui";
-import type { Effort, ModelOption, ModelRef, QueuedMessage } from "@ace/channel/protocol";
+import {
+	type Effort,
+	MAX_IMAGES,
+	type ModelOption,
+	type ModelRef,
+	type QueuedMessage,
+} from "@ace/channel/protocol";
 import type { Listing } from "@ace/host/protocol";
 
 import { host } from "./host";
@@ -221,6 +227,18 @@ export function Composer(
 	// Formatting tools crowd a phone's composer; they stay one tap away.
 	const phone = useMedia("(width < 40rem)");
 
+	function attach(next: Attachment[]) {
+		let images = 0;
+		const kept = next.filter((item) => !item.type.startsWith("image/") || ++images <= MAX_IMAGES);
+		if (kept.length < next.length) {
+			const left = next.length - kept.length;
+			toast(`A message can carry ${MAX_IMAGES} images`, {
+				description: left === 1 ? "One image wasn't attached." : `${left} images weren't attached.`,
+			});
+		}
+		setAttached(kept);
+	}
+
 	async function send(text: string, mode: string, attached: Attachment[]) {
 		if (sending.current) return;
 		// A blocked teammate's typed "@ace" is just text.
@@ -331,7 +349,7 @@ export function Composer(
 				effort={effort}
 				onEffortChange={(value) => changePick({ model: picked, effort: value as Effort })}
 				attachments={attached}
-				onAttachmentsChange={setAttached}
+				onAttachmentsChange={attach}
 				busy={busy}
 				submitBusy={pending}
 				submitLabel={waiting}

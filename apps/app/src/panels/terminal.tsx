@@ -138,7 +138,9 @@ export function Terminal({ channel, chat, active, terminal, onTerminal }: Props)
 	const persist = useEffectEvent(onTerminal);
 	if (active && !opened) setOpened(true);
 
-	useLayoutEffect(() => {
+	// Not a layout effect: ThemeProvider toggles the dark class in its own layout effect, which runs
+	// after this child's, so the tokens tone() reads would still be the old theme's.
+	useEffect(() => {
 		schemeRef.current = scheme;
 		if (shell.current) shell.current.options.theme = tone(scheme);
 	}, [scheme]);
