@@ -604,6 +604,14 @@ async function main() {
 		case "fork":
 			return console.log((await fork(record.id, catalog.user)).name);
 		case "kill":
+			// A running host owns the channel's terminals and closes them with it, as for the app.
+			if (await isHostRunning()) {
+				return void (await local({
+					op: "channel",
+					channel: record.id,
+					request: { op: "kill", author: catalog.user },
+				}));
+			}
 			return kill(record.id);
 		case "move": {
 			// `--hosted <url>` only finishes a move to a hosting service that an earlier version started.
@@ -639,11 +647,16 @@ async function main() {
 			);
 		}
 		case "archive":
-			return void (await archive(record.id, true));
-		case "unarchive":
-			return void (await archive(record.id, false));
+		case "unarchive": {
+			const archived = command === "archive";
+			if (await isHostRunning()) {
+				return void (await local({ op: "archive", channel: record.id, archived }));
+			}
+			return void (await archive(record.id, archived));
+		}
 		case "delete":
-			await remove(record.id);
+			if (await isHostRunning()) await local({ op: "delete", channel: record.id });
+			else await remove(record.id);
 			return console.log(`Deleted ${record.name}. Its lane branches remain in ${record.project}.`);
 	}
 }
