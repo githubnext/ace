@@ -9,7 +9,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { openNodeSqliteDatabase } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -79,7 +79,18 @@ export async function backup(record: catalog.Listing, directory: string): Promis
 	const hosted = record.hosted ? await exported(record) : undefined;
 	const path = resolve(directory);
 	// An existing destination must never be overwritten or removed by failed-backup cleanup.
-	mkdirSync(path, { mode: 0o700 });
+	try {
+		mkdirSync(path, { mode: 0o700 });
+	} catch (error) {
+		const { code } = error as NodeJS.ErrnoException;
+		if (code === "EEXIST") {
+			throw new Error(`${path} already exists. Back up into a new directory.`, { cause: error });
+		}
+		if (code === "ENOENT") {
+			throw new Error(`${dirname(path)} doesn't exist. Create it first.`, { cause: error });
+		}
+		throw error;
+	}
 	try {
 		const source = catalog.paths(record.id);
 		save(join(path, "channel.json"), record);
@@ -117,23 +128,38 @@ export async function backup(record: catalog.Listing, directory: string): Promis
  * A backup as a new local channel. The new ID and lane prefix keep it from ever running as the
  * original, which may still be live here or on its hosting service.
  */
-export async function restore(directory: string, dir?: string): Promise<catalog.Listing> {
+export async function restore(
+	directory: string,
+	options: { dir?: string; name?: string } = {},
+): Promise<catalog.Listing> {
 	const path = resolve(directory);
+	if (!existsSync(path)) throw new Error(`${path} doesn't exist.`);
+	if (!existsSync(join(path, "backup.json"))) {
+		throw new Error(`${path} isn't an Ace backup: it has no backup.json.`);
+	}
 	const manifest = JSON.parse(readFileSync(join(path, "backup.json"), "utf8")) as {
 		format: number;
 		files: { path: string; sha256: string }[];
 	};
 	if (manifest.format !== 1) throw new Error(`Unsupported backup format ${manifest.format}`);
 	for (const file of manifest.files) {
+		if (!existsSync(join(path, file.path))) {
+			throw new Error(`The backup is incomplete: ${file.path} is missing from ${path}.`);
+		}
 		if (await checksum(join(path, file.path)) !== file.sha256) {
 			throw new Error(`${file.path} does not match its checksum in backup.json`);
 		}
 	}
 	const original = JSON.parse(readFileSync(join(path, "channel.json"), "utf8")) as catalog.Listing;
+	const draft = catalog.draft(
+		await project(options.dir || original.project),
+		original.model,
+		options.name,
+	);
 	const record: catalog.Listing = {
-		...catalog.draft(await project(dir || original.project), original.model),
-		name: catalog.restored(original.name),
-		named: original.named !== false,
+		...draft,
+		name: options.name ? draft.name : catalog.restored(original.name),
+		named: !!options.name || original.named !== false,
 		summary: original.summary,
 	};
 	const { base, storage } = catalog.paths(record.id);
