@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	copyFileSync,
+	cpSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -141,6 +149,25 @@ run([
 const helpers = join(contents, "Helpers");
 mkdirSync(helpers, { recursive: true });
 copyFileSync(await lane(), join(helpers, "lane"));
+
+// Ace Helper deploys the team's Cloudflare services without a checkout, so it ships them bundled.
+for (const service of ["directory", "channel"]) {
+	const source = fileURLToPath(
+		new URL(`../../../services/${service}/wrangler.jsonc`, import.meta.url),
+	);
+	const out = join(contents, "Resources", "services", service);
+	run([compiler, "x", "wrangler", "deploy", "-c", source, "--dry-run", "--outdir", out]);
+	rmSync(join(out, "index.js.map"));
+	rmSync(join(out, "README.md"));
+	const { $schema: _, ...settings } = Bun.JSONC.parse(readFileSync(source, "utf8")) as Record<
+		string,
+		unknown
+	>;
+	writeFileSync(
+		join(out, "wrangler.json"),
+		JSON.stringify({ ...settings, main: "index.js", no_bundle: true }),
+	);
+}
 
 const sdk = await sparkle();
 writeFileSync(

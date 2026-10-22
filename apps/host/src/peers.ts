@@ -4,7 +4,7 @@ import { isIP } from "node:net";
 import { config } from "./config";
 import { GatewayClient } from "./gateway-client";
 import { log } from "./log";
-import type { Hello, Listing, People } from "./protocol";
+import type { Hello, Invite, Listing, People, TeamPeer } from "./protocol";
 import { type Machine, peers } from "./tailnet";
 
 /** Hosts serve their tailnet listener on the same port unless told otherwise. */
@@ -137,6 +137,32 @@ export function find(channel: string): Machine | undefined {
 			return machine;
 		}
 	}
+}
+
+/** Peers whose hosts are in a team, asked now: a peer may have joined since it first answered. */
+export async function teams(): Promise<TeamPeer[]> {
+	const found = await Promise.all(
+		[...hosts.values()].map(async ({ machine, client }) => {
+			if (client.status !== "open" || stalled.has(machine.name)) return;
+			const hello = await Promise.race([
+				client.request<Hello>({ op: "hello" }),
+				Bun.sleep(3000),
+			]).catch(() => undefined);
+			if (!hello?.team) return;
+			const peer: TeamPeer = { host: machine.name, login: machine.login, team: hello.team };
+			const github = hello.github || named[machine.login];
+			if (github) peer.github = github;
+			return peer;
+		}),
+	);
+	return found.filter((peer) => !!peer);
+}
+
+/** Waits for the peer's owner to approve; see asks.ts. */
+export function ask(name: string): Promise<Invite> {
+	const client = hosts.get(name)?.client;
+	if (client?.status !== "open") throw new Error(`${name} isn't reachable on the tailnet`);
+	return client.request<Invite>({ op: "team-request" });
 }
 
 export function machine(name: string): Machine | undefined {

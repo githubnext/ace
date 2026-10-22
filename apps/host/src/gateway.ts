@@ -12,6 +12,7 @@ import * as compute from "./compute";
 import { config } from "./config";
 import * as demo from "./demo";
 import { diagnostics } from "./diagnostics";
+import * as asks from "./asks";
 import * as directory from "./directory";
 import { retryLoginShell, shell } from "./environment";
 import type { GatewayClient, Watch } from "./gateway-client";
@@ -51,6 +52,7 @@ import { type Machine, self, whois } from "./tailnet";
 import {
 	checkKey,
 	forgetKey,
+	invite,
 	removeKey,
 	setCompute,
 	setDirectory,
@@ -61,6 +63,7 @@ import {
 	storeKey,
 } from "./settings";
 import { resume, shutdown } from "./shutdown";
+import { deploy as deployTeam } from "./team";
 import * as terminals from "./terminals";
 import * as web from "./web";
 import * as windows from "./windows";
@@ -71,6 +74,8 @@ type Client = {
 	user: string;
 	/** Arrived over the tailnet. Peers act only on this host's channels, and never as its owner. */
 	peer: boolean;
+	/** The tailnet machine a peer connected from, as Tailscale named it. */
+	machine?: string;
 	local: boolean;
 	channels: Map<string, Promise<Connection>>;
 	/** This client's connections to peer hosts, opened when it first uses one of their channels. */
@@ -382,6 +387,12 @@ function projectsChanged(): Promise<void> {
 	});
 }
 
+/** Only the local app can answer an ask, so only it is told about them. */
+function asksChanged(): void {
+	const frame = JSON.stringify({ asks: asks.list() } satisfies HostFrame);
+	for (const socket of sockets) if (socket.data.local) socket.send(frame);
+}
+
 function settingsChanged(): void {
 	for (const socket of sockets) {
 		if (!socket.data.peer) socket.send(JSON.stringify({ settings: true } satisfies HostFrame));
@@ -443,7 +454,15 @@ async function lifecycle(
 const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete", "fork"]);
 const windowOps = new Set<HostRequest["op"]>(["window", "windows", "tab-rename", "tab-result"]);
 const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
-const keychainOps = new Set<HostRequest["op"]>(["key-store", "key-forget", "directory-set"]);
+const keychainOps = new Set<HostRequest["op"]>([
+	"key-store",
+	"key-forget",
+	"directory-set",
+	"team-deploy",
+	"team-invite",
+	"team-ask",
+	"team-answer",
+]);
 const localOps = new Set<HostRequest["op"]>([
 	"projects",
 	"project-access",
@@ -461,6 +480,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"key-check",
 	"key-remove",
 	"preferences",
+	"team-peers",
 	"compute",
 	"folder",
 	"compute-start",
@@ -567,8 +587,15 @@ async function handle(
 				updating = false;
 			}
 			return;
-		case "hello":
-			return { user: client.user, host: name, github: github.login(loginChanged) };
+		case "hello": {
+			const team = directory.url();
+			return {
+				user: client.user,
+				host: name,
+				github: github.login(loginChanged),
+				...(team ? { team: new URL(team).host } : {}),
+			};
+		}
 		case "project-access":
 			return access.describe(request.project);
 		case "project-share":
@@ -657,6 +684,24 @@ async function handle(
 		}
 		case "directory-set":
 			return setDirectory(request.url, request.secret);
+		case "team-deploy":
+			return deployTeam(request.hosted, (waiting) => send({ id, waiting }));
+		case "team-invite":
+			return invite();
+		case "team-peers":
+			return peers.teams();
+		case "team-ask": {
+			const team = await peers.ask(request.host);
+			return setDirectory(team.url, team.secret);
+		}
+		case "team-request": {
+			if (!client.peer || !client.machine) throw new Error("Ask from your own host");
+			const asker = { login: client.user, host: client.machine };
+			const login = people()[client.user];
+			return asks.ask(socket, login ? { ...asker, github: login } : asker, asksChanged);
+		}
+		case "team-answer":
+			return asks.answer(request.ask, request.approve, asksChanged);
 		case "models":
 			if (request.host && request.host !== name && !client.peer) {
 				return (await remote(client, request.host)).request({ op: "models" });
@@ -840,6 +885,9 @@ function websocket(): Bun.WebSocketHandler<Client> {
 				socket.send(JSON.stringify({ projects: await projects.list() } satisfies HostFrame));
 				socket.send(JSON.stringify({ people: people() } satisfies HostFrame));
 				socket.send(JSON.stringify({ presence: present() } satisfies HostFrame));
+				if (socket.data.local) {
+					socket.send(JSON.stringify({ asks: asks.list() } satisfies HostFrame));
+				}
 			});
 		},
 		async message(socket, raw) {
@@ -880,6 +928,7 @@ function websocket(): Bun.WebSocketHandler<Client> {
 		close(socket, code) {
 			sockets.delete(socket);
 			windows.drop(socket);
+			if (socket.data.peer) asks.drop(socket, asksChanged);
 			if (!socket.data.peer) lobbyChanged();
 			log("info", "gateway.close", { user: socket.data.user, peer: socket.data.peer, code });
 			for (const open of socket.data.channels.values()) {
@@ -891,8 +940,16 @@ function websocket(): Bun.WebSocketHandler<Client> {
 	};
 }
 
-function client(user: string, peer: boolean, local = false): Client {
-	return { user, peer, local, channels: new Map(), remotes: new Map(), terminals: new Map() };
+function client(user: string, peer: boolean, local = false, machine?: string): Client {
+	return {
+		user,
+		peer,
+		local,
+		machine,
+		channels: new Map(),
+		remotes: new Map(),
+		terminals: new Map(),
+	};
 }
 
 async function serveApp(url: URL): Promise<Response> {
@@ -985,8 +1042,9 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 			const ip = server.requestIP(request);
 			if (!ip) return new Response("Forbidden", { status: 403 });
 			let user: string;
+			let from: string;
 			try {
-				user = await whois(ip.address, ip.port);
+				({ login: user, host: from } = await whois(ip.address, ip.port));
 			} catch (error) {
 				log("warn", "gateway.whois", { address: ip.address, ...failure(error) });
 				return new Response("Forbidden", { status: 403 });
@@ -996,7 +1054,7 @@ function team(machine: Machine, listener: web.Listener, tls?: Bun.TLSOptions): S
 				log("warn", "gateway.browser.refused", { user, origin });
 				return new Response("Open Ace from your own host", { status: 403 });
 			}
-			return server.upgrade(request, { data: client(user, !browser) })
+			return server.upgrade(request, { data: client(user, !browser, false, from) })
 				? undefined
 				: new Response("Upgrade failed", { status: 400 });
 		},

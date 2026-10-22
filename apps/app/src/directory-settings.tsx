@@ -6,6 +6,7 @@ import type { Diagnostics } from "@ace/host/protocol";
 import { desktop } from "./desktop";
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
+import { parse } from "./invite";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
 const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
@@ -204,7 +205,14 @@ function TeamDirectory(
 				label="Directory"
 				description={directory.url || (
 					<>
-						Not joined. <Setup>Set up a directory</Setup>
+						Not joined.{" "}
+						<button
+							type="button"
+							onClick={() => window.dispatchEvent(new Event("ace:team-setup"))}
+							className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
+						>
+							Set up your team
+						</button>
 					</>
 				)}
 				footer={
@@ -237,11 +245,15 @@ function TeamDirectory(
 									autoFocus
 									type="url"
 									spellCheck={false}
-									aria-label="Directory URL"
-									placeholder="https://ace-directory.example.workers.dev"
+									aria-label="Invite link or directory URL"
+									placeholder="Invite link or https://ace-directory.example.workers.dev"
 									value={url}
 									disabled={!!action.busy}
-									onChange={(event) => setUrl(event.target.value)}
+									onChange={(event) => {
+										const invite = parse(event.target.value);
+										setUrl(invite?.url || event.target.value);
+										if (invite) setSecret(invite.secret);
+									}}
 								/>
 								<Input
 									type="password"
@@ -303,6 +315,15 @@ function TeamDirectory(
 							? "Not synced"
 							: "Syncing…"}
 					</Value>
+				)}
+				{directory.url && saved && !editing && (
+					<Button
+						variant="outline"
+						disabled={!!action.busy}
+						onClick={() => window.dispatchEvent(new Event("ace:team-invite"))}
+					>
+						Invite…
+					</Button>
 				)}
 				{!editing && (
 					<Button

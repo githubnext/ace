@@ -11,6 +11,9 @@ export default {
 		// Electrobun writes this to CFBundleVersion and version.json; the helper script moves it to
 		// CFBundleShortVersionString and sets the orderable bundle version.
 		version: current(channel).display,
+		// Invite links open the app; each channel takes its own scheme so a dev build never answers
+		// stable's links.
+		urlSchemes: [channel === "stable" ? "ace" : `ace-${channel}`],
 	},
 	build: {
 		// Electrobun's bundled runtime matches its native FFI; Ace Helper carries its own Bun.

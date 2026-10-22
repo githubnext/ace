@@ -18,6 +18,8 @@ export const config = {
 	webPort: process.env.ACE_WEB_PORT ? Number(process.env.ACE_WEB_PORT) : undefined,
 	peerPort: process.env.ACE_PEER_PORT ? Number(process.env.ACE_PEER_PORT) : undefined,
 	app: fileURLToPath(new URL("../../app/dist", import.meta.url)),
+	/** The team's Cloudflare services: sources in a checkout, prebuilt bundles in the app. */
+	services: fileURLToPath(new URL("../../../services", import.meta.url)),
 	appUrl: process.env.ACE_APP_URL,
 	helper: false,
 	/** Ace Helper's app version, reported by /health so a conflict can name the build on the port. */
