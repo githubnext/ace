@@ -4,8 +4,9 @@ anchor: function usePull
 created: 2026-10-16T22:11:37Z
 norm: '1'
 sig: a9da5d18c3817c7c
-body_hash: 1d9b3fa757ffe35b
-raw_hash: 32a07fd4de2d6171
+body_hash: 745f3ff60655c30b
+raw_hash: e2e769d80fa9b661
+vouched: 2026-10-22T16:53:07Z
 lines: 191-218
 ---
 

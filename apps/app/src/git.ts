@@ -176,6 +176,8 @@ export function useGit(channel: Listing, chat: number, user: string) {
 	};
 }
 
+const SETTLE = 15_000;
+
 /**
  * Ends an action's pending state once the run it started ends, or for Create PR once the pull
  * request exists. Called once per shown channel, by its details, which stay mounted while the
@@ -184,15 +186,29 @@ export function useGit(channel: Listing, chat: number, user: string) {
 export function useAsked(channel: string, busy: boolean, pull: GithubPull | null | undefined) {
 	const { asked } = useDetails(channel);
 	const ran = useRef(false);
+	const ended = useRef(0);
 	useEffect(() => {
 		if (!asked) {
 			ran.current = false;
+			ended.current = 0;
 			return;
 		}
 		// A closed or merged pull request from before isn't the one Create PR asked for.
 		const live = pull?.state === "open" || pull?.state === "draft";
 		if (asked === "create" && live) return publish(channel, { asked: null });
 		if (busy) ran.current = true;
-		else if (ran.current) publish(channel, { asked: null });
+		else if (ran.current) {
+			// Merge and Close stay pending until GitHub reports the pull request settled, so the stale
+			// Merge PR doesn't come back after the run; a refused merge shows it again after SETTLE.
+			if ((asked === "merge" || asked === "close") && live) {
+				ended.current ||= Date.now();
+				const timer = setTimeout(
+					() => publish(channel, { asked: null }),
+					ended.current + SETTLE - Date.now(),
+				);
+				return () => clearTimeout(timer);
+			}
+			publish(channel, { asked: null });
+		}
 	}, [channel, asked, busy, pull]);
 }
