@@ -19,7 +19,7 @@ import * as served from "./directory-server";
 import { retryLoginShell, shell } from "./environment";
 import type { GatewayClient, Watch } from "./gateway-client";
 import * as github from "./github";
-import { health, HostConflict } from "./health";
+import { describe, health, HostConflict } from "./health";
 import { seal } from "./keys";
 import * as lobby from "./lobby";
 import { failure, log, open as openLog } from "./log";
@@ -1165,6 +1165,23 @@ async function listen(port: number): Promise<Server<Client>> {
 	}
 }
 
+/** The port of the host serving this home, so a second host on another port finds it. */
+const SERVED = () => join(config.home, "host.port");
+
+/** Two hosts on one home would run the same channels' workers and stores twice; the first keeps it. */
+async function claim(port: number) {
+	const held = Number(await Bun.file(SERVED()).text().catch(() => ""));
+	if (!held || held === port) return;
+	const info = await health(held).catch((error) =>
+		error instanceof HostConflict ? error : undefined
+	);
+	if (info?.home !== config.home) return;
+	const listener = info instanceof HostConflict ? info.listener : describe(info);
+	throw new Error(
+		`${config.home} is already served by ${listener.text} on port ${held}. Stop it, or set ACE_HOME to give this host its own data directory.`,
+	);
+}
+
 /**
  * `loopback` keeps a disposable host off the team: no tailnet listener, peer discovery, directory
  * entry, or lobby presence. A second host on this machine would otherwise publish under the
@@ -1178,8 +1195,10 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	// Hosted channels run tools in this process.
 	seal();
 	openLog("host");
+	await claim(port);
 	await resume();
 	const server = await listen(port);
+	await Bun.write(SERVED(), String(server.port));
 	log("info", "host.start", { port: server.port, user: catalog.user, bun: Bun.version });
 	if (shell.state === "pending") {
 		log("warn", "host.shell", { error: shell.error });
