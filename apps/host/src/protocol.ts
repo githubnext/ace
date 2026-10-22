@@ -64,6 +64,8 @@ export type Diagnostics = {
 		secret: CredentialStatus;
 		/** The team services the directory named in its last answer; an unnamed one is not set up. */
 		services: { hosted?: string; app?: string; compute?: string };
+		/** This host serves the team's directory on the tailnet. */
+		serving: boolean;
 	};
 	/** Whether the helper loaded the login shell's environment; `pending` while it retries. */
 	shell: { state: "adopted" | "pending" | "failed"; error?: string };
@@ -163,7 +165,14 @@ export function isInactive(
 
 /** `github` is the host owner's GitHub login, when its GitHub CLI is signed in. */
 /** `team` is the host of the directory this host joined, never its secret, so peers can ask to join. */
-export type Hello = { user: string; host: string; github?: string; team?: string };
+/** `directory` is the joined directory's URL, which a host without one joins if it needs no secret. */
+export type Hello = {
+	user: string;
+	host: string;
+	github?: string;
+	team?: string;
+	directory?: string;
+};
 
 /** What joining a team takes: its directory URL and the team secret. */
 export type Invite = { url: string; secret: string };
@@ -321,6 +330,11 @@ export type HostRequest =
 	| { op: "key-forget"; name: string }
 	/** Join after the directory accepts the URL and secret, or keep the saved secret; null leaves. */
 	| { op: "directory-set"; url: string | null; secret?: string }
+	/**
+	 * Serve the team's directory from this host on the tailnet and join it, or stop serving it.
+	 * Answers with its URL; teammates' hosts join it from this host's hello.
+	 */
+	| { op: "directory-serve"; serve: boolean }
 	/**
 	 * Deploy the tailnet's directory to the owner's Cloudflare account, then join it. Answers with
 	 * the directory URL and the secret to send teammates.

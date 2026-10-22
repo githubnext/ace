@@ -1,14 +1,15 @@
 /**
- * The team's directory (services/directory): this host publishes its channels there and reads
- * everyone else's, so a channel stays listed while its host is asleep.
+ * The team's directory, served by a host on the tailnet (directory-server.ts) or deployed from
+ * services/directory: this host publishes its channels there and reads everyone else's, so a
+ * channel stays listed while its host is offline.
  */
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Lifecycle, Share } from "@ace/directory/protocol";
 
 import * as catalog from "./catalog";
-import { hostedAuth, serviceAuth } from "./client";
+import { directoryAuth, serviceAuth } from "./client";
 import { refusal, rejection } from "./http";
 import { failure, log } from "./log";
 import type { Listing } from "./protocol";
@@ -26,8 +27,8 @@ const config = join(catalog.home, "directory.json");
 type Services = { app?: string; hosted?: string; compute?: string };
 type Known = Services & { hosts: Host[]; channels: Listing[]; shares: Share[] };
 
-/** The joined directory's URL and the services it last named. */
-type Saved = Services & { url: string };
+/** The joined directory's URL and the services it last named; no URL after leaving one. */
+type Saved = Services & { url?: string };
 
 function saved(): Saved | undefined {
 	if (existsSync(config)) return JSON.parse(readFileSync(config, "utf8"));
@@ -75,10 +76,12 @@ export function canonical(value: string): string {
 	return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
 }
 
-/** Another directory's hosts and channels must not linger once this host leaves it. */
+/**
+ * Another directory's hosts and channels must not linger once this host leaves it. Leaving keeps
+ * an empty file, so a host that left never joins a peer's directory on its own again.
+ */
 export function configure(value: string | undefined): Promise<void> | undefined {
-	if (value) writeFileSync(config, JSON.stringify({ url: canonical(value) }));
-	else rmSync(config, { force: true });
+	writeFileSync(config, JSON.stringify(value ? { url: canonical(value) } : {}));
 	known = { hosts: [], channels: [], shares: [] };
 	synced = undefined;
 	error = undefined;
@@ -87,9 +90,12 @@ export function configure(value: string | undefined): Promise<void> | undefined 
 	return active?.sync();
 }
 
-/** Read the directory with `secret`, so a wrong URL or secret fails before either is saved. */
-export async function check(base: string, secret: string): Promise<void> {
-	const headers = await serviceAuth(secret);
+/**
+ * Read the directory, with `secret` for a deployed one, so a wrong URL or secret fails before
+ * either is saved.
+ */
+export async function check(base: string, secret?: string): Promise<void> {
+	const headers = secret ? await serviceAuth(secret) : {};
 	let response: Response;
 	try {
 		response = await fetch(`${base}/`, {
@@ -108,6 +114,39 @@ export async function check(base: string, secret: string): Promise<void> {
 	const body = await response.json().catch(() => undefined) as { hosts?: unknown } | undefined;
 	if (!Array.isArray(body?.hosts)) throw new Error("This URL is not a team directory.");
 }
+/** This host joined a directory or left one, so it doesn't join a peer's on its own. */
+export function isChosen(): boolean {
+	return existsSync(config) || !!process.env.ACE_DIRECTORY;
+}
+
+/**
+ * When each URL a peer named last failed without a secret, so discovery doesn't ask every 15
+ * seconds; its host may only be offline, so it's asked again later.
+ */
+const refused = new Map<string, number>();
+const RETRY_ADOPT = 10 * 60_000;
+
+/**
+ * Join the directory a peer's host names, when this host never chose one: a directory a host
+ * serves admits everyone on the tailnet, so a team needs no invite. A deployed directory refuses
+ * hosts without its secret and is left to Settings.
+ */
+export async function adopt(value: string): Promise<void> {
+	if (isChosen() || Date.now() - (refused.get(value) || 0) < RETRY_ADOPT) return;
+	const base = canonical(value);
+	try {
+		await check(base);
+	} catch (error) {
+		refused.set(value, Date.now());
+		log("info", "directory.adopt.refused", { url: base, ...failure(error) });
+		return;
+	}
+	// Another peer's hello may have joined one while this check ran.
+	if (isChosen()) return;
+	log("info", "directory.adopted", { url: base });
+	await configure(base);
+}
+
 /** Lifecycle events applied while a read is in flight; that read may predate them. */
 let reading: Lifecycle<Listing>[] | undefined;
 
@@ -161,7 +200,7 @@ async function call(
 	signal: AbortSignal,
 	init?: RequestInit,
 ): Promise<Response> {
-	const headers = { ...(await hostedAuth()), ...init?.headers };
+	const headers = { ...(await directoryAuth()), ...init?.headers };
 	let response: Response;
 	try {
 		// A directory that never answers must still fail the sync, or Settings waits forever.

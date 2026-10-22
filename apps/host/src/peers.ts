@@ -2,6 +2,7 @@
 import { isIP } from "node:net";
 
 import { config } from "./config";
+import * as directory from "./directory";
 import { GatewayClient } from "./gateway-client";
 import { log } from "./log";
 import type { Hello, Invite, Listing, People, TeamPeer } from "./protocol";
@@ -45,14 +46,7 @@ async function discover(signal: AbortSignal) {
 		if (hosts.has(name)) continue;
 		const client = new GatewayClient(url(machine));
 		const host: Peer = { machine, client };
-		client.onOpen = () => {
-			client.request<Hello>({ op: "hello" }).then((hello) => {
-				// A freshly started peer answers before `gh` has told it its owner's login.
-				if (!hello.github || named[machine.login] === hello.github) return;
-				named[machine.login] = hello.github;
-				emit();
-			}, () => {});
-		};
+		client.onOpen = () => greet(client, machine);
 		let status = client.status;
 		client.subscribe(() => {
 			if (client.status !== status) {
@@ -69,6 +63,21 @@ async function discover(signal: AbortSignal) {
 		});
 		hosts.set(name, host);
 	}
+	// A teammate can start a directory after this host first greeted them.
+	if (directory.isChosen()) return;
+	for (const { client, machine } of hosts.values()) {
+		if (client.status === "open") greet(client, machine);
+	}
+}
+
+function greet(client: GatewayClient, machine: Machine) {
+	client.request<Hello>({ op: "hello" }).then((hello) => {
+		if (hello.directory) void directory.adopt(hello.directory);
+		// A freshly started peer answers before `gh` has told it its owner's login.
+		if (!hello.github || named[machine.login] === hello.github) return;
+		named[machine.login] = hello.github;
+		emit();
+	}, () => {});
 }
 
 /** Start looking for peers; `onChange` runs when any peer's channels or reachability change. */

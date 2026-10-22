@@ -595,7 +595,15 @@ Shared state that must outlive any one machine lives in cells: Durable Objects d
 the team's Cloudflare account, or celld on a team machine. The team deploys and operates these
 services. Each service is named for its job.
 
-`services/directory` holds the team's hosts and where each channel lives. Every host publishes its
+The directory holds the team's hosts and where each channel lives. One host can serve it on its
+tailnet listener at `/directory` (`directory-server.ts`, on `bun:sqlite`), with the same API and
+lobbies as `services/directory`. Tailscale names each caller there, so it needs no team secret: a
+host publishes only under its own machine name and owner, and shares only as its owner. Each
+host's hello names its directory, and a host that never joined or left one joins a peer's when
+it answers without a secret, so a team on a host-served directory needs no invite. A deployed
+directory still needs `ACE_SECRET` and a join from Settings.
+
+`services/directory` is the deployed directory. Every host publishes its
 whole channel set on each change and every 30 seconds, then reads everyone's; project lobbies
 below make that poll slower once they push changes. It answers lookups
 only: channel traffic goes to the channel's host over the tailnet, or to the hosted channel. So a

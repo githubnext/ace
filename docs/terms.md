@@ -56,8 +56,9 @@ from the channel header or with `ace agents <channel> on|off`.
 _Avoid_: sharing a channel
 
 **Directory**:
-The team's shared cell listing its projects, hosts, and where each channel lives. It holds no
-channel content.
+The team's shared list of its projects, hosts, and where each channel lives, served by one host
+on the tailnet or deployed as a cell. It holds no channel content. A team works without one;
+it adds offline listings, shares, and presence.
 _Avoid_: relay, hub
 
 **Lobby**:
