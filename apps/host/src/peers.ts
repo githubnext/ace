@@ -27,6 +27,8 @@ const remembered = new Map<string, Listing[]>();
 const stalled = new Map<string, number>();
 /** Peer owners' GitHub logins by Tailscale login, from their last hello, so remembered channels keep their owner's name and avatar. */
 const named: People = {};
+/** Peers whose last hello carried no GitHub login, asked again until one does. */
+const unnamed = new Set<string>();
 
 function emit() {
 	for (const listener of listeners) listener();
@@ -63,18 +65,21 @@ async function discover(signal: AbortSignal) {
 		});
 		hosts.set(name, host);
 	}
-	// A teammate can start a directory after this host first greeted them.
-	if (directory.isChosen()) return;
-	for (const { client, machine } of hosts.values()) {
-		if (client.status === "open") greet(client, machine);
+	// A teammate can start a directory after this host first greeted them, and a peer that answered
+	// before `gh` resolved has a login to give.
+	const chosen = directory.isChosen();
+	for (const [name, { client, machine }] of hosts) {
+		if (client.status === "open" && (!chosen || unnamed.has(name))) greet(client, machine);
 	}
 }
 
 function greet(client: GatewayClient, machine: Machine) {
 	client.request<Hello>({ op: "hello" }).then((hello) => {
 		if (hello.directory) void directory.adopt(hello.directory);
-		// A freshly started peer answers before `gh` has told it its owner's login.
-		if (!hello.github || named[machine.login] === hello.github) return;
+		// A freshly started peer answers before `gh` has told it its owner's login, which may have changed.
+		if (!hello.github) return void unnamed.add(machine.name);
+		unnamed.delete(machine.name);
+		if (named[machine.login] === hello.github) return;
 		named[machine.login] = hello.github;
 		emit();
 	}, () => {});
@@ -167,18 +172,11 @@ export async function teams(): Promise<TeamPeer[]> {
 	return found.filter((peer) => !!peer);
 }
 
-/** Hosts running Ace on the tailnet now. */
+/** Hosts running Ace on the tailnet now; the gateway names their owners from every source. */
 export function online(): Member[] {
-	return [...hosts.values()].flatMap(({ machine, client }) => {
-		if (client.status !== "open") return [];
-		const github = named[machine.login];
-		return [{
-			host: machine.name,
-			login: machine.login,
-			...(github ? { github } : {}),
-			online: true,
-		}];
-	});
+	return [...hosts.values()].flatMap(({ machine, client }) =>
+		client.status === "open" ? [{ host: machine.name, login: machine.login, online: true }] : []
+	);
 }
 
 /** Waits for the peer's owner to approve; see asks.ts. */

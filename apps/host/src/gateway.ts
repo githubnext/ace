@@ -308,11 +308,13 @@ async function owners(own?: Listing[]): Promise<void> {
 	await lobbyProjects(own);
 }
 
-/** Fresher sources win: the directory, then reachable peers, then this host's own owner. */
+/**
+ * Fresher sources win: peers' hellos, then the directory, which each host re-announces itself to
+ * on every heartbeat while a hello is asked only on connect, then this host's own owner.
+ */
 function people(): People {
-	const known: People = {};
+	const known: People = { ...peers.people() };
 	for (const host of directory.read().hosts) if (host.github) known[host.login] = host.github;
-	Object.assign(known, peers.people());
 	Object.assign(known, demo.people());
 	const own = github.login(loginChanged);
 	if (own) known[catalog.user] = own;
@@ -721,23 +723,18 @@ async function handle(
 		case "team-peers":
 			return peers.teams();
 		case "team-roster": {
-			const gh = github.login(loginChanged);
 			const roster: Member[] = [
-				{
-					host: name,
-					login: catalog.user,
-					...(gh ? { github: gh } : {}),
-					online: true,
-					self: true,
-				},
+				{ host: name, login: catalog.user, online: true, self: true },
 				...peers.online(),
 			];
 			const seen = new Set(roster.map((member) => member.host));
-			for (const { name: host, login, github: owner } of directory.read().hosts) {
-				if (seen.has(host)) continue;
-				roster.push({ host, login, ...(owner ? { github: owner } : {}), online: false });
+			for (const { name: host, login } of directory.read().hosts) {
+				if (!seen.has(host)) roster.push({ host, login, online: false });
 			}
-			return roster;
+			const known = people();
+			return roster.map((member) =>
+				known[member.login] ? { ...member, github: known[member.login] } : member
+			);
 		}
 		case "team-ask": {
 			const team = await peers.ask(request.host);
