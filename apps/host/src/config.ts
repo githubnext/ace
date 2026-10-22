@@ -22,6 +22,8 @@ export const config = {
 	services: fileURLToPath(new URL("../../../services", import.meta.url)),
 	appUrl: process.env.ACE_APP_URL,
 	helper: false,
+	/** The name the command line was run as, such as `ace-canary` through the app's link. */
+	command: "ace",
 	/** Ace Helper's app version, reported by /health so a conflict can name the build on the port. */
 	version: undefined as string | undefined,
 	/** Set by ace serve --loopback; the host stays off the tailnet and the team directory. */

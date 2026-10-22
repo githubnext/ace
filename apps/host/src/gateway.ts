@@ -1199,6 +1199,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	// Hosted channels run tools in this process.
 	seal();
 	openLog("host");
+	const scripted = script === undefined ? undefined : demo.read(script);
 	await claim(port);
 	await resume();
 	const server = await listen(port);
@@ -1242,6 +1243,12 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	process.on("SIGTERM", () => void stop());
 	process.on("SIGINT", () => void stop());
 	console.log(`Ace on http://${server.hostname}:${server.port}`);
+	// Ace Helper's console is its log file, which must not hold the token.
+	if (!config.helper) {
+		const signIn = auth.appUrl(server.port);
+		signIn.hash = new URLSearchParams({ token: auth.token() }).toString();
+		console.log(`Sign in at ${signIn.href}`);
+	}
 	if (loopback) {
 		log("info", "host.tailnet", { loopback: true });
 		console.log(
@@ -1295,8 +1302,8 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	} else if (!loopback) {
 		console.log("Tailscale is not running; channels stay on this machine");
 	}
-	if (script) {
-		cleanup.push(demo.start(script, {
+	if (scripted) {
+		cleanup.push(demo.start(scripted, script!, {
 			project: projectOfChannel,
 			changed: () => {
 				peopleChanged();
