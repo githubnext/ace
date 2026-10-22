@@ -45,6 +45,7 @@ import {
 	type HostInfo,
 	type HostRequest,
 	type Listing,
+	type Member,
 	type People,
 	type Presence,
 	projectId,
@@ -488,6 +489,7 @@ const localOps = new Set<HostRequest["op"]>([
 	"key-remove",
 	"preferences",
 	"team-peers",
+	"team-roster",
 	"compute",
 	"folder",
 	"compute-start",
@@ -710,6 +712,25 @@ async function handle(
 			return invite();
 		case "team-peers":
 			return peers.teams();
+		case "team-roster": {
+			const gh = github.login(loginChanged);
+			const roster: Member[] = [
+				{
+					host: name,
+					login: catalog.user,
+					...(gh ? { github: gh } : {}),
+					online: true,
+					self: true,
+				},
+				...peers.online(),
+			];
+			const seen = new Set(roster.map((member) => member.host));
+			for (const { name: host, login, github: owner } of directory.read().hosts) {
+				if (seen.has(host)) continue;
+				roster.push({ host, login, ...(owner ? { github: owner } : {}), online: false });
+			}
+			return roster;
+		}
 		case "team-ask": {
 			const team = await peers.ask(request.host);
 			return setDirectory(team.url, team.secret);

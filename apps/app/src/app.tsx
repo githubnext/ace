@@ -57,6 +57,14 @@ import { type Section, Settings } from "./settings";
 import { SetupProject } from "./setup-project";
 import { ShareProject, useCanShare } from "./share-project";
 import { TeamAsks } from "./team-asks";
+import {
+	AddTeammate,
+	CREATE_DIRECTORY,
+	CreateDirectory,
+	DirectoryCard,
+	useDirectory,
+	Welcome,
+} from "./onboarding";
 import { TeamSetup } from "./team-setup";
 import { UpdateNotice } from "./updates";
 import { useWindowStorage } from "./window-storage";
@@ -301,9 +309,15 @@ export function App() {
 	const [left, setLeft] = useLocalStorage("panel:left", true);
 	const [width, setWidth] = useLocalStorage("panel:left:width", 200);
 	const [pins, setPins] = useLocalStorage<string[]>("ace:pinned-channels", []);
-	// Offered once on first run; Settings → Team opens it again.
+	// Welcome shows once on first run.
 	const [offered, setOffered] = useLocalStorage("ace:team-setup", false);
+	// Joining or inviting to a deployed directory, which needs the team secret.
 	const [teaming, setTeaming] = useState<boolean | "inviting" | Invite>(false);
+	const [directoryDialog, setDirectoryDialog] = useState(false);
+	const [teammate, setTeammate] = useState(false);
+	const [dismissed, setDismissed] = useLocalStorage("ace:directory-card", false);
+	const directory = useDirectory();
+	const card = !!directory && !directory.url && !dismissed;
 	const [collapsed, setCollapsed] = useState<Record<SessionSidebarGroupId, boolean>>({
 		pinned: false,
 		mine: false,
@@ -341,6 +355,13 @@ export function App() {
 			setTeaming(invite);
 		};
 		const joining = (event: Event) => join((event as CustomEvent<string>).detail);
+		const create = () => {
+			setSettings(false);
+			setDirectoryDialog(true);
+		};
+		const add = () => setTeammate(true);
+		window.addEventListener(CREATE_DIRECTORY, create);
+		window.addEventListener("ace:add-teammate", add);
 		window.addEventListener("ace:team-setup", open);
 		window.addEventListener("ace:team-invite", invite);
 		window.addEventListener("ace:join", joining);
@@ -350,6 +371,8 @@ export function App() {
 			join(fragment);
 		}
 		return () => {
+			window.removeEventListener(CREATE_DIRECTORY, create);
+			window.removeEventListener("ace:add-teammate", add);
 			window.removeEventListener("ace:team-setup", open);
 			window.removeEventListener("ace:team-invite", invite);
 			window.removeEventListener("ace:join", joining);
@@ -777,7 +800,7 @@ export function App() {
 							side="left"
 							id="sidebar"
 							className="-my-2 h-[calc(100%+1rem)]"
-							innerClassName="h-full min-h-0"
+							innerClassName={card ? "flex h-full min-h-0 flex-col" : "h-full min-h-0"}
 						>
 							{page === "channels"
 								? (
@@ -863,6 +886,7 @@ export function App() {
 										onClone={cloneUrl}
 									/>
 								)}
+							{card && <DirectoryCard onDismiss={() => setDismissed(true)} />}
 						</Sidebar>
 					)}
 					<Main
@@ -1066,7 +1090,23 @@ export function App() {
 						onClose={() => setSettings(false)}
 					/>
 				)}
-				{(teaming || (!offered && connected && !current)) && (
+				{!offered && connected && !current && (
+					<Welcome
+						github={hello.github}
+						onClose={() => setOffered(true)}
+					/>
+				)}
+				{directoryDialog && (
+					<CreateDirectory
+						onAdd={() => {
+							setDirectoryDialog(false);
+							setTeammate(true);
+						}}
+						onClose={() => setDirectoryDialog(false)}
+					/>
+				)}
+				{teammate && <AddTeammate onClose={() => setTeammate(false)} />}
+				{teaming && (
 					<TeamSetup
 						key={typeof teaming === "object" ? teaming.url : String(teaming)}
 						github={hello.github}
