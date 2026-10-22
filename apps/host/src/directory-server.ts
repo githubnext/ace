@@ -96,6 +96,12 @@ export function remove(): void {
 	log("info", "directory.removed", {});
 }
 
+/** The project shares stopping deletes. */
+export function shares(): Share[] {
+	if (!isServing()) return [];
+	return open().query<Share, []>('SELECT project, person, shared_by AS "by", at FROM shares').all();
+}
+
 /** Requests under `/directory`, with `path` the rest. */
 export async function handle(path: string, request: Request, caller: Caller): Promise<Response> {
 	if (!isServing()) return new Response("This host serves no directory", { status: 404 });
@@ -150,7 +156,7 @@ function read(sql: Database) {
 		channels: sql.query<{ listing: string }, []>("SELECT listing FROM channels").all().map((row) =>
 			JSON.parse(row.listing)
 		),
-		shares: sql.query<Share, []>('SELECT project, person, shared_by AS "by", at FROM shares').all(),
+		shares: shares(),
 	};
 }
 
