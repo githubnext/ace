@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { Image, QueuedMessage, Reactions, TextFile } from "@ace/channel/protocol";
 import { DISCONNECTED } from "@ace/host/gateway-client";
@@ -234,6 +234,8 @@ export function apply(state: Transcript, event: Event): Transcript {
 		}
 		case "live":
 			return { ...state, live: true };
+		case "agent":
+			return state;
 		case "metadata": {
 			const shared = event.shared ?? state.shared;
 			const desktop = event.desktop ?? state.desktop;
@@ -316,6 +318,15 @@ export function useTranscript(
 	/** The channel's worker ended the watch and a re-watch is waiting for it to come back. */
 	const [restarting, setRestarting] = useState(false);
 	const [attempt, setAttempt] = useState(0);
+	const refresh = useRef<() => void>(undefined);
+	// A default model change moves what Automatic picks, which info names.
+	const settingsVersion = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
+	const settingsSeen = useRef(settingsVersion);
+	useEffect(() => {
+		if (settingsVersion === settingsSeen.current) return;
+		settingsSeen.current = settingsVersion;
+		refresh.current?.();
+	}, [settingsVersion]);
 	const [wasOffline, setWasOffline] = useState(offline);
 	if (offline !== wasOffline) {
 		setWasOffline(offline);
@@ -352,11 +363,12 @@ export function useTranscript(
 			// A re-watch replays the whole chat; the shown transcript stays until the replay is
 			// complete so the timeline, and what is expanded in it, stays mounted.
 			let replay: Transcript | undefined = EMPTY;
-			const refresh = () =>
+			const read = () =>
 				host.channel<ChannelInfo>(channel, { op: "info" }).then((value) => {
 					if (current()) setInfo(value);
 				}, () => {});
-			void refresh();
+			refresh.current = () => void read();
+			void read();
 			host.channel(channel, {
 				op: "watch",
 				queue: true,
@@ -364,6 +376,7 @@ export function useTranscript(
 				progress: true,
 				actions: true,
 				typing: true,
+				agent: true,
 				...(chat === undefined ? {} : { chat }),
 			}, {
 				event(event) {
@@ -375,7 +388,7 @@ export function useTranscript(
 						setRestarting(false);
 						replay = undefined;
 					}
-					if (event.kind === "run") void refresh();
+					if (event.kind === "run" || event.kind === "agent") void read();
 				},
 				// A released watch belongs to an old generation; a reconnecting host restarts every watch.
 				closed(reason) {

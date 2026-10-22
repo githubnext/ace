@@ -1533,7 +1533,7 @@ function ComposerModel({ state }: { state: ComposerState }) {
 						/>
 					}
 				>
-					<span className="truncate max-inline-[10rem]">
+					<span className="truncate max-inline-[13rem]">
 						{selected?.name}
 					</span>
 				</ComboboxTrigger>

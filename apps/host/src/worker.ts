@@ -21,7 +21,7 @@ import { tabs } from "./tabs";
 
 const RETIRE_AFTER = 10 * 60_000;
 /** An archived channel keeps its history as it was archived. */
-const ARCHIVED = new Set(["say", "ask", "chat", "react", "delete", "edit"]);
+const ARCHIVED = new Set(["say", "ask", "select", "chat", "react", "delete", "edit"]);
 
 seal();
 

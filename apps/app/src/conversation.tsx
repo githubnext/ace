@@ -320,6 +320,7 @@ export function Conversation(
 						user={user}
 						current={model}
 						currentEffort={chat?.effort}
+						automatic={transcript.info?.automatic}
 						busy={transcript.busy}
 						waiting={waiting}
 						shared={transcript.shared}

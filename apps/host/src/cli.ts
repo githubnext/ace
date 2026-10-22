@@ -36,7 +36,17 @@ import {
 	type WindowInfo,
 } from "./protocol";
 import { checkModel, setModel } from "./settings";
-import { archive, fork, isRunning, kill, models, parseModel, project, remove } from "./manage";
+import {
+	archive,
+	defaultModel,
+	fork,
+	isRunning,
+	kill,
+	models,
+	parseModel,
+	project,
+	remove,
+} from "./manage";
 import { move } from "./move";
 
 const HELP = `ace — channels on this host
@@ -502,7 +512,12 @@ async function main() {
 		case "model": {
 			if (ref) await setModel(ref === "auto" ? null : parseModel(ref));
 			const saved = preference();
-			console.log(saved ? `${saved.provider}/${saved.modelId}` : "Automatic");
+			if (saved) console.log(`${saved.provider}/${saved.modelId}`);
+			else {
+				// Without a usable key Automatic has nothing to pick yet.
+				const picked = await defaultModel().catch(() => undefined);
+				console.log(picked ? `Automatic (${picked.provider}/${picked.modelId})` : "Automatic");
+			}
 			if (config.model) console.log(`Overridden by ACE_MODEL=${config.model}`);
 			return;
 		}

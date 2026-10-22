@@ -47,7 +47,6 @@ export const EFFORTS: Record<Effort, string> = {
 };
 const ACE = /(^|\s)@ace\b/i;
 const LEADING = /^\s*@ace\b/i;
-const UNPICKED: { model?: string; effort?: Effort } = {};
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
 // Errors a provider gives for the model or its key, which another try with them would repeat.
@@ -61,6 +60,8 @@ type Props = {
 	user: string;
 	current?: ModelRef;
 	currentEffort?: Effort;
+	/** What the channel picks for a chat on Automatic. */
+	automatic?: ModelRef;
 	busy: boolean;
 	/** What a pending send waits on, as its submit control's label. */
 	waiting: string;
@@ -100,6 +101,7 @@ export function Composer(
 		user,
 		current,
 		currentEffort,
+		automatic,
 		busy,
 		waiting,
 		shared,
@@ -118,7 +120,7 @@ export function Composer(
 	const typed = useRef(0);
 	const [pending, setPending] = useState(false);
 	const [attached, setAttached] = useState<Attachment[]>([]);
-	// Kept beside the channel's draft so a deliberate mode and an unsent model pick survive relaunch.
+	// Kept beside the channel's draft so a deliberate mode survives relaunch.
 	const scope = `/channels/${channel.id}`;
 	const [stored, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
 	// The channel refuses a blocked teammate's ask, stop, and kill too.
@@ -204,14 +206,14 @@ export function Composer(
 			active = false;
 		};
 	}, [channel.id, mode, status, settingsVersion, offline, ready]);
-	const [{ model: picked, effort: pickedEffort }, changePick] = useLocalStorage(
-		`ace:pick:${scope}/${id}`,
-		UNPICKED,
-	);
-	const model = picked || (current ? key(current) : "auto");
+	// The chat holds the pick, so details, the CLI and other clients name what its next run uses.
+	// A pick shows until the chat's info reports a change, which follows the pick's own answer.
+	const chosen = `${current ? key(current) : "auto"} ${currentEffort || "off"}`;
+	const [picking, setPicking] = useState<{ model: string; effort?: Effort; from: string }>();
+	if (picking && picking.from !== chosen) setPicking(undefined);
+	const model = picking?.model || (current ? key(current) : "auto");
 	const levels = models?.find((value) => key(value) === model)?.efforts;
-	const requestedEffort = pickedEffort
-		|| (current && key(current) === model ? currentEffort : undefined) || "off";
+	const requestedEffort = picking?.effort || currentEffort || "off";
 	const effort = requestedEffort === "off" || levels?.includes(requestedEffort)
 		? requestedEffort
 		: "off";
@@ -230,7 +232,11 @@ export function Composer(
 		choices.unshift({ id: model, name: model.split("/").slice(1).join("/"), vendor: "" });
 	}
 	// Automatic stays offered so a chat whose model lost its key can hand the choice back.
-	choices.unshift({ id: "auto", name: "Automatic", vendor: "" });
+	choices.unshift({
+		id: "auto",
+		name: automatic ? `Automatic (${automatic.modelId})` : "Automatic",
+		vendor: "",
+	});
 	// Formatting tools crowd a phone's composer; they stay one tap away.
 	const phone = useMedia("(width < 40rem)");
 
@@ -244,6 +250,33 @@ export function Composer(
 			});
 		}
 		setAttached(kept);
+	}
+
+	async function pick(next: string, nextEffort?: Effort) {
+		const from = chosen;
+		setPicking({ model: next, effort: nextEffort, from });
+		const [provider, ...rest] = next.split("/");
+		try {
+			const result = await host.channel<{ model: ModelRef; effort: Effort }>(channel.id, {
+				op: "select",
+				chat: id,
+				author: user,
+				...(next === "auto"
+					? { automatic: true }
+					: { model: { provider: provider!, modelId: rest.join("/") } }),
+				...(nextEffort ? { effort: nextEffort } : {}),
+			});
+			setPicking({ model: key(result.model), effort: result.effort, from });
+		} catch (error) {
+			setPicking(undefined);
+			const { message } = error as Error;
+			toast.error("Could not change the model", {
+				description: message,
+				...(onProviders && /provider key/i.test(message)
+					? { action: { label: "Providers", onClick: onProviders } }
+					: {}),
+			});
+		}
 	}
 
 	async function send(text: string, mode: string, attached: Attachment[]) {
@@ -269,18 +302,14 @@ export function Composer(
 		try {
 			const encoded = await attachments(attached);
 			if (invoke) {
-				const [provider, ...rest] = model.split("/");
+				// The chat holds the pick; asking without a model lets the channel replace one whose
+				// provider lost its key.
 				await host.channel(channel.id, {
 					op: "ask",
-					...(levels ? { effort } : {}),
 					chat: id,
 					author: user,
 					text: body,
 					...encoded,
-					// An unpicked model lets the channel replace a chat model whose provider lost its key.
-					...(picked && picked !== "auto"
-						? { model: { provider: provider!, modelId: rest.join("/") } }
-						: {}),
 				});
 			} else {
 				await host.channel(channel.id, {
@@ -315,23 +344,14 @@ export function Composer(
 		sending.current = true;
 		setPending(true);
 		try {
-			const [provider, ...rest] = model.split("/");
 			await host.channel(channel.id, {
 				op: "ask",
 				chat: id,
 				author: user,
 				text: RETRY,
-				...(reset
-					? { automatic: true }
-					: {
-						...(levels ? { effort } : {}),
-						...(picked && picked !== "auto"
-							? { model: { provider: provider!, modelId: rest.join("/") } }
-							: {}),
-					}),
+				...(reset ? { automatic: true } : {}),
 			});
 			if (reset) {
-				changePick(UNPICKED);
 				toast("Switched this chat to Automatic", {
 					description: `${model} failed, so Retry let Ace choose the model.`,
 				});
@@ -358,10 +378,10 @@ export function Composer(
 				mentions={mentions}
 				models={choices}
 				model={model}
-				onModelChange={(value) => changePick({ model: value })}
+				onModelChange={(value) => void pick(value)}
 				efforts={efforts}
 				effort={effort}
-				onEffortChange={(value) => changePick({ model: picked, effort: value as Effort })}
+				onEffortChange={(value) => void pick(model, value as Effort)}
 				attachments={attached}
 				onAttachmentsChange={attach}
 				busy={busy}
