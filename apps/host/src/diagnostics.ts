@@ -64,5 +64,6 @@ export async function diagnostics(sync?: boolean): Promise<Diagnostics> {
 		},
 		shell: { ...environment },
 		web: web.address,
+		http: web.plain,
 	};
 }

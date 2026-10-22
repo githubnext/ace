@@ -425,16 +425,19 @@ export function Settings(
 					<DialogTitle className="px-2 pt-1">Settings</DialogTitle>
 					<nav
 						aria-label="Settings sections"
-						className="flex gap-0.5 overflow-x-auto scrollbar-hidden sm:flex-col sm:gap-4"
+						className="flex flex-wrap gap-0.5 sm:flex-col sm:flex-nowrap sm:gap-4"
 					>
 						{groups.map((group) => (
-							<div key={group.label || "app"} className="flex shrink-0 gap-0.5 sm:flex-col">
+							<div
+								key={group.label || "app"}
+								className="contents sm:flex sm:shrink-0 sm:flex-col sm:gap-0.5"
+							>
 								{group.label && (
 									<h3 className="hidden px-2 pb-1 text-xs text-muted-foreground sm:block">
 										{group.label}
 									</h3>
 								)}
-								<ul className="flex gap-0.5 sm:flex-col">
+								<ul className="contents sm:flex sm:flex-col sm:gap-0.5">
 									{group.sections.map(({ id, label, icon: Icon }) => (
 										<li key={id} className="shrink-0">
 											<button

@@ -47,8 +47,12 @@ export type Listener = { port: number; secure: boolean };
 /** The HTTPS address the owner's phone opens, once that listener is up. */
 export let address: string | undefined;
 
+/** The tailnet's plain HTTP address, which WireGuard encrypts but browsers treat as insecure. */
+export let plain: string | undefined;
+
 export function served(machine: Machine, listener: Listener): void {
-	address = `https://${machine.dns}:${listener.port}`;
+	if (listener.secure) address = `https://${machine.dns}:${listener.port}`;
+	else plain = `http://${machine.dns}:${listener.port}`;
 }
 
 /** Names this host answers to on the tailnet; anything else is DNS rebinding. */

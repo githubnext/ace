@@ -64,7 +64,8 @@ function Machine({ channel }: { channel: Listing }) {
 				}
 			>
 				<Icon className="size-3.5 shrink-0" aria-hidden />
-				<span className="max-w-40 truncate">{name}</span>
+				{/* A phone's tab strip needs the room; the icon's tooltip still names the machine. */}
+				<span className="max-w-40 truncate max-sm:sr-only">{name}</span>
 			</TooltipTrigger>
 			<TooltipContent>{detail}</TooltipContent>
 		</Tooltip>

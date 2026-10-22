@@ -1252,6 +1252,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	}
 	if (machine) {
 		servers.push(team(machine, { port, secure: false }));
+		web.served(machine, { port, secure: false });
 		const address = isIP(machine.address) === 6 ? `[${machine.address}]` : machine.address;
 		servedUrl = `http://${address}:${port}/directory`;
 		console.log(`Sharing with the tailnet on ${machine.address}:${port} as ${machine.login}`);
