@@ -18,7 +18,7 @@ export type CommandPaletteCommandItem = {
 	hiddenUntilSearch?: boolean;
 };
 
-export type CommandPaletteSessionStatus = "idle" | "busy" | "unread" | "mention";
+export type CommandPaletteSessionStatus = "idle" | "busy" | "unread" | "mention" | "attention";
 
 export type CommandPaletteSessionItem = {
 	kind: "session";
