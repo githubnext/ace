@@ -87,17 +87,21 @@ function tabItems(window: WindowState): CommandPaletteItem[] {
 }
 
 /** Mod+K searches channels in every project, the open channel's tabs, and window actions. */
-export function Palette({ channels, projects, host, project, attention, onChannel, onCreate }: {
-	channels: Listing[];
-	projects: AppProject[];
-	host: string;
-	/** The current project's id. */
-	project?: string;
-	attention: Map<string, Attention>;
-	onChannel: (channel: Listing) => void;
-	/** Starts a channel in the current project, when one can start there. */
-	onCreate?: { name: string; run: () => void };
-}) {
+export function Palette(
+	{ channels, projects, host, project, github, attention, onChannel, onCreate }: {
+		channels: Listing[];
+		projects: AppProject[];
+		host: string;
+		/** The current project's id. */
+		project?: string;
+		/** Whether the current project has a GitHub repository for Issues and Pull requests. */
+		github: boolean;
+		attention: Map<string, Attention>;
+		onChannel: (channel: Listing) => void;
+		/** Starts a channel in the current project, when one can start there. */
+		onCreate?: { name: string; run: () => void };
+	},
+) {
 	const [open, setOpen] = useState(false);
 	// Tabs are read once on open: they only change through the window the palette covers.
 	const [tabs, setTabs] = useState<CommandPaletteItem[]>([]);
@@ -119,7 +123,7 @@ export function Palette({ channels, projects, host, project, attention, onChanne
 	if (!open) return null;
 	const items: CommandPaletteItem[] = [
 		...(onCreate ? [action(CREATE, `New channel in ${onCreate.name}`, "Channel")] : []),
-		...ACTIONS,
+		...(github ? ACTIONS : ACTIONS.filter(({ id }) => id !== "issues" && id !== "prs")),
 		...tabs,
 		...channelItems(channels, projects, host, project, attention),
 	];

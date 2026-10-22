@@ -105,6 +105,21 @@ export async function readable(repo: string, login?: string): Promise<boolean> {
 	return permission !== "none";
 }
 
+/**
+ * Whether GitHub finds `repo` for this host's gh account. It answers not found for private
+ * repositories the account can't read, and `gh pr list --search` returns nothing for them instead
+ * of failing. Other failures throw, so the lists can show them.
+ */
+export async function found(repo: string): Promise<boolean> {
+	return gh(["api", `repos/${repository(repo)}`, "--jq", ".id"]).then(
+		() => true,
+		(error: Error) => {
+			if (MISSING.test(error.message)) return false;
+			throw error;
+		},
+	);
+}
+
 /** A GitHub repository URL, SSH remote, or owner/name, as a valid owner/name. */
 export function parse(value: string): string {
 	const repo = githubRepo(value);

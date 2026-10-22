@@ -4,9 +4,9 @@ anchor: function handle
 created: 2026-10-15T06:00:20Z
 norm: '1'
 sig: e597b5fbc8e664ce
-body_hash: 7148e9daddb2ba29
-raw_hash: 1839c37c0e9b7635
-vouched: 2026-10-22T14:33:27Z
+body_hash: 3d892bdf2a5a0db7
+raw_hash: f681a895851ad4fb
+vouched: 2026-10-22T16:18:52Z
 lines: 281-561
 ---
 

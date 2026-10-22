@@ -41,7 +41,7 @@ import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
 import { DeleteChannel } from "./delete-channel";
 import { Github, GithubSidebar } from "./github";
-import { useGithubRefresh } from "./github-cache";
+import { useGithub, useGithubRefresh } from "./github-cache";
 import { desktop, here, titlebar } from "./desktop";
 import { host } from "./host";
 import { type Invite, parse } from "./invite";
@@ -312,7 +312,7 @@ export function App() {
 	const people = useSyncExternalStore(host.subscribe, () => host.people);
 	const presence = useSyncExternalStore(host.subscribe, () => host.presence);
 	const [hello, setHello] = useState<Hello>({ user: "", host: "" });
-	const [page, setPage] = useWindowStorage<Page>("ace:page", "dashboard");
+	const [saved, setPage] = useWindowStorage<Page>("ace:page", "dashboard");
 	const [project, setProject] = useWindowStorage<string | undefined>("ace:project-id", undefined);
 	const [all, setAll] = useWindowStorage("ace:all-projects", false);
 	const [selected, setSelected] = useWindowStorage<Record<string, string>>(
@@ -428,7 +428,6 @@ export function App() {
 		hello.host,
 	]);
 	useGithubRefresh(available);
-	const allProjects = all && page === "channels";
 	const listings = new Map(channels.map((channel) => [channel.id, channel]));
 	const byId = useMemo(() => {
 		const values = new Map<string, AppProject>();
@@ -440,6 +439,16 @@ export function App() {
 		return values;
 	}, [available]);
 	const current = (project && byId.get(project)) || available[0];
+	const repo = useGithub<string | null>(
+		current && { op: "project-repo", project: current.path, host: current.host },
+	);
+	// Only a definite answer hides GitHub, so the lists can still say why a lookup failed.
+	const linked = repo.value !== null;
+	const page = !linked && (saved === "issues" || saved === "prs") ? "channels" : saved;
+	function go(next: Page) {
+		if (linked || (next !== "issues" && next !== "prs")) setPage(next);
+	}
+	const allProjects = all && page === "channels";
 	const visible = current
 		? channels.filter((channel) => channelProject(channel) === current.id)
 		: [];
@@ -840,7 +849,8 @@ export function App() {
 							page={page}
 							user={hello.user}
 							github={people[hello.user]}
-							onPage={setPage}
+							repo={linked}
+							onPage={go}
 							onSettings={() => setSettings(true)}
 						/>
 					}
@@ -850,7 +860,7 @@ export function App() {
 						onOpen={() => void choose()}
 						onClone={cloneUrl}
 						onSettings={() => setSettings(true)}
-						onPage={setPage}
+						onPage={go}
 						connected={connected}
 					/>
 					{page !== "dashboard" && current && (
@@ -1086,6 +1096,7 @@ export function App() {
 					projects={available}
 					host={hello.host}
 					project={current?.id}
+					github={linked}
 					attention={attention}
 					onChannel={select}
 					onCreate={current && creatable && connected
