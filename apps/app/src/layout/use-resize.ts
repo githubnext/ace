@@ -1,4 +1,12 @@
-import { type PointerEvent, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+	type KeyboardEvent as KeyEvent,
+	type PointerEvent,
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 
 import * as Split from "@ace/split-tabs";
 import { media, useMedia } from "@ace/ui";
@@ -185,22 +193,29 @@ export function useResize(
 		clear();
 	}, [flat]);
 
-	function start(event: PointerEvent<HTMLButtonElement>, handle: Split.Handle) {
+	function measure(handle: Split.Handle) {
 		const rect = grid.current?.getBoundingClientRect();
 		if (!rect) return;
 
 		const size = handle.axis === "col" ? rect.width : rect.height;
 		if (size <= 0) return;
 
-		const base = view;
-		const limit = Split.bounds(base, {
+		const limit = Split.bounds(view, {
 			axis: handle.axis,
 			line: handle.line,
 			ratio: handle.ratio,
 			size,
 			min,
 		});
-		if (!limit) return;
+		if (limit) return { size, limit };
+	}
+
+	function start(event: PointerEvent<HTMLElement>, handle: Split.Handle) {
+		const box = measure(handle);
+		if (!box) return;
+
+		const { size, limit } = box;
+		const base = view;
 
 		const item: Resize = {
 			axis: handle.axis,
@@ -220,6 +235,25 @@ export function useResize(
 		event.stopPropagation();
 	}
 
+	// Arrows move a divider 16px (64px with Shift); Home and End go to its limits, like a window splitter.
+	function key(event: KeyEvent<HTMLElement>, handle: Split.Handle) {
+		const back = handle.axis === "col" ? "ArrowLeft" : "ArrowUp";
+		const ahead = handle.axis === "col" ? "ArrowRight" : "ArrowDown";
+		if (![back, ahead, "Home", "End"].includes(event.key)) return;
+
+		const box = measure(handle);
+		if (!box) return;
+
+		event.preventDefault();
+		const step = (event.shiftKey ? 64 : 16) / box.size;
+		const ratio = event.key === "Home"
+			? box.limit.min
+			: event.key === "End"
+			? box.limit.max
+			: handle.ratio + (event.key === ahead ? step : -step);
+		api.resize({ axis: handle.axis, line: handle.line, ratio, size: box.size });
+	}
+
 	return {
 		view,
 		css,
@@ -229,5 +263,6 @@ export function useResize(
 		desktop,
 		box,
 		start,
+		key,
 	};
 }
