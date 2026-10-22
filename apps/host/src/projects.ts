@@ -98,6 +98,7 @@ async function project(path: string): Promise<Project> {
 	if (repo) value.repo = repo;
 	if (!commit) {
 		value.git = false;
+		if (existsSync(join(root, ".git"))) value.empty = true;
 		if (existsSync(join(root, ".gitignore"))) value.ignored = true;
 	}
 	return value;

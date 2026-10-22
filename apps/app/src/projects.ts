@@ -89,6 +89,7 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 			};
 			if (repo) created.repo = repo;
 			if (opened?.git === false) created.git = false;
+			if (opened?.empty) created.empty = true;
 			if (opened?.ignored) created.ignored = true;
 			return void values.set(id, created);
 		}
