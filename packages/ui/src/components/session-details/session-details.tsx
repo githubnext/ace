@@ -43,7 +43,14 @@ export type DetailsLink = { url: string; label: string; kind: "issue" | "pull" |
 export type DetailsFact = { label: string; value: string; title?: string };
 type Icon = ComponentType<{ className?: string }>;
 /** One group's totals, such as committed or untracked files; ungrouped totals omit `group`. */
-export type DetailsChanges = { group?: string; adds: number; dels: number; files: number };
+export type DetailsChanges = {
+	group?: string;
+	adds: number;
+	dels: number;
+	files: number;
+	/** Whether `adds` and `dels` are known; untracked directories and binary files have none. */
+	lines: boolean;
+};
 
 export type SessionDetailsViewProps = {
 	summary?: string;
@@ -129,15 +136,19 @@ function Changes({ changes, onDiff }: { changes: DetailsChanges; onDiff?: () => 
 	const files = `${changes.files.toLocaleString()} ${changes.files === 1 ? "file" : "files"}`;
 	const adds = `${changes.adds} ${changes.adds === 1 ? "addition" : "additions"}`;
 	const dels = `${changes.dels} ${changes.dels === 1 ? "deletion" : "deletions"}`;
-	const label = `${name}: ${files}, ${adds}, ${dels}`;
+	const label = changes.lines ? `${name}: ${files}, ${adds}, ${dels}` : `${name}: ${files}`;
 	const content = (
 		<>
 			<IconFileDiff className={cn(GLYPH, "text-muted-foreground")} aria-hidden />
 			<span className="min-w-0 truncate">{name}</span>
 			<span className="ml-auto flex shrink-0 gap-1.5 font-medium tabular-nums">
 				{changes.group && <span className="font-normal text-muted-foreground">{files}</span>}
-				<span className="text-success">+{changes.adds.toLocaleString()}</span>
-				<span className="text-destructive">-{changes.dels.toLocaleString()}</span>
+				{changes.lines && (
+					<>
+						<span className="text-success">+{changes.adds.toLocaleString()}</span>
+						<span className="text-destructive">-{changes.dels.toLocaleString()}</span>
+					</>
+				)}
 			</span>
 		</>
 	);
