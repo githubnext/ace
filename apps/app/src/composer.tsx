@@ -49,6 +49,19 @@ const ACE = /(^|\s)@ace\b/i;
 const LEADING = /^\s*@ace\b/i;
 
 const key = (model: ModelRef) => `${model.provider}/${model.modelId}`;
+/** The latest pick in this client, as `provider/id` or `auto`; new channels start on it. */
+export const LAST_MODEL = `ace:last-model:${host.url}`;
+
+export function lastModel(): ModelRef | undefined {
+	try {
+		const value: unknown = JSON.parse(localStorage.getItem(LAST_MODEL) || "null");
+		if (typeof value !== "string" || value === "auto") return;
+		const [provider, ...rest] = value.split("/");
+		return { provider: provider!, modelId: rest.join("/") };
+	} catch {
+		return;
+	}
+}
 // Errors a provider gives for the model or its key, which another try with them would repeat.
 const MODEL_FAULT =
 	/\b(401|403|404)\b|api key|unauthori[sz]ed|authenticat|permission|does not exist|not found|access to/i;
@@ -123,6 +136,7 @@ export function Composer(
 	// Kept beside the channel's draft so a deliberate mode survives relaunch.
 	const scope = `/channels/${channel.id}`;
 	const [stored, changeMode] = useLocalStorage(`ace:mode:${scope}`, "ace");
+	const [, setLast] = useLocalStorage(LAST_MODEL, "auto");
 	// The channel refuses a blocked teammate's ask, stop, and kill too.
 	const blocked = shared === false && channel.owner !== user;
 	// Agent mode only once a teammate's access is known to be on, as it isn't while their Mac is offline.
@@ -267,6 +281,7 @@ export function Composer(
 				...(nextEffort ? { effort: nextEffort } : {}),
 			});
 			setPicking({ model: key(result.model), effort: result.effort, from });
+			setLast(next);
 		} catch (error) {
 			setPicking(undefined);
 			const { message } = error as Error;

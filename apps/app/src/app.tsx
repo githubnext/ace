@@ -39,6 +39,7 @@ import { chosen, deployed, gateway, remember } from "./address";
 import { type Attention, glow, useAttention } from "./attention";
 import { ArchiveChannel } from "./archive-channel";
 import { Channel, ChannelDetails, type ChannelDraft } from "./channel";
+import { lastModel } from "./composer";
 import { useCompute } from "./compute";
 import { Dashboard } from "./dashboard";
 import { DeleteChannel } from "./delete-channel";
@@ -750,7 +751,8 @@ export function App() {
 			const value = await host.request<Pick<Listing, "id" | "name" | "project">>({
 				op: "create",
 				project: target.path,
-				...(cloud ? { cloud } : {}),
+				// A cloud channel's models are the compute service's, which this host's pick may lack.
+				...(cloud ? { cloud } : { model: lastModel() }),
 			});
 			if (cloud) {
 				onCreated?.();

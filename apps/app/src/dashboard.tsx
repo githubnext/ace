@@ -13,6 +13,7 @@ import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
+	useLocalStorage,
 } from "@ace/ui";
 import {
 	IconChevronDown,
@@ -25,11 +26,11 @@ import {
 	IconPlus,
 	IconRotate,
 } from "@ace/ui/icons";
-import type { GithubList, ModelRef } from "@ace/channel/protocol";
-import type { Listing, People, Presence } from "@ace/host/protocol";
+import type { GithubList, ModelOption, ModelRef } from "@ace/channel/protocol";
+import type { Listing, People, Presence, Settings } from "@ace/host/protocol";
 
 import type { Attention } from "./attention";
-import { Notice } from "./composer";
+import { LAST_MODEL, Notice } from "./composer";
 import { desktop, here } from "./desktop";
 import { prompt, StateIcon } from "./github";
 import { useGithub } from "./github-cache";
@@ -353,14 +354,19 @@ export function Dashboard(
 	const owner = (channel?: Listing) =>
 		channel && channel.owner !== user ? people[channel.owner] || channel.owner : undefined;
 	const settingsVersion = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
-	const [models, setModels] = useState<ModelRef[]>();
+	const [models, setModels] = useState<ModelOption[]>();
+	const [automatic, setAutomatic] = useState<ModelRef>();
 	useEffect(() => {
 		if (!local || !connected) return;
 		let active = true;
 		// An unread answer offers no setup; starting then reports whatever failed.
-		host.request<ModelRef[]>({ op: "models" }).then(
+		host.request<ModelOption[]>({ op: "models" }).then(
 			(value) => active && setModels(value),
 			() => active && setModels(undefined),
+		);
+		host.request<Settings>({ op: "settings" }).then(
+			(value) => active && setAutomatic(value.automatic),
+			() => active && setAutomatic(undefined),
 		);
 		return () => {
 			active = false;
@@ -368,6 +374,23 @@ export function Dashboard(
 	}, [local, connected, settingsVersion]);
 	// A cloud channel runs on the service's credentials, not this host's.
 	const unprovided = models?.length === 0 && place === "local";
+	// `create` starts a local channel on this pick, which a pick in any chat's composer also sets.
+	const [model, setModel] = useLocalStorage(LAST_MODEL, "auto");
+	const choices = models?.length && place === "local"
+		? models.map(({ provider, modelId }) => ({
+			id: `${provider}/${modelId}`,
+			name: modelId,
+			vendor: provider,
+		}))
+		: undefined;
+	if (choices && model !== "auto" && !choices.some((value) => value.id === model)) {
+		choices.unshift({ id: model, name: model.split("/").slice(1).join("/"), vendor: "" });
+	}
+	choices?.unshift({
+		id: "auto",
+		name: automatic ? `Automatic (${automatic.modelId})` : "Automatic",
+		vendor: "",
+	});
 	const hour = new Date().getHours();
 	const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
@@ -456,6 +479,9 @@ export function Dashboard(
 						modes={MODES}
 						mentions={MENTIONS}
 						mode="ace"
+						models={choices}
+						model={model}
+						onModelChange={setModel}
 						agents={cloud ? PLACES : undefined}
 						agent={place}
 						onAgentChange={setPlace}

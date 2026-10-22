@@ -28,10 +28,10 @@ export async function models(): Promise<ModelRef[]> {
 	return available(providers());
 }
 
-export async function defaultModel(): Promise<ModelRef> {
+/** `models` lets Settings resolve it without waiting on a keychain prompt. */
+export async function defaultModel(models = providers()): Promise<ModelRef> {
 	if (config.model) return parseModel(config.model);
 	const saved = preference();
-	const models = providers();
 	// A saved default whose key expired or was removed must not block agents another key can run.
 	if (saved && await usable(models, saved)) return saved;
 	return choose(models);
