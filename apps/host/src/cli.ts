@@ -50,7 +50,7 @@ import {
 } from "./manage";
 import { move } from "./move";
 
-const HELP = `ace — channels on this host
+const USAGE = `ace — channels on this host
 
   ace new [--project <dir>] [--name <name>] [--model <provider/id>]
   ace ls [--all] [--team]                        --team adds reachable teammates' channels
@@ -88,14 +88,15 @@ const HELP = `ace — channels on this host
   ace directory [<url> | off]                    the team's directory, which lists every host's channels;
                                                  a running host checks it with ACE_SECRET first
   ace web [<url> | off]                          the deployed web app your devices may use with this host
-  ace serve [--port 4140] [--loopback] [--demo <script>]
+  ace serve [--port ${config.port}] [--loopback] [--demo <script.json>]
                                                 serve the app and its WebSocket gateway;
                                                  --loopback stays off the tailnet and the directory;
-                                                 --demo runs scripted synthetic teammates
+                                                 --demo runs scripted synthetic teammates (docs/demo.md)
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
-  ace open [--port 4140]                          open this host's authenticated app
+  ace open [--port ${config.port}]                          open this host's authenticated app
   ace archive <channel> | unarchive <channel> | delete <channel>
+  ace --version
 
 info, say, ask, answer, watch, chat and stop also take a teammate's channel, by name or ID, through this
 host's running gateway (open Ace or run ace serve). Their host decides who may invoke its agents.
@@ -104,34 +105,48 @@ Models are provider/id, such as openai/gpt-6-astra or anthropic/claude-opus-5-5.
 A credential such as OPENAI_API_KEY comes from ACE_OPENAI_API_KEY, then OPENAI_API_KEY, then the
 keychain. Store keys there for the desktop app, which starts without your shell's environment.`;
 
-const { values: flags, positionals } = parseArgs({
-	allowPositionals: true,
-	options: {
-		project: { type: "string" },
-		name: { type: "string" },
-		model: { type: "string" },
-		hosted: { type: "string" },
-		local: { type: "boolean" },
-		compute: { type: "boolean" },
-		chat: { type: "string" },
-		port: { type: "string" },
-		all: { type: "boolean" },
-		team: { type: "boolean" },
-		detach: { type: "boolean" },
-		now: { type: "boolean" },
-		channel: { type: "string" },
-		trace: { type: "string" },
-		level: { type: "string" },
-		since: { type: "string" },
-		grep: { type: "string" },
-		lines: { type: "string", short: "n" },
-		follow: { type: "boolean", short: "f" },
-		json: { type: "boolean" },
-		loopback: { type: "boolean" },
-		demo: { type: "string" },
-		help: { type: "boolean", short: "h" },
-	},
-});
+// The app installs the command under another name for Canary.
+const HELP = USAGE.replace(/\bace\b/g, config.command);
+
+const OPTIONS = {
+	project: { type: "string" },
+	name: { type: "string" },
+	model: { type: "string" },
+	hosted: { type: "string" },
+	local: { type: "boolean" },
+	compute: { type: "boolean" },
+	chat: { type: "string" },
+	port: { type: "string" },
+	all: { type: "boolean" },
+	team: { type: "boolean" },
+	detach: { type: "boolean" },
+	now: { type: "boolean" },
+	channel: { type: "string" },
+	trace: { type: "string" },
+	level: { type: "string" },
+	since: { type: "string" },
+	grep: { type: "string" },
+	lines: { type: "string", short: "n" },
+	follow: { type: "boolean", short: "f" },
+	json: { type: "boolean" },
+	loopback: { type: "boolean" },
+	demo: { type: "string" },
+	help: { type: "boolean", short: "h" },
+	version: { type: "boolean" },
+} as const;
+
+function parse() {
+	try {
+		return parseArgs({ allowPositionals: true, options: OPTIONS });
+	} catch (error) {
+		// Node's message goes on to explain `--` for positionals, which no command here takes.
+		const [problem] = (error as Error).message.split(". ");
+		console.error(`${problem}. Run ${config.command} --help for usage.`);
+		process.exit(1);
+	}
+}
+
+const { values: flags, positionals } = parse();
 const [command, ref, ...rest] = positionals;
 
 const model = parseModel;
@@ -374,7 +389,14 @@ function advice(conflict: HostConflict): string {
 }
 
 async function main() {
-	if (flags.help || !command) return console.log(HELP);
+	if (flags.version) {
+		return console.log(
+			config.version
+				? `${config.command} ${config.version}`
+				: "Ace from source has no release version",
+		);
+	}
+	if (flags.help || !command || command === "help") return console.log(HELP);
 	// Shells start background jobs with SIGINT ignored and Bun keeps that, so `kill -INT` would not
 	// end a backgrounded watch. A listener takes SIGINT back; serve shuts down with its own.
 	if (command !== "serve") process.on("SIGINT", () => process.exit(130));

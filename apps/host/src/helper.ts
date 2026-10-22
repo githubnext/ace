@@ -26,6 +26,7 @@ config.services = join(dirname(process.execPath), "..", "Resources", "services")
 config.worker = [process.execPath, "--worker"];
 
 if (cli) {
+	config.command = basename(process.argv0);
 	await import("./cli");
 } else if (worker) {
 	// A compiled executable dispatches its worker entry itself, rather than running a TS file.

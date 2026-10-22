@@ -177,12 +177,68 @@ function schedule() {
 	}, (last + script!.loop) * 1000));
 }
 
-/** Starts the script in `file`; the returned function stops it and takes everyone away. */
+const ACTIONS = ["open", "close", "away", "leave", "type", "say", "ask", "react"];
+const UNTARGETED = new Set(["away", "leave"]);
+
+function isObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The script in `file`, or an error naming what's wrong in one line, before the host serves. */
+export function read(file: string): Script {
+	const path = resolve(file);
+	let text: string;
+	try {
+		text = readFileSync(path, "utf8");
+	} catch {
+		throw new Error(`No demo script at ${path}`);
+	}
+	let value: unknown;
+	try {
+		value = JSON.parse(text);
+	} catch (error) {
+		throw new Error(`${file} is not JSON: ${(error as Error).message}`, { cause: error });
+	}
+	const fail = (problem: string) => new Error(`${file}: ${problem}. See docs/demo.md.`);
+	if (!isObject(value) || !isObject(value.people)) {
+		throw fail(`needs "people", naming each person's "login" and "github"`);
+	}
+	for (const [who, person] of Object.entries(value.people)) {
+		if (
+			!isObject(person) || typeof person.login !== "string" || typeof person.github !== "string"
+		) {
+			throw fail(`person ${who} needs a "login" and a "github" login`);
+		}
+	}
+	if (!Array.isArray(value.steps)) throw fail(`needs "steps", a list`);
+	for (const [index, step] of value.steps.entries()) {
+		const where = `step ${index + 1}`;
+		if (!isObject(step)) throw fail(`${where} is not an object`);
+		if (typeof step.at !== "number" || step.at < 0) {
+			throw fail(`${where} needs "at", seconds from the start`);
+		}
+		if (typeof step.who !== "string" || !(step.who in value.people)) {
+			throw fail(
+				`${where} needs "who", one of ${Object.keys(value.people).join(", ") || "the people"}`,
+			);
+		}
+		const actions = ACTIONS.filter((action) => action in step);
+		if (actions.length !== 1) throw fail(`${where} needs exactly one of ${ACTIONS.join(", ")}`);
+		if (!UNTARGETED.has(actions[0]!) && typeof step.channel !== "string") {
+			throw fail(`${where} needs "channel"`);
+		}
+	}
+	if (value.loop !== undefined && typeof value.loop !== "number") throw fail(`"loop" is seconds`);
+	return value as Script;
+}
+
+/** Starts a script read from `file`; the returned function stops it and takes everyone away. */
 export function start(
+	value: Script,
 	file: string,
 	options: { project(channel: string): Promise<string>; changed(): void },
 ): () => void {
-	script = JSON.parse(readFileSync(resolve(file), "utf8")) as Script;
+	script = value;
 	({ project, changed } = options);
 	log("info", "demo.start", { file, people: Object.keys(script.people).length });
 	console.log(`Demo mode: ${Object.keys(script.people).join(", ")} from ${file}`);
