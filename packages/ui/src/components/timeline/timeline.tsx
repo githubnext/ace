@@ -610,6 +610,7 @@ type GroupProps = {
 	editing?: string;
 	unsent?: ReadonlyMap<string, Unsent>;
 	editable?: ReadonlySet<string>;
+	mentioned?: ReadonlySet<string>;
 	openGroups: Set<string>;
 	openWorking: Set<string>;
 	settlingWorking: Set<string>;
@@ -960,8 +961,18 @@ function GroupTurn({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 }
 
 function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolbar }) {
-	let { group, blocks, editing, unsent, target, onRowEnter, currentUser, onReact, onOpenChange } =
-		props;
+	let {
+		group,
+		blocks,
+		editing,
+		unsent,
+		mentioned,
+		target,
+		onRowEnter,
+		currentUser,
+		onReact,
+		onOpenChange,
+	} = props;
 	let { content, mine } = state;
 
 	let isUser = group.role === "user";
@@ -1032,9 +1043,15 @@ function GroupRows({ props, state, toolbar }: GroupRender & { toolbar: RowToolba
 								background: isBubble
 									? target === uid && isUser
 										? "color-mix(in oklch, var(--accent) 75%, transparent)"
+										: mentioned?.has(uid)
+										? "color-mix(in oklch, var(--accent) 25%, var(--muted))"
 										: "var(--muted)"
 									: "transparent",
-								boxShadow: tone ? `inset 3px 0 0 ${tone}` : undefined,
+								boxShadow: tone
+									? `inset 3px 0 0 ${tone}`
+									: mentioned?.has(uid)
+									? "inset 3px 0 0 var(--accent)"
+									: undefined,
 								// Outlines never affect measured layout.
 								outline: state === "failed" ? "1px solid var(--destructive)" : undefined,
 								padding: isBubble ? `${BUBBLE_PAD_Y}px ${BUBBLE_PAD_X}px` : 0,
@@ -1113,6 +1130,10 @@ type TimelineProps =
 		onReact?: (uid: string, emoji: string) => void;
 		/** Message UID to scroll into view. */
 		target?: string;
+		/** The first message the viewer hasn't seen, which a New divider sits above. */
+		unread?: string;
+		/** Messages that mention the viewer, which are highlighted. */
+		mentioned?: ReadonlySet<string>;
 		/** Called when the user clicks a rendered message link. */
 		onLink?: (href: string) => void;
 		/** How to open a sender whose name links somewhere, such as the channel that sent it. */
@@ -1163,9 +1184,11 @@ function useTimeline(
 		alignment = "left",
 		editing,
 		unsent,
+		mentioned,
 		editable,
 		onReact,
 		target,
+		unread,
 		onLink,
 		openSender,
 		onDocumentOpen,
@@ -1202,7 +1225,12 @@ function useTimeline(
 	let seenFinalWorking = useRef<Set<string> | null>(null);
 	let point = useRef<{ x: number; y: number } | null>(null);
 	let suppress = useRef(false);
-	let timeline = useMemo(() => compile(events, working, project), [events, working, project]);
+	let timeline = useMemo(() => compile(events, working, project, unread), [
+		events,
+		working,
+		project,
+		unread,
+	]);
 	let finalWorkingKey = useMemo(() => finalWorkingIds(timeline).join("\0"), [timeline]);
 	let visibleWorking = useMemo(() => {
 		let next = new Set(openWorking);
@@ -1524,6 +1552,7 @@ function useTimeline(
 		target,
 		editing,
 		unsent,
+		mentioned,
 		editable,
 		openWorking,
 		settlingWorking,
@@ -1573,6 +1602,7 @@ function Timeline(input: TimelineProps) {
 		target,
 		editing,
 		unsent,
+		mentioned,
 		editable,
 		openWorking,
 		settlingWorking,
@@ -1636,6 +1666,19 @@ function Timeline(input: TimelineProps) {
 								</div>
 							);
 						}
+						if (item.kind === "new") {
+							return (
+								<div
+									role="separator"
+									aria-label="New messages"
+									className="utils:max-width flex items-center gap-2 text-[0.6875rem] leading-4 font-medium"
+									style={{ paddingInline: PAD, blockSize: DAY_HEIGHT }}
+								>
+									<div className="h-px min-w-2 flex-1 bg-accent" />
+									<span className="rounded-full bg-accent px-1.5 text-accent-foreground">New</span>
+								</div>
+							);
+						}
 						if (item.kind === "event") {
 							let content = lane - PAD * 2 - AVATAR - AVATAR_GAP;
 							return (
@@ -1675,6 +1718,7 @@ function Timeline(input: TimelineProps) {
 									editing={editing}
 									unsent={unsent}
 									editable={editable}
+									mentioned={mentioned}
 									openGroups={openGroups}
 									openWorking={openWorking}
 									settlingWorking={settlingWorking}

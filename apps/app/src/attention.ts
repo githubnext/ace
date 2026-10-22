@@ -204,5 +204,8 @@ export function useAttention(
 		return found;
 	}, [channels, user, names, state]);
 
-	return { attention, pulse };
+	/** When this person last saw a channel; undefined before this profile's first visit. */
+	const seen = (channel: Listing) => state ? seenAt(channel, state) : undefined;
+
+	return { attention, pulse, seen };
 }

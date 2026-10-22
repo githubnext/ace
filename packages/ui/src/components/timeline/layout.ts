@@ -590,7 +590,7 @@ async function parseBlockMap(
 	};
 
 	for (let item of timeline) {
-		if (item.kind === "day") continue;
+		if (item.kind === "day" || item.kind === "new") continue;
 		if (item.kind === "event") {
 			jobs.push(convert(item.row.chunks, item.row.uid, eventTextCompact(item.row.chunks)));
 			continue;
@@ -666,7 +666,7 @@ function useBlockMap(
 		};
 
 		for (let item of timeline) {
-			if (item.kind === "day") continue;
+			if (item.kind === "day" || item.kind === "new") continue;
 			if (item.kind === "event") {
 				map.set(
 					item.row.uid,
@@ -742,7 +742,7 @@ function itemHeight(
 	open: Set<string> = new Set(),
 	openWorking: Set<string> = new Set(),
 ): number {
-	if (item.kind === "day") return DAY_HEIGHT;
+	if (item.kind === "day" || item.kind === "new") return DAY_HEIGHT;
 	if (item.kind === "event") {
 		let b = blocks.get(item.row.uid);
 		let content = width - PAD * 2 - AVATAR - AVATAR_GAP;
