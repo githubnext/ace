@@ -33,7 +33,7 @@ channel sidebar. Project paths are scoped to their host until repository-based i
   store nonsecret preferences under `~/Library/Application Support/Ace` on macOS.
 - The app's command line tool is Ace Helper itself: started under any other name, it runs the CLI
   with its app's data directory, port, and Keychain service, and spawns workers as Ace Helper.
-  Settings → This Mac links `~/.local/bin/ace`, or `ace-<channel>` for other channels, to the
+  Settings → Ace Helper links `~/.local/bin/ace`, or `ace-<channel>` for other channels, to the
   bundle's helper. It needs no administrator rights, adds no second compiled runtime, and keeps
   `Contents/Helpers`, which is first on agents' `PATH`, limited to lane. Install replaces only a
   link to another Ace and refuses other files; a translocated app can't install a link.
@@ -146,7 +146,7 @@ and Ace's grouped permission in macOS background-item settings.
   caching object snapshots in the shared local-storage hook.
 - Follow-up work is tracked in the [dogfooding](https://github.com/githubnext/ace/issues/5) and
   [desktop distribution](https://github.com/githubnext/ace/issues/7) meta issues. Providers beyond
-  Anthropic/OpenAI still use the CLI. This Mac joins, changes, and leaves the team directory and
+  Anthropic/OpenAI still use the CLI. Settings → Team joins, changes, and leaves the team directory and
   saves its secret; deploying the directory stays a CLI step.
 
 ## UI testing
@@ -216,7 +216,7 @@ history should remain available.
 This helper-testing mode cannot coexist with source dev builds. They share the same app identity,
 and macOS can resolve a registered helper from another copy even though source apps never
 register it. For routine development, use `bun desktop dev` alongside installed Canary. Before
-switching from installed Ace-dev to source development, stop Ace Helper in Settings → This Mac,
+switching from installed Ace-dev to source development, stop Ace Helper in Settings → Ace Helper,
 quit Ace-dev, and remove its installed bundle. Keep its data directories.
 
 The installed `/Applications/Ace-dev.app` uses `dev.ace.desktop.dev`, port 4141, the `ace-dev`
@@ -233,20 +233,20 @@ registered helper's signature, so an ad-hoc or differently signed replacement fa
 constraint violation. The build refuses ad-hoc signing. Apple recommends an
 [Apple-issued identity for both the app and helper](https://developer.apple.com/forums/thread/799910).
 
-To replace it, stop Ace Helper in Settings → This Mac, which unregisters it, and quit Ace. Remove
+To replace it, stop Ace Helper in Settings → Ace Helper, which unregisters it, and quit Ace. Remove
 the old bundle and move the new one from `dist/dev-macos-arm64` into `/Applications` as a complete
 directory; do not overwrite executables inside the installed bundle or leave copies with the
 `dev.ace.desktop.dev` identifier elsewhere, because launchd can resolve the helper from any
 registered copy. Refresh its registration with
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Ace-dev.app`,
-then open Ace and enable Ace Helper. In Settings → This Mac, try restarting the helper, then stopping
+then open Ace and enable Ace Helper. In Settings → Ace Helper, try restarting the helper, then stopping
 and starting it. Keep the `ace-dev` data, preferences, and Keychain service. Changing the signing
 identity may require approving Keychain access again. This build is signed locally, not notarized.
 
 ## Test hosts
 
 `ace serve --loopback` runs a host that only listens on 127.0.0.1. It doesn't bind the tailnet,
-find peers, or publish to the team directory; Settings says so under Tailscale. Give a disposable
+find peers, or publish to the team directory; Settings → Team says so under Tailscale. Give a disposable
 host its own `ACE_HOME`, `ACE_CONFIG_HOME`, `ACE_KEYCHAIN_SERVICE`, and port. A busy port's error
 names the Ace on it and never asks to restart a listener that belongs to another app or checkout.
 
@@ -277,7 +277,7 @@ The Chat tab keeps the channel's name; use `ace rename` to change that name inst
 
 The commands connect to an already running local host and never start one. Use its `ACE_HOME`
 profile and pass `--port <port>` when it differs from `ACE_PORT` or the default 4140. The command the
-installed app links from Settings → This Mac, such as `ace-canary tabs`, already targets its app. For
+installed app links from Settings → Ace Helper, such as `ace-canary tabs`, already targets its app. For
 a source CLI, the installed canary uses `ACE_HOME="$HOME/.local/state/ace-canary"` and `--port 4142`; the development
 app uses `ACE_HOME="$HOME/.local/state/ace-dev"` and `--port 4141`. Authentication checks the host's
 identity and protocol before connecting. Listing or renaming tabs over the tailnet is unavailable.

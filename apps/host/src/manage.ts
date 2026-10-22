@@ -41,7 +41,7 @@ export async function defaultModel(): Promise<ModelRef> {
 export async function project(dir: string): Promise<string> {
 	dir = resolve(dir === "~" ? homedir() : dir.startsWith("~/") ? homedir() + dir.slice(1) : dir);
 	const result = await git(dir, ["rev-parse", "--show-toplevel"]);
-	if (result.status === null) throw new Error("Git is unavailable. Check This Mac in Settings.");
+	if (result.status === null) throw new Error("Git is unavailable. Check Settings → Ace Helper.");
 	if (result.status !== 0) {
 		throw new Error(`${dir} is not a Git repository. Initialize Git to start channels in it.`);
 	}

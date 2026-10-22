@@ -30,12 +30,12 @@ export function Connect({ previous }: { previous?: string }) {
 						<p className="text-sm leading-6 text-muted-foreground">
 							{previous
 								? `Couldn't reach ${previous}. Check that Tailscale is on, then try again or enter another host.`
-								: "Enter the address your Ace host prints for HTTPS, such as mac.tailnet.ts.net:5141. This device must be on your tailnet."}
+								: "Enter the address your Ace host prints for HTTPS, such as mac.tailnet.ts.net:5140. This device must be on your tailnet."}
 						</p>
 					</div>
 					<Input
 						aria-label="Host address"
-						placeholder="mac.tailnet.ts.net:5141"
+						placeholder="mac.tailnet.ts.net:5140"
 						autoCapitalize="none"
 						autoCorrect="off"
 						spellCheck={false}

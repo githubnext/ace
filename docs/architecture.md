@@ -420,7 +420,7 @@ Literal insertion uses one GUI-owned temporary plain-text paste, with the existi
 lane and clipboard transaction gate held through delivery and cleanup. The GUI preserves bounded
 prior clipboard contents privately and restores them only when no paste key was sent or the expected
 edit was observed in the same control. Uncertain consumption leaves the replacement or preserves newer contents; no
-restore journal or automatic retry is created. Clipboard read policy is reported in This Mac.
+restore journal or automatic retry is created. Clipboard read policy is reported in Settings → Computer use.
 The same clipboard gate retains a content-free reservation while a dispatched paste is unresolved.
 Later automated writes require observed consumption or termination of the exact receiver process
 generation. The reservation survives GUI restart; clipboard contents and comparison state do not.

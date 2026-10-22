@@ -15,7 +15,7 @@ take priority and Settings identifies them.
 
 ## Command line tool
 
-`Settings → This Mac` installs the command line tool. It links `ace` for stable, or `ace-canary`
+`Settings → Ace Helper` installs the command line tool. It links `ace` for stable, or `ace-canary`
 for Canary, in `~/.local/bin` to the app's own Ace Helper, so it uses that app's channels and port
 and stays current with app updates. Settings says whether your shell finds it and, if not, what to
 add to your `PATH`.
@@ -52,8 +52,8 @@ home screen to use it as an app.
 
 The team's directory lists every host's channels, so they stay visible while their host sleeps.
 Whoever sets up the team deploys the services once from a checkout; everyone else joins in
-`Settings → This Mac → Team directory` with the directory's URL and the team's secret, shared
-privately. `Troubleshooting → Refresh status` syncs at once. From a checkout,
+`Settings → Team` (Join…) with the directory's URL and the team's secret, shared privately.
+Refresh there syncs at once. From a checkout,
 `printf %s "$SECRET" | bun ace key set ACE_SECRET` then `bun ace directory <url>` does the same.
 
 The services are cells, so they run on Cloudflare Workers, or on [celld](#on-celld) on machines the

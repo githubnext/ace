@@ -63,7 +63,7 @@ export async function hostedAuth(): Promise<Record<string, string>> {
 	const secret = await key("ACE_SECRET");
 	if (!secret) {
 		throw new Error(
-			"The team's services need ACE_SECRET. Add it in Settings → This Mac → Team directory, or with ace key set ACE_SECRET",
+			"The team's services need ACE_SECRET. Add it in Settings → Team, or with ace key set ACE_SECRET",
 		);
 	}
 	return serviceAuth(secret);
