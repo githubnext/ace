@@ -11,7 +11,7 @@ import {
 	DialogTitle,
 	Input,
 } from "@ace/ui";
-import { IconArrowUpRight, IconCheck, IconCopy, IconLoader } from "@ace/ui/icons";
+import { IconArrowUpRight, IconCheck, IconCopy, IconLoader, IconUsers } from "@ace/ui/icons";
 import type { TeamPeer } from "@ace/host/protocol";
 
 import { host } from "./host";
@@ -19,6 +19,7 @@ import { useDiagnostics } from "./host-settings";
 import { type Invite as Team, link, page, parse } from "./invite";
 
 const DOCS = "https://github.com/githubnext/ace/blob/main/docs/setup.md";
+export const TEAM_SETUP = "ace:team-setup";
 const PROVIDERS = {
 	cloudflare: { label: "Cloudflare" },
 	fly: { label: "Fly.io" },
@@ -40,6 +41,20 @@ const STEPS: Partial<Record<Step, string>> = {
  * Membership stays the tailnet's: this only decides where the team's channels are listed.
  * `invite` opens on joining with an invite link's values; `inviting` opens on this team's invite.
  */
+/** Sidebar footer entry to team setup, where Ask to join and deploying a directory live. */
+export function TeamSetupItem() {
+	return (
+		<button
+			type="button"
+			onClick={() => window.dispatchEvent(new Event(TEAM_SETUP))}
+			className="mx-2 mb-2 flex h-7 shrink-0 items-center gap-2 rounded-md px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
+		>
+			<IconUsers className="size-3.5" aria-hidden />
+			Team setup
+		</button>
+	);
+}
+
 export function TeamSetup({ github, invite, inviting, onClose }: {
 	github?: string;
 	invite?: Team;

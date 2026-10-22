@@ -9,6 +9,7 @@ import { useDiagnostics } from "./host-settings";
 import { parse } from "./invite";
 import { CREATE_DIRECTORY, DIRECTORY_CHANGED, People, useRoster } from "./onboarding";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
+import { TEAM_SETUP } from "./team-setup";
 
 const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
 
@@ -95,6 +96,14 @@ export function TeamSettings({ active }: { active: boolean }) {
 							)}
 						</Row>
 						<TeamDirectory directory={checked.directory} onChange={() => checks.refresh()} />
+						<Row
+							label="Team setup"
+							description="Ask a teammate's host to let you in, or deploy a directory to Cloudflare or Fly.io."
+						>
+							<Button variant="outline" onClick={() => window.dispatchEvent(new Event(TEAM_SETUP))}>
+								Set up…
+							</Button>
+						</Row>
 					</>
 				)}
 			</Group>
