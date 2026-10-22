@@ -334,9 +334,10 @@ export function Channel(
 	}, [channel.id]);
 
 	// Shells live on this host, so only its own channels have them; reconnecting may follow a reload.
+	const elsewhere = remote || place.kind !== "local";
 	const [shells, setShells] = useState<TerminalShell[]>();
 	useEffect(() => {
-		if (remote || place.kind !== "local") return;
+		if (elsewhere) return;
 		let live = true;
 		const load = () => {
 			host.request<TerminalShell[]>({ op: "terminals", channel: channel.id }).then(
@@ -352,7 +353,7 @@ export function Channel(
 			live = false;
 			off();
 		};
-	}, [channel.id, remote, place.kind]);
+	}, [channel.id, elsewhere]);
 
 	const opener = useRef<() => void>(undefined);
 	useEffect(() => {
@@ -384,6 +385,7 @@ export function Channel(
 			changed={changed}
 			opener={opener}
 			shells={shells}
+			terminals={!elsewhere}
 			actions={<ChannelAccess channel={channel} user={user} />}
 			render={(data, uid, active, update) => {
 				if (uid === CHAT) {
@@ -406,6 +408,18 @@ export function Channel(
 					return <Diff channel={channel} chat={data.chat} user={user} active={active} />;
 				}
 				if (data.type !== "terminal") return null;
+				// Tabs saved before Terminal was withheld here still open, so they say why they're empty.
+				if (elsewhere) {
+					return (
+						<section className="grid h-full min-h-0 place-items-center bg-background px-4 text-center text-sm text-muted-foreground">
+							{place.kind === "cloud"
+								? "This cloud channel's shell is in its container, so terminals don't open here."
+								: place.kind === "hosted"
+								? `This channel runs on ${place.service}, which doesn't open terminals.`
+								: `Terminals open on the channel's host, ${channel.host}, and only for its owner.`}
+						</section>
+					);
+				}
 				return (
 					<Terminal
 						channel={channel.id}
