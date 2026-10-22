@@ -4,8 +4,9 @@ anchor: function discover
 created: 2026-10-15T04:29:11Z
 norm: '1'
 sig: ab69f97386d0db50
-body_hash: 75be26d25d6bd1b9
-raw_hash: 08d9946a3a985c23
+body_hash: 3a50f94087c324bd
+raw_hash: c8bb63059457b3f4
+vouched: 2026-10-22T14:33:27Z
 lines: 32-70
 ---
 

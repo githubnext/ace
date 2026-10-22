@@ -72,15 +72,18 @@ function useGithubFilter(kind: GithubKind, project: AppProject) {
 	);
 }
 
-export function GithubSidebar({ kind, project, repos, connected, onProject, onOpen, onClone }: {
-	kind: GithubKind;
-	project: AppProject;
-	repos: SessionSidebarRepo[];
-	connected: boolean;
-	onProject: (id: string) => void;
-	onOpen: () => void;
-	onClone: () => void;
-}) {
+export function GithubSidebar(
+	{ kind, project, repos, connected, onProject, onRemove, onOpen, onClone }: {
+		kind: GithubKind;
+		project: AppProject;
+		repos: SessionSidebarRepo[];
+		connected: boolean;
+		onProject: (id: string) => void;
+		onRemove: (repo: SessionSidebarRepo) => void;
+		onOpen: () => void;
+		onClone: () => void;
+	},
+) {
 	const [filter, setFilter] = useGithubFilter(kind, project);
 	const left = useLayoutLeft();
 	const phone = useMedia("(width < 40rem)");
@@ -91,6 +94,7 @@ export function GithubSidebar({ kind, project, repos, connected, onProject, onOp
 			repos={repos}
 			selectedRepoId={project.id}
 			onRepoChange={(repo) => onProject(repo.id)}
+			onRepoRemove={onRemove}
 			onAddRepo={connected ? onOpen : undefined}
 			onCloneRepo={connected ? onClone : undefined}
 		>

@@ -73,6 +73,8 @@ export type SessionSidebarRepo = {
 	avatar?: string;
 	/** Shown on hover, such as the project's full path. */
 	title?: string;
+	/** The picker offers removing it when `onRepoRemove` is provided. */
+	removable?: boolean;
 };
 
 export type SessionSidebarProps = Omit<ComponentPropsWithRef<"aside">, "children" | "onSelect"> & {
@@ -362,7 +364,7 @@ export function ProjectPicker(
 								repo={repo}
 								selected={repo.id === selected.id}
 								onRepoChange={onRepoChange}
-								onRepoRemove={onRepoRemove}
+								onRepoRemove={repo.removable ? onRepoRemove : undefined}
 							/>
 						))}
 					</DropdownMenuGroup>
@@ -671,6 +673,7 @@ function Group({
 										onContinuePr={onContinuePr}
 										onStartIssue={onStartIssue}
 										onShareProject={shareProject}
+										onRemoveProject={group.onRemove}
 									/>
 								)}
 							</div>
@@ -692,7 +695,7 @@ function Group({
 						{group.onRemove && (
 							<ContextMenuItem onClick={group.onRemove}>
 								<IconTrash className="size-3.5" />
-								Remove project
+								Remove project…
 							</ContextMenuItem>
 						)}
 					</ContextMenuContent>

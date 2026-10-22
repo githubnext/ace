@@ -4,9 +4,9 @@ anchor: function serve
 created: 2026-10-15T10:17:10Z
 norm: '1'
 sig: 171797818ef4d836
-body_hash: 347ec5128df25eff
-raw_hash: 4f8782ceb985ad81
-vouched: 2026-10-21T23:57:08Z
+body_hash: 50b83460ae5ee675
+raw_hash: f38372c6ca8389a3
+vouched: 2026-10-22T14:33:27Z
 lines: 830-948
 supersedes: 01M4Z2R1HEVDKEA8VEJ7XRJQ8F
 ---

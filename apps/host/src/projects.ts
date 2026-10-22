@@ -96,7 +96,10 @@ async function project(path: string): Promise<Project> {
 	const { root, repo, commit } = await checkout(path);
 	const value: Project = { path: root, name: repo?.split("/")[1] || basename(root) || root };
 	if (repo) value.repo = repo;
-	if (!commit) value.git = false;
+	if (!commit) {
+		value.git = false;
+		if (existsSync(join(root, ".gitignore"))) value.ignored = true;
+	}
 	return value;
 }
 
@@ -126,7 +129,11 @@ const expand = (value: string) =>
 
 /** Opening a folder must not require model credentials or create a channel. */
 export async function open(value: string): Promise<Project> {
-	let path = realpathSync(resolve(expand(value)));
+	// A relative path would resolve against Ace Helper's working directory, which no one sees.
+	const expanded = expand(value.trim());
+	if (!isAbsolute(expanded)) throw new Error("Enter a full folder path, such as ~/code/project");
+	if (!existsSync(expanded)) throw new Error(`There's no folder at ${expanded}. Check the path.`);
+	let path = realpathSync(expanded);
 	if (!statSync(path).isDirectory()) throw new Error("Choose a folder to open as a project");
 	path = realpathSync((await checkout(path)).root);
 	const opened = paths();
