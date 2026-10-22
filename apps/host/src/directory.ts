@@ -119,6 +119,21 @@ export function isChosen(): boolean {
 	return existsSync(config) || !!process.env.ACE_DIRECTORY;
 }
 
+/** The directory each peer's host names, so a host without one can offer to join it. */
+const offers = new Map<string, string>();
+
+export function offer(peer: string, value: string | undefined): void {
+	if (value) offers.set(peer, value);
+	else offers.delete(peer);
+}
+
+/** A directory a peer's host names while this host has none, as after leaving one. */
+export function offered(): { url: string; host: string } | undefined {
+	if (url()) return;
+	const [host, value] = offers.entries().next().value ?? [];
+	return host && value ? { url: value, host } : undefined;
+}
+
 /**
  * When each URL a peer named last failed without a secret, so discovery doesn't ask every 15
  * seconds; its host may only be offline, so it's asked again later.
