@@ -75,16 +75,16 @@ localStorage.removeItem(`ace:github-targets:${host.url}`);
 
 /**
  * On a phone the channel list is a drawer over the channel: open while no channel is chosen, and
- * out of the way once one is.
+ * out of the way once one is. Choosing a project closes it over Issues and PRs.
  */
-function Drawers({ page, channel }: { page: string; channel?: string }) {
+function Drawers({ page, channel, project }: { page: string; channel?: string; project?: string }) {
 	const left = useLayoutLeft();
 	const { setOpen: setRightOpen } = useLayoutRight();
 	const phone = useMedia("(width < 40rem)");
 	const { setOpen } = left;
 	useEffect(() => {
 		if (phone) setOpen(page === "channels" && !channel);
-	}, [phone, page, channel, setOpen]);
+	}, [phone, page, channel, project, setOpen]);
 	useEffect(() => {
 		if (page !== "channels" || !channel) setRightOpen(false);
 	}, [page, channel, setRightOpen]);
@@ -819,7 +819,7 @@ export function App() {
 						/>
 					}
 				>
-					<Drawers page={page} channel={channel?.id} />
+					<Drawers page={page} channel={channel?.id} project={current?.id} />
 					<WindowControls
 						onOpen={() => void choose()}
 						onClone={cloneUrl}
