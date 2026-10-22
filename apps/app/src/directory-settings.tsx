@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Button, Input } from "@ace/ui";
 import type { Diagnostics } from "@ace/host/protocol";
@@ -9,6 +9,13 @@ import { useDiagnostics } from "./host-settings";
 import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-layout";
 
 const SETUP = "https://github.com/githubnext/ace/blob/main/docs/setup.md#team-directory";
+
+/** What each service the directory can name offers, since an unnamed one leaves no trace elsewhere. */
+const services = [
+	{ key: "hosted", label: "Hosted channels", offers: "Move to cloud in a channel's menu" },
+	{ key: "app", label: "Web app", offers: "Ace in a browser on other devices" },
+	{ key: "compute", label: "Cloud compute", offers: "Run in cloud for new channels" },
+] as const;
 
 const secrets = {
 	keychain: "Saved in Keychain",
@@ -89,11 +96,47 @@ export function TeamSettings({ active }: { active: boolean }) {
 					</>
 				)}
 			</Group>
+			{checked?.directory.url && checked.directory.synced && (
+				<TeamServices services={checked.directory.services} />
+			)}
 			{!checks.open
 				? <Status>Waiting for Ace Helper…</Status>
 				: !checked && !checks.error && <Status>Checking…</Status>}
 			{checks.error && checks.open && <Problem>{checks.error}</Problem>}
 		</Page>
+	);
+}
+
+function Setup({ children }: { children: ReactNode }) {
+	return (
+		<a
+			href={SETUP}
+			target="_blank"
+			rel="noopener noreferrer"
+			className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
+		>
+			{children}
+		</a>
+	);
+}
+
+/** Which services the joined directory names; whoever deployed it sets the rest up. */
+function TeamServices({ services: named }: { services: Diagnostics["directory"]["services"] }) {
+	return (
+		<Group title="Team services">
+			{services.map(({ key, label, offers }) => (
+				<Row key={key} label={label} description={offers}>
+					<Value>{named[key] ? URL.parse(named[key])?.host || named[key] : "Not set up"}</Value>
+				</Row>
+			))}
+			{services.some(({ key }) => !named[key]) && (
+				<div className="py-3">
+					<Status>
+						Whoever deployed the directory can add the rest. <Setup>Set up team services</Setup>
+					</Status>
+				</div>
+			)}
+		</Group>
 	);
 }
 
@@ -161,15 +204,7 @@ function TeamDirectory(
 				label="Directory"
 				description={directory.url || (
 					<>
-						Not joined.{" "}
-						<a
-							href={SETUP}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
-						>
-							Set up a directory
-						</a>
+						Not joined. <Setup>Set up a directory</Setup>
 					</>
 				)}
 				footer={
