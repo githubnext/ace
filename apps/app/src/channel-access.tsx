@@ -1,6 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useSyncExternalStore } from "react";
 
-import type { Listing } from "@ace/host/protocol";
+import type { Listing, People } from "@ace/host/protocol";
 import {
 	Button,
 	Dialog,
@@ -22,9 +22,13 @@ import { placement } from "./placement";
 
 /**
  * What teammates' runs can reach. A cloud container has no desktop tools and no macOS
- * permissions, so its copy names neither.
+ * permissions, so its copy names neither. A guest reads whose account and machine they would use.
  */
-function reach(channel: Listing): { agents: string; confirm: string; desktop: boolean } {
+function reach(
+	channel: Listing,
+	owner: boolean,
+	people: People,
+): { agents: string; confirm: string; desktop: boolean } {
 	const place = placement(channel);
 	if (place.kind === "cloud") {
 		return {
@@ -35,9 +39,12 @@ function reach(channel: Listing): { agents: string; confirm: string; desktop: bo
 			desktop: false,
 		};
 	}
+	const name = people[channel.owner] || channel.owner.split("@")[0];
+	const machine = place.kind === "local" ? place.host : place.workspace;
 	return {
-		agents:
-			"Let teammates invoke this channel's agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue.",
+		agents: owner
+			? "Let teammates invoke this channel's agents, which run commands as you on this machine with Ace's macOS permissions, such as Screen Recording. Turning this off leaves chat available and active runs continue."
+			: `Teammates can invoke this channel's agents, which run commands as ${name} on ${machine}, with ${name}'s model keys and Ace's macOS permissions there, such as Screen Recording.`,
 		confirm:
 			"Teammates can run commands as you on this machine, with Ace's macOS permissions such as Screen Recording.",
 		desktop: true,
@@ -118,8 +125,9 @@ export function ChannelAccess({ channel, user }: { channel: Listing; user: strin
 	const [sharing, setSharing] = useState(false);
 	const [confirming, setConfirming] = useState(false);
 	const [changingDesktop, setChangingDesktop] = useState(false);
+	const people = useSyncExternalStore(host.subscribe, () => host.people);
 	const owner = channel.owner === user;
-	const copy = reach(channel);
+	const copy = reach(channel, owner, people);
 
 	// Render only watch-confirmed values, never an optimistic permission grant.
 	function share() {

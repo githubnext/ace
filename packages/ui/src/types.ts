@@ -106,6 +106,8 @@ export namespace Event {
 			value: string;
 			/** @example "Ace" */
 			display: string;
+			/** Who asked for the run and what ran it, when someone other than its owner asked. */
+			credit?: string;
 		};
 	}
 

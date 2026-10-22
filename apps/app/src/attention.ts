@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useLocalStorage } from "@ace/ui";
 import type { RunEnd } from "@ace/channel/protocol";
-import type { Listing } from "@ace/host/protocol";
+import type { Listing, People } from "@ace/host/protocol";
 
 import { desktop } from "./desktop";
 import { isFocused, subscribe } from "./focus";
@@ -62,6 +62,14 @@ function pending(channel: Listing, user: string, state: State): Outcome | undefi
 	return ran.outcome;
 }
 
+/** A run a teammate asked for in this person's channel, which ran with their machine and key. */
+function isTeammateRun(channel: Listing, user: string, state: State): boolean {
+	const { ran } = channel;
+	if (!ran || channel.owner !== user || ran.author === user) return false;
+	if (ran.outcome !== "done" && ran.outcome !== "failed") return false;
+	return ran.at > seenAt(channel, state);
+}
+
 function mark(channel: Listing, user: string, state: State): Mark | undefined {
 	const outcome = pending(channel, user, state);
 	if (outcome) return outcome;
@@ -92,16 +100,17 @@ function missed(found: { channel: Listing; count: number }[]): [string, string] 
 
 /**
  * Runs this person invoked that ended, or that wait on a question, while they were not watching the
- * channel, and new @mentions of `names` (lowercased GitHub logins). Each pulses the window's glow or
- * sends one desktop notification, then marks its row until they open it; mentions that arrived
- * while Ace was closed or disconnected notify once together. Others' messages mark the row too,
- * without a notification.
+ * channel, teammates' runs that ended in their channels, and new @mentions of `names` (lowercased
+ * GitHub logins). Each pulses the window's glow or sends one desktop notification, then marks its
+ * row until they open it; mentions that arrived while Ace was closed or disconnected notify once
+ * together. Others' messages mark the row too, without a notification.
  */
 export function useAttention(
 	channels: Listing[],
 	user: string,
 	names: string[],
 	open: string | undefined,
+	people: People,
 ) {
 	const [state, setState] = useLocalStorage<State | null>(
 		`ace:attention:${host.url}:${user}`,
@@ -141,11 +150,15 @@ export function useAttention(
 			}
 			if (!ran) continue;
 			const outcome = pending(channel, user, state);
-			if (!outcome || ran.at <= (state.told[id] || 0)) continue;
+			if (!outcome && !isTeammateRun(channel, user, state)) continue;
+			if (ran.at <= (state.told[id] || 0)) continue;
 			told[id] = ran.at;
 			if (watching) setPulse("on");
+			else if (outcome) desktop?.notify(channel.name, NOTICES[outcome]).catch(() => {});
 			else {
-				desktop?.notify(channel.name, NOTICES[outcome]).catch(() => {});
+				const who = people[ran.author] || ran.author.split("@")[0];
+				const failed = ran.outcome === "failed" ? ", and the run failed" : "";
+				desktop?.notify(channel.name, `${who} used your agent${failed}`).catch(() => {});
 			}
 		}
 		if (away && mentions.length) {
@@ -169,7 +182,7 @@ export function useAttention(
 				called: { ...value.called, ...called },
 			}
 		);
-	}, [channels, user, names, state, setState, watching, open]);
+	}, [channels, user, names, state, setState, watching, open, people]);
 
 	useEffect(() => {
 		if (!pulse) return;
