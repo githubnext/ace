@@ -99,12 +99,11 @@ function name(reaction: Event.Message.Reaction, me?: CurrentUser): string {
 const SIZE = {
 	wide: "w-14 px-2",
 	mid: "w-12 px-2",
-	pair: "w-9 px-1.5",
-	single: "size-5.5 p-0",
+	digit: "w-9 px-1.5",
 } as const;
 const STACK = {
-	right: { wide: "-mr-10", mid: "-mr-8", pair: "-mr-5", single: "-mr-2.5" },
-	left: { wide: "-ml-10", mid: "-ml-8", pair: "-ml-5", single: "-ml-2.5" },
+	right: { wide: "-mr-10", mid: "-mr-8", digit: "-mr-5" },
+	left: { wide: "-ml-10", mid: "-ml-8", digit: "-ml-5" },
 } as const;
 const SLIDE = {
 	right: "group-hover/reactions:mr-0.5 group-data-[popup-open]/reactions:mr-0.5",
@@ -114,8 +113,7 @@ const SLIDE = {
 function tier(count: number): keyof typeof SIZE {
 	if (count > 99) return "wide";
 	if (count > 9) return "mid";
-	if (count > 1) return "pair";
-	return "single";
+	return "digit";
 }
 
 function size(count: number): string {
@@ -178,9 +176,7 @@ function Reactions(
 							}
 						>
 							<EmojiGlyph emoji={emoji} />
-							{count > 1 && (
-								<span className="text-foreground/70 font-semibold tabular-nums">{count}</span>
-							)}
+							<span className="text-foreground/70 font-semibold tabular-nums">{count}</span>
 						</TooltipTrigger>
 						<TooltipContent>{reactors(users, currentUser)}</TooltipContent>
 					</Tooltip>
