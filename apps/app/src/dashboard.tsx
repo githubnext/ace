@@ -15,20 +15,17 @@ import {
 } from "@ace/ui";
 import {
 	IconChevronDown,
-	IconCircleX,
 	IconCloud,
 	IconExternal,
 	IconGlobe,
 	IconHash,
 	IconLaptop,
-	IconMessage,
 	IconPlus,
 	IconRotate,
 } from "@ace/ui/icons";
 import type { GithubList, ModelRef } from "@ace/channel/protocol";
 import type { Listing, People, Presence } from "@ace/host/protocol";
 
-import type { Outcome } from "./attention";
 import { Notice } from "./composer";
 import { desktop, here } from "./desktop";
 import { prompt, StateIcon } from "./github";
@@ -37,7 +34,7 @@ import { host } from "./host";
 import { InitGit } from "./open-project";
 import type { AppProject } from "./projects";
 import { pulse, type Teammate } from "./pulse";
-import { byBranch, needsYou, pickBackUp, type Work } from "./work";
+import { byBranch, pickBackUp, type Work } from "./work";
 
 /**
  * A project's dashboard draft and history follow its identity, so setting up a GitHub project here
@@ -122,9 +119,6 @@ function Section({ title, action, children }: {
 		</section>
 	);
 }
-
-const ROW =
-	"flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30";
 
 function ChannelLink({ channel, onChannel }: {
 	channel: Listing;
@@ -262,7 +256,6 @@ export function Dashboard(
 		user,
 		people,
 		presence,
-		attention,
 		local,
 		connected,
 		onSetup,
@@ -282,7 +275,6 @@ export function Dashboard(
 		user: string;
 		people: People;
 		presence: Presence[] | undefined;
-		attention: Map<string, Outcome>;
 		local: boolean;
 		connected: boolean;
 		/** Offered for a GitHub project with no checkout on this host. */
@@ -322,12 +314,10 @@ export function Dashboard(
 			: undefined;
 	// `@me` is this host's GitHub CLI account, the only one Ace reads GitHub with.
 	const authored = useGithub<GithubList>(list("prs", "author:@me"));
-	const reviews = useGithub<GithubList>(list("prs", "review-requested:@me"));
 	const assigned = useGithub<GithubList>(list("issues", "assignee:@me"));
-	const github = [authored, reviews, assigned];
+	const github = [authored, assigned];
 	const branches = byBranch(channels, user);
 	const work = pickBackUp(authored.value?.items || [], assigned.value?.items || [], branches);
-	const waiting = needsYou(channels, attention, reviews.value?.items || [], branches);
 	const team = pulse(channels, presence, people, user, since, now);
 	const owner = (channel?: Listing) =>
 		channel && channel.owner !== user ? people[channel.owner] || channel.owner : undefined;
@@ -457,46 +447,6 @@ export function Dashboard(
 						</Notice>
 					)}
 				</div>
-			)}
-			{waiting.length > 0 && (
-				<Section title="Needs you">
-					<ul className="flex flex-col gap-1">
-						{waiting.map((value) =>
-							value.kind === "review"
-								? (
-									<WorkRow
-										key={value.work.item.url}
-										work={value.work}
-										owner={owner(value.work.channel)}
-										busy={busy}
-										onChannel={onChannel}
-									/>
-								)
-								: (
-									<li key={value.channel.id} className="flex">
-										<button
-											type="button"
-											className={`${ROW} flex-1`}
-											onClick={() => onChannel(value.channel)}
-										>
-											{value.outcome === "failed"
-												? <IconCircleX className="size-4 shrink-0 text-destructive" aria-hidden />
-												: <IconMessage className="size-4 shrink-0 text-accent" aria-hidden />}
-											<span className="min-w-0 flex-1">
-												<span className="block truncate">{value.channel.name}</span>
-												<span className="mt-0.5 block truncate text-xs text-muted-foreground">
-													{value.outcome === "failed"
-														? "Your run failed"
-														: "The agent is waiting for your answer"}
-													{owner(value.channel) && ` · ${owner(value.channel)}’s channel`}
-												</span>
-											</span>
-										</button>
-									</li>
-								)
-						)}
-					</ul>
-				</Section>
 			)}
 			{project.repo && (
 				<Section

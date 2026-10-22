@@ -955,7 +955,6 @@ export function App() {
 									user={hello.user}
 									people={people}
 									presence={presence[current.id]}
-									attention={attention}
 									local={local}
 									connected={connected}
 									onSetup={!local && current.repo ? () => startSetup(current) : undefined}
