@@ -4,9 +4,9 @@ anchor: function ChannelDetails
 created: 2026-10-15T02:58:24Z
 norm: '1'
 sig: b49433e7f0d6d4f3
-body_hash: c78ae37103f4096d
-raw_hash: 7d353ff7240b0bf1
-vouched: 2026-10-22T16:29:20Z
+body_hash: 0ae4093a683b3fe7
+raw_hash: 92ed025366ce01d8
+vouched: 2026-10-22T16:53:07Z
 lines: 161-209
 ---
 
