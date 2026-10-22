@@ -384,13 +384,17 @@ export function App() {
 	const picking = useRef(false);
 	const creating = useRef(false);
 	useEffect(() => {
-		const open = () => setSettings("updates");
-		window.addEventListener("ace:updates", open);
-		if (location.hash === "#updates") {
-			history.replaceState(null, "", location.pathname + location.search);
-			open();
-		}
-		return () => window.removeEventListener("ace:updates", open);
+		const sections = { updates: "updates", helper: "host" } as const;
+		const listeners = Object.entries(sections).map(([name, section]) => {
+			const open = () => setSettings(section);
+			window.addEventListener(`ace:${name}`, open);
+			if (location.hash === `#${name}`) {
+				history.replaceState(null, "", location.pathname + location.search);
+				open();
+			}
+			return () => window.removeEventListener(`ace:${name}`, open);
+		});
+		return () => listeners.forEach((remove) => remove());
 	}, []);
 	useEffect(() => {
 		const open = () => {
