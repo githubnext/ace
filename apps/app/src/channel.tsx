@@ -58,6 +58,8 @@ const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "U
 const date = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 // Open checks change on their own, so the shown channel's pull request is read again this often.
 const PULL = 60_000;
+// While a merge or close settles, so the pull request's new state shows within seconds.
+const SETTLING = 3_000;
 
 /** Links people and agents wrote in the chat, newest mention first; tool output is left out. */
 function links(items: Item[], repo?: string): DetailsLink[] {
@@ -194,6 +196,7 @@ function usePull(
 	branch: string | undefined,
 	head: string | undefined,
 	busy: boolean,
+	settling: boolean,
 ) {
 	const [, render] = useReducer((count: number) => count + 1, 0);
 	const key = repo && branch ? `${repo}\0${branch}` : undefined;
@@ -209,12 +212,12 @@ function usePull(
 				() => {},
 			);
 		void read();
-		const timer = setInterval(read, PULL);
+		const timer = setInterval(read, settling ? SETTLING : PULL);
 		return () => {
 			active = false;
 			clearInterval(timer);
 		};
-	}, [repo, branch, head, busy]);
+	}, [repo, branch, head, busy, settling]);
 	return key ? pulls.get(key) : undefined;
 }
 
@@ -222,9 +225,15 @@ export function ChannelDetails({ channel, user }: { channel: Listing; user: stri
 	const right = useLayoutRight();
 	const details = useDetails(channel.id);
 	const channels = useSyncExternalStore(host.subscribe, () => host.channels);
-	const { changes, info, items } = details;
+	const { changes, info, items, asked } = details;
 	const busy = !!info?.chats.find((value) => value.id === chat)?.busy;
-	const pull = usePull(channel.repo, changes?.branch, changes?.head, busy);
+	const pull = usePull(
+		channel.repo,
+		changes?.branch,
+		changes?.head,
+		busy,
+		asked === "merge" || asked === "close",
+	);
 	useEffect(() => publish(channel.id, { pull }), [channel.id, pull]);
 	useAsked(channel.id, busy, pull);
 	const git = useGit(channel, chat, user);
