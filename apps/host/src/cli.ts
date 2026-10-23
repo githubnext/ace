@@ -558,7 +558,7 @@ async function main() {
 			}
 			const { directory: status, tailscale } = await local<Diagnostics>({ op: "diagnostics" });
 			if (!status.url) return console.log("No directory");
-			console.log(status.url);
+			console.log(url ? `Joined ${status.url}` : status.url);
 			if (tailscale.loopback) {
 				return console.log(dim("This host runs with --loopback, so it doesn't sync it."));
 			}
@@ -594,7 +594,7 @@ async function main() {
 			url.hash = new URLSearchParams({ token: token() }).toString();
 			const result = Bun.spawnSync([process.platform === "darwin" ? "open" : "xdg-open", url.href]);
 			if (!result.success) throw new Error("Could not open Ace in your browser");
-			return;
+			return console.log(`Opened ${url.origin} in your browser, signed in to this host.`);
 		}
 		case "serve":
 			return serve(Number(flags.port || config.port), !!flags.loopback, flags.demo);

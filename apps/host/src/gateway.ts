@@ -1053,7 +1053,8 @@ function owner(port: number): Server<Client> {
 				});
 			}
 			if (url.pathname === "/ws") {
-				if (!access.authorizes(request)) return new Response("Unauthorized", { status: 401 });
+				// The body names this build's command, so a signed-out page can say what to run.
+				if (!access.authorizes(request)) return new Response(config.command, { status: 401 });
 				const protocols = request.headers.get("sec-websocket-protocol")?.split(",").map((value) =>
 					value.trim()
 				);
