@@ -163,11 +163,15 @@ async function local(): Promise<Listing[]> {
 	});
 }
 
-/** Channels only the directory or a peer's last answer knows: their host is unreachable, unless they are hosted. */
+/**
+ * Channels only the directory or a peer's last answer knows: their host is unreachable, unless they
+ * are hosted. A reachable host's own listing leaves out what it no longer shares, which is not offline.
+ */
 function listed(seen: Set<string>): Listing[] {
 	return [...directory.read().channels, ...peers.unreachable()]
 		.filter((value) => {
 			if (seen.has(value.id) || value.host === name) return false;
+			if (!value.hosted && peers.isReachable(value.host)) return false;
 			seen.add(value.id);
 			return true;
 		})
@@ -726,7 +730,7 @@ async function handle(
 		case "team-roster": {
 			const roster: Member[] = [
 				{ host: name, login: catalog.user, online: true, self: true },
-				...peers.online(),
+				...peers.members(),
 			];
 			const seen = new Set(roster.map((member) => member.host));
 			for (const { name: host, login } of directory.read().hosts) {

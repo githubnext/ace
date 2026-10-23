@@ -29,6 +29,8 @@ const stalled = new Map<string, number>();
 const named: People = {};
 /** Peers whose last hello carried no GitHub login, asked again until one does. */
 const unnamed = new Set<string>();
+/** Owners' Tailscale logins of peers that answered, so one that stops answering stays in People as offline. */
+const met = new Map<string, string>();
 
 function emit() {
 	for (const listener of listeners) listener();
@@ -61,7 +63,10 @@ async function discover(signal: AbortSignal) {
 				});
 				status = client.status;
 			}
-			if (client.status === "open") remembered.set(name, client.channels);
+			if (client.status === "open") {
+				remembered.set(name, client.channels);
+				met.set(name, machine.login);
+			}
 			emit();
 		});
 		hosts.set(name, host);
@@ -136,9 +141,7 @@ export function listings(): Listing[] {
 
 /** Channels of peers that answered before but are unreachable now. */
 export function unreachable(): Listing[] {
-	return [...remembered].flatMap(([name, channels]) =>
-		hosts.get(name)?.client.status === "open" ? [] : channels
-	);
+	return [...remembered].flatMap(([name, channels]) => isReachable(name) ? [] : channels);
 }
 
 /** Peers' owners' GitHub logins as they last answered, reachable or not. */
@@ -174,11 +177,16 @@ export async function teams(): Promise<TeamPeer[]> {
 	return found.filter((peer) => !!peer);
 }
 
-/** Hosts running Ace on the tailnet now; the gateway names their owners from every source. */
-export function online(): Member[] {
-	return [...hosts.values()].flatMap(({ machine, client }) =>
-		client.status === "open" ? [{ host: machine.name, login: machine.login, online: true }] : []
-	);
+/**
+ * Peers that answered since this host started, online while they answer, like their channels in
+ * `listings` and `unreachable`; the gateway names their owners from every source.
+ */
+export function members(): Member[] {
+	return [...met].map(([host, login]) => ({ host, login, online: isReachable(host) }));
+}
+
+export function isReachable(name: string): boolean {
+	return hosts.get(name)?.client.status === "open";
 }
 
 /** Waits for the peer's owner to approve; see asks.ts. */
