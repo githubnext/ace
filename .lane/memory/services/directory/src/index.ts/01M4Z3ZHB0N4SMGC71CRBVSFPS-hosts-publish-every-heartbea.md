@@ -4,9 +4,9 @@ anchor: class Directory
 created: 2026-10-15T06:28:49Z
 norm: '1'
 sig: 6dd0ab7d7a4fcaa0
-body_hash: 35f5333e78ef4ab2
-raw_hash: 48cbc89e6e566ec8
-vouched: 2026-10-19T20:58:11Z
+body_hash: 6322e74c70344729
+raw_hash: 6c5edbcdbf70a074
+vouched: 2026-10-23T15:02:24Z
 lines: 27-77
 ---
 
