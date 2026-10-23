@@ -388,7 +388,6 @@ function useDiffView({
 	onOpenPr,
 	onCreatePr,
 	onCreateDraftPr,
-	onManualCreatePr,
 	actions,
 	onFileOpen,
 	className,
@@ -562,7 +561,6 @@ function useDiffView({
 		onOpenPr,
 		onCreatePr,
 		onCreateDraftPr,
-		onManualCreatePr,
 		actions,
 		className,
 		summary,
@@ -595,7 +593,6 @@ function DiffViewContent(props: DiffViewProps & { kept: Kept }) {
 		onOpenPr,
 		onCreatePr,
 		onCreateDraftPr,
-		onManualCreatePr,
 		actions,
 		className,
 		summary,
@@ -680,7 +677,6 @@ function DiffViewContent(props: DiffViewProps & { kept: Kept }) {
 							onOpenPr={onOpenPr}
 							onCreatePr={onCreatePr}
 							onCreateDraftPr={onCreateDraftPr}
-							onManualCreatePr={onManualCreatePr}
 						/>
 						<ToolButton
 							label={view === "unified" ? "Switch to split diff" : "Switch to unified diff"}

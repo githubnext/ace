@@ -205,18 +205,18 @@ function actions(data: SidebarRow, props: RowActions): RowActions {
 	if (data.kind === "lobby") return { onRebuild: props.onRebuild };
 	let pins = { onPin: props.onPin, onUnpin: props.onUnpin };
 	// Archived channels leave every group but Archived, so a pin would never show.
-	if (data.lifecycle === "archived") {
-		return {
-			onArchive: data.capabilities?.archive === false ? undefined : props.onArchive,
-			onDelete: data.capabilities?.delete === false ? undefined : props.onDelete,
-		};
-	}
+	let remove = {
+		onArchive: data.capabilities?.archive === false ? undefined : props.onArchive,
+		// A live channel's menu shows Delete disabled, with Archive first, so the path is findable.
+		onDelete: data.capabilities?.delete === false ? undefined : props.onDelete,
+	};
+	if (data.lifecycle === "archived") return remove;
 	return {
 		...pins,
+		...remove,
 		onFork: data.capabilities?.fork === false ? undefined : props.onFork,
 		onInfo: props.onInfo,
 		onLeave: props.onLeave,
-		onArchive: data.capabilities?.archive === false ? undefined : props.onArchive,
 		onRename: data.capabilities?.rename === false ? undefined : props.onRename,
 		...(data.capabilities?.move
 			? { onMoveTargets: props.onMoveTargets, onMove: props.onMove }

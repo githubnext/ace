@@ -30,7 +30,6 @@ function PrAction({
 	onOpenPr,
 	onCreatePr,
 	onCreateDraftPr,
-	onManualCreatePr,
 }: {
 	pr?: DiffViewPr;
 	creatingPr?: boolean;
@@ -38,7 +37,6 @@ function PrAction({
 	onOpenPr?: () => void;
 	onCreatePr?: () => void;
 	onCreateDraftPr?: () => void;
-	onManualCreatePr?: () => void;
 }) {
 	if (pr) {
 		let content = (
@@ -108,7 +106,6 @@ function PrAction({
 				menu={
 					<CreatePrMenu
 						onCreateDraftPr={onCreateDraftPr}
-						onManualCreatePr={onManualCreatePr}
 					/>
 				}
 				menuLabel="Create PR options"
