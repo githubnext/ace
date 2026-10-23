@@ -263,6 +263,11 @@ async function isHostRunning(): Promise<boolean> {
 	return (await health(Number(flags.port || config.port)))?.home === config.home;
 }
 
+/** The running host knows each owner's GitHub login, as the app shows it. */
+async function roster(): Promise<Member[]> {
+	return await isHostRunning() ? await local<Member[]>({ op: "team-roster" }) : [];
+}
+
 /** What a teammate can do in a channel from the app; everything else acts on this host's own. */
 const SWITCH = new Set(["on", "off"]);
 
@@ -547,6 +552,7 @@ async function main() {
 		}
 		case "directory": {
 			const url = ref === "off" ? null : ref;
+			const rejoined = !!url && directory.url() === directory.canonical(url);
 			const running = await isHostRunning();
 			if (ref && running) await local({ op: "directory-set", url });
 			else if (ref) await directory.configure(url || undefined);
@@ -558,11 +564,14 @@ async function main() {
 			}
 			const { directory: status, tailscale } = await local<Diagnostics>({ op: "diagnostics" });
 			if (!status.url) return console.log("No directory");
-			console.log(url ? `Joined ${status.url}` : status.url);
+			console.log(
+				rejoined ? `Already joined ${status.url}` : url ? `Joined ${status.url}` : status.url,
+			);
 			if (tailscale.loopback) {
 				return console.log(dim("This host runs with --loopback, so it doesn't sync it."));
 			}
 			if (status.serving) console.log("This Mac serves it.");
+			else if (status.server) console.log(`${status.server} serves it.`);
 			if (status.error) {
 				return console.log(`Last sync failed ${ago(status.failed!)}: ${status.error}`);
 			}
@@ -635,16 +644,13 @@ async function main() {
 				case "info": {
 					// docs/terms.md names it agent access, after `ace agents`; `shared` is the wire name.
 					const { shared, owner, ...info } = await session.request<ChannelInfo>({ op: "info" });
-					// The running host knows each owner's GitHub login, as the app shows it.
-					const roster = await isHostRunning()
-						? await local<Member[]>({ op: "team-roster" })
-						: [];
-					const self = roster.find((member) => member.self);
+					const members = await roster();
+					const self = members.find((member) => member.self);
 					return console.log(JSON.stringify(
 						{
 							...info,
 							host: host || self?.host,
-							owner: roster.find((member) => member.login === owner)?.github || owner,
+							owner: members.find((member) => member.login === owner)?.github || owner,
 							agents: shared,
 						},
 						null,
@@ -664,14 +670,23 @@ async function main() {
 						text,
 						model: flags.model ? model(flags.model) : undefined,
 					} as const;
+					// The channel refuses by the owner's Tailscale login; name them as the app does.
+					const refused = async (error: Error): Promise<never> => {
+						const { shared, owner } = await session.request<ChannelInfo>({ op: "info" });
+						if (shared || owner === catalog.user) throw error;
+						const github = (await roster()).find((member) => member.login === owner)?.github;
+						throw github ? new Error(error.message.replace(owner, github)) : error;
+					};
 					if (flags.detach) {
-						await session.request(body);
+						await session.request(body).catch(refused);
 						return console.log(
 							`Asked ${name}'s agent; the run continues. Follow it with: ace watch ${name}`,
 						);
 					}
 					await watch(session, false);
-					const { submission } = await session.request<{ submission: number }>(body);
+					const { submission } = await session.request<{ submission: number }>(body).catch(
+						refused,
+					);
 					process.prependListener("SIGINT", () => {
 						console.log(dim(`\nDetached; the run continues. Stop it with: ace stop ${name}`));
 						process.exit(130);
