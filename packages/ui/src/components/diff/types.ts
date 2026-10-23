@@ -46,7 +46,6 @@ type DiffViewProps = {
 	onOpenPr?: () => void;
 	onCreatePr?: () => void;
 	onCreateDraftPr?: () => void;
-	onManualCreatePr?: () => void;
 	/** Git and pull request actions for the branch, each offered only while it can be taken. */
 	actions?: GitAction[];
 	onFileOpen?: (file: DiffViewFile) => void;

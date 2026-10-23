@@ -62,6 +62,9 @@ function MessageToolbar(
 	let [menu, setMenu] = useState(false);
 	let [popup, setPopup] = useState(false);
 	let button = useRef<HTMLButtonElement | null>(null);
+	let edit = mine && canEdit;
+	// A deleted message, or one in an archived channel, can't be deleted, so More drops Delete.
+	let remove = mine && actions?.delete !== false;
 
 	function handleOpenChange(o: boolean) {
 		setOpen(o);
@@ -148,7 +151,7 @@ function MessageToolbar(
 							ref={button}
 							active={menu}
 							aria-label="More"
-							className={!mine ? "notouch:hidden" : undefined}
+							className={!edit && !remove ? "notouch:hidden" : undefined}
 							icon={<IconDots className="size-3.5" />}
 						/>
 					}
@@ -188,34 +191,29 @@ function MessageToolbar(
 							<IconLinkMicro className="size-3.5" />
 							Copy link
 						</DropdownMenuItem>
-						{mine && canEdit && <DropdownMenuSeparator className="notouch:hidden" />}
-						{mine && (
-							<>
-								{canEdit && (
-									<>
-										<DropdownMenuItem
-											onClick={() => {
-												onAction({ type: "edit" });
-											}}
-											disabled={actions?.edit === false}
-										>
-											<IconPencil className="size-3.5" />
-											Edit
-										</DropdownMenuItem>
-										<DropdownMenuSeparator />
-									</>
-								)}
-								<DropdownMenuItem
-									variant="destructive"
-									disabled={actions?.delete === false}
-									onClick={() => {
-										onAction({ type: "delete" });
-									}}
-								>
-									<IconTrash className="size-3.5" />
-									Delete
-								</DropdownMenuItem>
-							</>
+						{(edit || remove) && <DropdownMenuSeparator className="notouch:hidden" />}
+						{edit && (
+							<DropdownMenuItem
+								onClick={() => {
+									onAction({ type: "edit" });
+								}}
+								disabled={actions?.edit === false}
+							>
+								<IconPencil className="size-3.5" />
+								Edit
+							</DropdownMenuItem>
+						)}
+						{edit && remove && <DropdownMenuSeparator />}
+						{remove && (
+							<DropdownMenuItem
+								variant="destructive"
+								onClick={() => {
+									onAction({ type: "delete" });
+								}}
+							>
+								<IconTrash className="size-3.5" />
+								Delete
+							</DropdownMenuItem>
 						)}
 					</DropdownMenuGroup>
 				</DropdownMenuContent>
