@@ -199,8 +199,17 @@ function shared(shares: Share[]): string {
 	return [...projects].map(([name, people]) => `${name} with ${people.join(", ")}`).join("; ");
 }
 
-/** `row` keeps each result beside the control that caused it. */
-type Action = { row?: "directory" | "secret"; busy?: string; error?: string; message?: string };
+/**
+ * `row` keeps each result beside the control that caused it. `joined` is whether `message` says
+ * this host is in a directory, so a join or leave made elsewhere, as with `ace directory`, hides it.
+ */
+type Action = {
+	row?: "directory" | "secret";
+	busy?: string;
+	error?: string;
+	message?: string;
+	joined?: boolean;
+};
 
 const link =
 	"rounded-sm underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30";
@@ -222,6 +231,7 @@ function TeamDirectory(
 		busy: string,
 		message: string,
 		request: () => Promise<unknown>,
+		joined?: boolean,
 	) {
 		setAction({ row, busy });
 		try {
@@ -229,7 +239,7 @@ function TeamDirectory(
 			setEditing(false);
 			setSecret("");
 			setConfirm(undefined);
-			setAction({ row, message });
+			setAction({ row, message, joined });
 		} catch (error) {
 			setAction({ row, error: (error as Error).message });
 		}
@@ -242,7 +252,9 @@ function TeamDirectory(
 			<>
 				{action.busy && <Status>{action.busy}</Status>}
 				{action.error && <Problem>{action.error}</Problem>}
-				{action.message && <Status>{action.message}</Status>}
+				{action.message && (action.joined === undefined || action.joined === !!directory.url) && (
+					<Status>{action.message}</Status>
+				)}
 			</>
 		);
 	}
@@ -291,6 +303,7 @@ function TeamDirectory(
 												url,
 												...(secret.trim() ? { secret } : {}),
 											}),
+										true,
 									);
 								}}
 								onKeyDown={(event) => {
@@ -371,6 +384,7 @@ function TeamDirectory(
 										"Leaving the directory…",
 										"Left the directory.",
 										() => host.request({ op: "directory-set", url: null }),
+										false,
 									)}
 								onCancel={() => setConfirm(undefined)}
 							>

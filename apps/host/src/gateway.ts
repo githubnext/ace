@@ -411,10 +411,10 @@ function asksChanged(): void {
 }
 
 /**
- * A host joined the directory this one serves. This host reads it only on its heartbeat, so it
- * reads it now for its apps' People and In the directory.
+ * A host joined or left the directory this one serves. This host reads it only on its heartbeat,
+ * so it reads it now for its apps' People and In the directory.
  */
-function directoryJoined(): void {
+function directoryMembers(): void {
 	void directory.refresh().then(settingsChanged);
 }
 
@@ -1153,7 +1153,7 @@ async function directoryRequest(
 		return new Response("Forbidden", { status: 403 });
 	}
 	const project = served.lobbyOf(path);
-	if (project === undefined) return served.handle(path, request, caller, directoryJoined);
+	if (project === undefined) return served.handle(path, request, caller, directoryMembers);
 	if (!served.isServing()) return new Response("This host serves no directory", { status: 404 });
 	const data = {
 		...client(caller.login, true, false, caller.host),

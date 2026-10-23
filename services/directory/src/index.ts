@@ -98,6 +98,14 @@ export class Directory extends DurableObject<Env> {
 		});
 	}
 
+	leave(name: string): void {
+		const sql = this.ctx.storage.sql;
+		this.ctx.storage.transactionSync(() => {
+			sql.exec("DELETE FROM hosts WHERE name = ?", name);
+			sql.exec("DELETE FROM channels WHERE host = ?", name);
+		});
+	}
+
 	read(): { hosts: Host[]; channels: unknown[]; shares: Share[] } {
 		const sql = this.ctx.storage.sql;
 		return {
@@ -171,6 +179,10 @@ export default {
 				return new Response("Invalid publication", { status: 400 });
 			}
 			await directory.publish(host[1], publication);
+			return new Response(null, { status: 204 });
+		}
+		if (host && request.method === "DELETE") {
+			await directory.leave(host[1]);
 			return new Response(null, { status: 204 });
 		}
 		if (pathname === "/shares" && request.method === "POST") {
