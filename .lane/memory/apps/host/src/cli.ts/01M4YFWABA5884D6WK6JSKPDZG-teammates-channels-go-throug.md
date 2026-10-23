@@ -3,10 +3,10 @@ id: 01M4YFWABA5884D6WK6JSKPDZG
 anchor: function join
 created: 2026-10-15T00:37:32Z
 norm: '1'
-sig: 2e2a490821164beb
-body_hash: cfd68c1e1f71ebcd
-raw_hash: bd472575a375bbf3
-vouched: 2026-10-15T04:47:29Z
+sig: 1683bb1d686bff45
+body_hash: a20ba5ce5033aa66
+raw_hash: 235168b7f499b1ce
+vouched: 2026-10-23T12:25:09Z
 lines: 201-223
 ---
 

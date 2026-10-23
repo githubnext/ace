@@ -24,10 +24,12 @@ import { preference } from "./preferences";
 import * as projects from "./projects";
 import {
 	channelProject,
+	type Diagnostics,
 	githubRepo,
 	type Hello,
 	type HostRequest,
 	type Listing,
+	type Member,
 	type Person,
 	type Project,
 	type ProjectAccess,
@@ -68,6 +70,7 @@ const USAGE = `ace — channels on this host
                                                 newest message to now
   ace say <channel> [--chat <id>] <text…>        post without invoking the agent
   ace ask <channel> [--chat <id>] [--model <provider/id>] [--detach] <text…>
+                                                exits 1 if the run fails or is stopped
   ace watch <channel> [--chat <id>]
   ace answer <channel> [--chat <id>] <text…>     answer the chat's waiting question in writing
   ace chat <channel> [--model <provider/id>]     open another chat
@@ -168,6 +171,8 @@ function clip(text: string, length: number): string {
 
 /** Whether `(run ended)` already printed, so `ask` doesn't print a second ending. */
 let ended = false;
+/** Whether a reply failed or was stopped, so `ask` exits 1 for a script. */
+let unanswered = false;
 
 function render(event: Event, info: ChannelInfo) {
 	const tag = event.chat === 1 && info.chats.length === 1 ? "" : dim(`[${event.chat}] `);
@@ -177,6 +182,7 @@ function render(event: Event, info: ChannelInfo) {
 		case "stopped":
 			return console.log(dim(`${tag}Stopped by ${event.author}.`));
 		case "reply": {
+			if (event.error || event.stopped) unanswered = true;
 			const ending = event.error
 				? `\x1b[31m${event.text ? "\n" : ""}Run failed: ${event.error}\x1b[0m`
 				: event.stopped
@@ -224,6 +230,13 @@ async function watch(session: Session, replay = true): Promise<{ ended: Promise<
 		closed: () => ended.resolve(),
 	});
 	return { ended: ended.promise };
+}
+
+function ago(at: number): string {
+	const minutes = Math.round((Date.now() - at) / 6e4);
+	if (minutes < 1) return "just now";
+	if (minutes < 60) return `${minutes}m ago`;
+	return `${Math.round(minutes / 60)}h ago`;
 }
 
 /** `10m`, `2h`, `1d`, or an ISO time. */
@@ -330,8 +343,8 @@ function listed(listings: Listing[], ref: string): Listing | undefined {
 	return matches[0];
 }
 
-/** A channel this host runs, or else one a reachable teammate's host runs. */
-async function join(ref: string): Promise<{ name: string; session: Session }> {
+/** A channel this host runs, or else one a reachable teammate's host runs, with that host's name. */
+async function join(ref: string): Promise<{ name: string; host?: string; session: Session }> {
 	if (mine(ref)) {
 		const record = catalog.find(ref);
 		return { name: record.name, session: await Connection.open(record.id) };
@@ -347,7 +360,7 @@ async function join(ref: string): Promise<{ name: string; session: Session }> {
 			request: (request, watch) => client.channel(listing.id, request, watch),
 			close: () => client.close(),
 		};
-		return { name: listing.name, session };
+		return { name: listing.name, host: listing.host, session };
 	} catch (error) {
 		client.close();
 		throw error;
@@ -534,9 +547,26 @@ async function main() {
 		}
 		case "directory": {
 			const url = ref === "off" ? null : ref;
-			if (ref && await isHostRunning()) await local({ op: "directory-set", url });
+			const running = await isHostRunning();
+			if (ref && running) await local({ op: "directory-set", url });
 			else if (ref) await directory.configure(url || undefined);
-			return console.log(directory.url() ?? "No directory");
+			if (!running) {
+				const joined = directory.url();
+				if (!joined) return console.log("No directory");
+				console.log(joined);
+				return console.log(dim("Ace isn't running here, so this Mac isn't syncing it."));
+			}
+			const { directory: status, tailscale } = await local<Diagnostics>({ op: "diagnostics" });
+			if (!status.url) return console.log("No directory");
+			console.log(status.url);
+			if (tailscale.loopback) {
+				return console.log(dim("This host runs with --loopback, so it doesn't sync it."));
+			}
+			if (status.serving) console.log("This Mac serves it.");
+			if (status.error) {
+				return console.log(`Last sync failed ${ago(status.failed!)}: ${status.error}`);
+			}
+			return console.log(status.synced ? `Synced ${ago(status.synced)}.` : "Not synced yet.");
 		}
 		case "web": {
 			if (ref) web.configure(ref === "off" ? undefined : ref);
@@ -599,13 +629,27 @@ async function main() {
 	if (!ref) throw new Error(`ace ${command} needs a channel`);
 	const text = rest.join(" ");
 	if (participant.has(command)) {
-		const { name, session } = await join(ref);
+		const { name, host, session } = await join(ref);
 		try {
 			switch (command) {
 				case "info": {
 					// docs/terms.md names it agent access, after `ace agents`; `shared` is the wire name.
-					const { shared, ...info } = await session.request<ChannelInfo>({ op: "info" });
-					return console.log(JSON.stringify({ ...info, agents: shared }, null, 2));
+					const { shared, owner, ...info } = await session.request<ChannelInfo>({ op: "info" });
+					// The running host knows each owner's GitHub login, as the app shows it.
+					const roster = await isHostRunning()
+						? await local<Member[]>({ op: "team-roster" })
+						: [];
+					const self = roster.find((member) => member.self);
+					return console.log(JSON.stringify(
+						{
+							...info,
+							host: host || self?.host,
+							owner: roster.find((member) => member.login === owner)?.github || owner,
+							agents: shared,
+						},
+						null,
+						2,
+					));
 				}
 				case "say":
 					if (!text) throw new Error("Nothing to say");
@@ -634,6 +678,7 @@ async function main() {
 					});
 					const status = await session.request<string>({ op: "wait", submission });
 					if (status === "unanswered" && !ended) console.log(dim("  (stopped before answering)"));
+					if (status === "unanswered" || unanswered) process.exit(1);
 					return;
 				}
 				case "answer":
