@@ -755,7 +755,9 @@ export class Channel {
 		if (author === this.#options.owner || room.isAgent(author) || settings?.shared !== false) {
 			return;
 		}
-		throw new Error("Only the owner can invoke agents here");
+		throw new Error(
+			`Agent access is off in this channel, so only its owner, ${this.#options.owner}, can ask its agents.`,
+		);
 	}
 
 	/** Model and effort apply to a whole run, never just its later turns. */

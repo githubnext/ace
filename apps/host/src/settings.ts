@@ -11,6 +11,7 @@ import {
 	key,
 	KEYCHAIN_WAITING,
 	latest,
+	models as keyed,
 	overriding,
 	settled,
 	store,
@@ -151,10 +152,18 @@ export async function removeKey(id: ProviderId): Promise<void> {
 /** A model this host has credentials for, as the default and `ace new --model` both need. */
 export async function checkModel(model: ModelRef): Promise<void> {
 	if (!isModel(model)) throw new Error("Choose a provider and model");
-	const found = await models();
-	if (!found.some((item) => item.provider === model.provider && item.modelId === model.modelId)) {
-		throw new Error("This model is unavailable. Add its provider key first.");
+	if (!keyed().getProvider(model.provider)) {
+		throw new Error(`There's no model provider named ${model.provider}.`);
 	}
+	const found = await models();
+	if (found.some((item) => item.provider === model.provider && item.modelId === model.modelId)) {
+		return;
+	}
+	// With its key set, the provider lists every model it has.
+	if (found.some((item) => item.provider === model.provider)) {
+		throw new Error(`${model.provider} has no model named ${model.modelId}.`);
+	}
+	throw new Error("This model is unavailable. Add its provider key first.");
 }
 
 export async function setModel(model: ModelRef | null): Promise<void> {
