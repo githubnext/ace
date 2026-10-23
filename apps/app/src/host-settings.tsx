@@ -14,6 +14,8 @@ import { Confirm, Group, Page, Problem, Row, Status, Value } from "./settings-la
 /** The host's tool and team checks, re-read while `active` and whenever `refresh` is called. */
 export function useDiagnostics(active: boolean) {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
+	// Joining or leaving the directory from anywhere, such as the CLI, changes what this shows.
+	const version = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
 	const [retry, setRetry] = useState(0);
 	/** A refresh can also sync the team directory, so its row shows that attempt rather than a stale one. */
 	const syncing = useRef(false);
@@ -35,7 +37,7 @@ export function useDiagnostics(active: boolean) {
 		return () => {
 			live = false;
 		};
-	}, [active, status, retry]);
+	}, [active, status, version, retry]);
 
 	// The shell environment, the first directory sync, and a keychain read waiting on a prompt all
 	// land in the background; show their results without a manual refresh.

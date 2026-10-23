@@ -7,7 +7,7 @@ import { desktop } from "./desktop";
 import { host } from "./host";
 import { useDiagnostics } from "./host-settings";
 import { parse } from "./invite";
-import { CREATE_DIRECTORY, DIRECTORY_CHANGED, People, useRoster } from "./onboarding";
+import { CREATE_DIRECTORY, People, useRoster } from "./onboarding";
 import { Confirm, Group, Page, Problem, Row, Status, Value, when } from "./settings-layout";
 import { DirectoryHosts, TEAM_SETUP } from "./team-setup";
 
@@ -233,7 +233,6 @@ function TeamDirectory(
 		} catch (error) {
 			setAction({ row, error: (error as Error).message });
 		}
-		window.dispatchEvent(new Event(DIRECTORY_CHANGED));
 		onChange();
 	}
 
@@ -259,7 +258,10 @@ function TeamDirectory(
 				id="directory-label"
 				label="Directory"
 				description={directory.serving
-					? `Served by this Mac at ${directory.url}`
+					// `ace directory off` leaves the directory this Mac still serves.
+					? directory.url
+						? `Served by this Mac at ${directory.url}`
+						: "Served by this Mac, which isn't in it"
 					: directory.url || (
 						<>
 							None yet. Teammates see channels only while their Mac is online.{" "}

@@ -9,21 +9,18 @@ import { Checks, Choice, Copyable, Footer, Header, Link, Pill } from "./team-set
 
 const DOWNLOAD = "https://ace.githubnext.com";
 const TAILSCALE_USERS = "https://login.tailscale.com/admin/users";
-/** Sent after the directory is created, joined, or left, so every view of it reads it again. */
-export const DIRECTORY_CHANGED = "ace:directory-changed";
 /** Opens Create directory from anywhere: the sidebar card, an offline channel, or Settings. */
 export const CREATE_DIRECTORY = "ace:create-directory";
 
-/** The directory as this host last reported it; undefined until the host answers. */
+/**
+ * The directory as this host last reported it; undefined until the host answers. The host tells
+ * its apps when it joins or leaves one, whether from this app, another window, the CLI, or an
+ * approved ask.
+ */
 export function useDirectory(): Diagnostics["directory"] | undefined {
 	const status = useSyncExternalStore(host.subscribe, () => host.status);
+	const version = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
 	const [directory, setDirectory] = useState<Diagnostics["directory"]>();
-	const [changed, setChanged] = useState(0);
-	useEffect(() => {
-		const bump = () => setChanged(value => value + 1);
-		window.addEventListener(DIRECTORY_CHANGED, bump);
-		return () => window.removeEventListener(DIRECTORY_CHANGED, bump);
-	}, []);
 	useEffect(() => {
 		if (status !== "open") return;
 		let live = true;
@@ -34,7 +31,7 @@ export function useDirectory(): Diagnostics["directory"] | undefined {
 		return () => {
 			live = false;
 		};
-	}, [status, changed]);
+	}, [status, version]);
 	return directory;
 }
 
@@ -264,7 +261,6 @@ export function DirectoryCard(
 		setError("");
 		try {
 			await host.request({ op: "directory-set", url });
-			window.dispatchEvent(new Event(DIRECTORY_CHANGED));
 		} catch (error) {
 			setError((error as Error).message);
 		} finally {
@@ -383,7 +379,6 @@ export function CreateDirectory({ onAdd, onClose }: { onAdd: () => void; onClose
 		setError("");
 		try {
 			setUrl(await host.request<string>({ op: "directory-serve", serve: true }));
-			window.dispatchEvent(new Event(DIRECTORY_CHANGED));
 			setStep("done");
 		} catch (error) {
 			setError((error as Error).message);

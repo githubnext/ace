@@ -478,9 +478,11 @@ function Nearby({ onJoined, team }: { onJoined: () => void; team?: string }) {
 		setError("");
 		try {
 			await host.request({ op: "team-ask", host: peer.host });
-			// Joining closes Team setup, so the asker may have looked away; say it outside it.
+			// Joining closes Team setup, and the asker is often at their teammate's screen while they
+			// approve, so the news waits outside it until dismissed.
 			toast.success(`${who} let you in`, {
 				description: "You're in your team's directory now.",
+				duration: Infinity,
 			});
 			onJoined();
 		} catch (error) {

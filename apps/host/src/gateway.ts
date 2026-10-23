@@ -1279,6 +1279,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 		self: () => ({ name, login: catalog.user, github: github.login(loginChanged), ...address }),
 		channels: local,
 		changed: () => void sharesChanged(),
+		chose: settingsChanged,
 		published: (before, after) => before && lobby.published(before, after),
 		covered: lobby.isCovered,
 	});
