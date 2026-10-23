@@ -37,6 +37,10 @@ export function useDirectory(): Diagnostics["directory"] | undefined {
 
 /** This host and everyone else running Ace on the tailnet, asked again while shown. */
 export function useRoster(): Member[] | undefined {
+	// The host sends listings when a peer comes or goes and settings when the directory changes, so
+	// People turns Offline with the sidebar and lists a host that joins the directory this one serves.
+	const channels = useSyncExternalStore(host.subscribe, () => host.channels);
+	const version = useSyncExternalStore(host.subscribe, () => host.settingsVersion);
 	const [roster, setRoster] = useState<Member[]>();
 	useEffect(() => {
 		let live = true;
@@ -52,7 +56,7 @@ export function useRoster(): Member[] | undefined {
 			live = false;
 			clearInterval(timer);
 		};
-	}, []);
+	}, [channels, version]);
 	return roster;
 }
 

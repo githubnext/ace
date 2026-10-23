@@ -64,7 +64,8 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	onClose: () => void;
 }) {
 	const [step, setStep] = useState<Step>(invite ? "join" : inviting ? "invite" : "fork");
-	const [starting, setStarting] = useState(true);
+	// Unset until chosen: a team already on the tailnet makes joining it the default.
+	const [chosen, setStarting] = useState<boolean>();
 	const [listed, setListed] = useState<"hosted" | "peers">("hosted");
 	const [provider, setProvider] = useState<Provider>("cloudflare");
 	const [joined, setJoined] = useState<Team>();
@@ -74,6 +75,8 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	const directory = checked?.directory.url ? checked.directory : undefined;
 	// Until the host answers, the fork can't tell a first person from one already in a team.
 	const pending = checks.open && !checked && !checks.error;
+	const peers = useTeamPeers();
+	const starting = chosen ?? (!checked?.directory.offered && !peers.length);
 
 	useEffect(() => {
 		if (!inviting) return;
@@ -99,7 +102,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 						<div className="flex flex-col divide-y divide-border/60 rounded-md border border-border/70 px-3">
 							<DirectoryHosts directory={directory} self={checked?.tailscale.name} />
 						</div>
-						<Nearby onJoined={onClose} team={new URL(directory.url!).host} />
+						<Nearby peers={peers} onJoined={onClose} team={new URL(directory.url!).host} />
 						<Footer
 							back={
 								<Button variant="ghost" onClick={() => setStep("directory")}>
@@ -118,7 +121,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 							title="Set up Ace for your team"
 							description="Everyone on your tailnet is your team. Start with how they'll find each other's channels."
 						/>
-						<Nearby onJoined={onClose} />
+						<Nearby peers={peers} onJoined={onClose} />
 						<div role="radiogroup" className="flex flex-col gap-2">
 							<Choice
 								selected={starting}
@@ -153,7 +156,7 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 								? "Check the directory before you join: it lists your channels for everyone who has this link."
 								: "Ask a teammate on your tailnet to let you in, or enter their directory URL. A deployed directory also needs the team secret, which its invite link carries."}
 						/>
-						{!invite && <Nearby onJoined={onClose} />}
+						{!invite && <Nearby peers={peers} onJoined={onClose} />}
 						<Join initial={invite} onJoined={onClose} back={() => setStep("fork")} />
 					</>
 				)}
@@ -464,9 +467,13 @@ function useTeamPeers(): TeamPeer[] {
 const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
 /** Ask a teammate's host to let this one in; their owner approves in their Ace. */
-function Nearby({ onJoined, team }: { onJoined: () => void; team?: string }) {
+function Nearby({ peers: all, onJoined, team }: {
+	peers: TeamPeer[];
+	onJoined: () => void;
+	team?: string;
+}) {
 	// A teammate already in this host's directory has no other team to let it into.
-	const peers = useTeamPeers().filter((peer) => peer.team !== team);
+	const peers = all.filter((peer) => peer.team !== team);
 	// By host: the peer list is read again every few seconds, which replaces its objects.
 	const [asking, setAsking] = useState<{ host: string; who: string; lapses: number }>();
 	const [error, setError] = useState("");

@@ -240,10 +240,8 @@ function row(
 const person = (people: People, owner: string) => people[owner] || owner;
 
 /** A teammate's section says when none of its channels can open because their hosts are unreachable. */
-function heading(label: string, rows: SidebarRow[]) {
-	return rows.length > 0 && rows.every((value) => value.connection === "offline")
-		? `${label} · Offline`
-		: label;
+function offline(rows: SidebarRow[]): string | undefined {
+	if (rows.length > 0 && rows.every((value) => value.connection === "offline")) return "Offline";
 }
 
 /** Pins belong to the person, not the channel, so teammates never see them. */
@@ -317,7 +315,7 @@ function projectGroups(
 			const id: SessionSidebarGroupId = `team:${owner}`;
 			const stored: SessionSidebarGroupId = `team:${owner}:archived`;
 			return [
-				{ id, label: heading(name, rows), rows, collapsed: folded(collapsed, id) },
+				{ id, label: name, note: offline(rows), rows, collapsed: folded(collapsed, id) },
 				{
 					id: stored,
 					label: `${name} · Archived`,
@@ -602,7 +600,8 @@ export function App() {
 						const group: SessionSidebarGroupId = `${id}:team:${owner}`;
 						return {
 							id: group,
-							label: heading(`${name} · ${teammate}`, rows),
+							label: `${name} · ${teammate}`,
+							note: offline(rows),
 							rows,
 							sort: "none",
 							collapsed: collapsed[group],
