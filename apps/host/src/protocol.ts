@@ -462,7 +462,10 @@ export type HostFrame =
 	/** What a pending request waits on, such as keychain access; null once it no longer waits. */
 	| { id: number; waiting: string | null }
 	| { rename: TabRename }
-	/** Local settings changed; clients reload model availability without receiving secrets. */
+	/**
+	 * Local settings or the joined directory changed; clients reload model availability and the
+	 * directory's state without receiving secrets.
+	 */
 	| { settings: true }
 	/** Opened projects belong to the local owner and are never sent to tailnet peers. */
 	| { projects: Project[] }

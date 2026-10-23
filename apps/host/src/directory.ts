@@ -60,7 +60,9 @@ let synced: number | undefined;
 let error: string | undefined;
 let failed: number | undefined;
 /** The running host's watch, so a change made through it takes effect without waiting for a heartbeat. */
-let active: { sync(): Promise<void>; again(): Promise<void>; changed(): void } | undefined;
+let active:
+	| { sync(): Promise<void>; again(): Promise<void>; changed(): void; chose(): void }
+	| undefined;
 
 /** A directory base URL without a trailing slash. */
 export function canonical(value: string): string {
@@ -86,6 +88,7 @@ export function configure(value: string | undefined): Promise<void> | undefined 
 	synced = undefined;
 	error = undefined;
 	failed = undefined;
+	active?.chose();
 	active?.changed();
 	return active?.sync();
 }
@@ -262,6 +265,8 @@ type Options = {
 	channels(): Promise<Listing[]>;
 	/** After each refresh. */
 	changed(): void;
+	/** After joining, changing, or leaving the directory, by any route: the app, the CLI, or a peer's hello. */
+	chose(): void;
 	/** After each publish; `before` is this process's previous publication, if any. */
 	published(before: Listing[] | undefined, after: Listing[]): void;
 	/** Every project this host knows has a live lobby pushing its changes. */
@@ -272,7 +277,7 @@ type Options = {
  * Publish this host's channels, then refresh what the directory knows. Failures keep the last
  * answer, so an unreachable directory never hides channels.
  */
-export function watch({ self, channels, changed, published, covered }: Options) {
+export function watch({ self, channels, changed, chose, published, covered }: Options) {
 	const controller = new AbortController();
 	let running: { base: string; done: Promise<void>; again?: Promise<void> } | undefined;
 	let before: Listing[] | undefined;
@@ -332,7 +337,7 @@ export function watch({ self, channels, changed, published, covered }: Options) 
 		if (!running || running.base !== url()) return join();
 		return running.again ??= running.done.then(join);
 	};
-	active = { sync: join, again: sync, changed };
+	active = { sync: join, again: sync, changed, chose };
 	void join();
 	const interval = setInterval(() => {
 		// A failed publish keeps retrying every heartbeat; lobbies only carry what was published.
