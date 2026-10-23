@@ -4,8 +4,9 @@ anchor: class Questions
 created: 2026-10-15T17:31:05Z
 norm: '1'
 sig: b320f3b4b2555f0f
-body_hash: 8d55156e0bb23b9d
-raw_hash: aa89381794b072eb
+body_hash: db6d80cd41b3614e
+raw_hash: 0a114ba9938f4f7d
+vouched: 2026-10-23T12:23:27Z
 lines: 86-161
 ---
 

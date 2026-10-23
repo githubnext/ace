@@ -89,9 +89,10 @@ function queued(state: Readonly<InboxState> | null | undefined): string | undefi
 export class Questions {
 	#queued = new Map<ConversationId, string>();
 	#waiting = new Map<ConversationId, Set<(author: string) => void>>();
-	#onAsk: (chat: ConversationId) => void;
+	#onAsk: (chat: ConversationId, phase: "question" | "answered") => void;
 
-	constructor(onAsk: (chat: ConversationId) => void) {
+	/** `onAsk` hears when a chat starts waiting on a question and when an answer or message ends it. */
+	constructor(onAsk: (chat: ConversationId, phase: "question" | "answered") => void) {
 		this.#onAsk = onAsk;
 	}
 
@@ -131,7 +132,7 @@ export class Questions {
 							doc.questions[call] = { items: args.questions };
 							return true;
 						}, context);
-						if (created) this.#onAsk(chat);
+						if (created) this.#onAsk(chat, "question");
 						const watch = (await api.watchDoc(QuestionsDoc, chat, context))!;
 						const settle = (value: typeof watch.value) => {
 							const answer = value?.questions[call]?.answer;
@@ -143,7 +144,9 @@ export class Questions {
 							if (context.abortSignal?.aborted) abort();
 							settle(watch.value);
 							watch.start(async (value) => settle(value));
-							return await promise;
+							const result = await promise;
+							this.#onAsk(chat, "answered");
+							return result;
 						} finally {
 							context.abortSignal?.removeEventListener("abort", abort);
 							await watch.stop();

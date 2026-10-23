@@ -11,8 +11,9 @@ import { host } from "./host";
 /**
  * Run ends and messages this person has seen or been told about, by channel, and how many mentions
  * of them each channel had when they last saw it (`heard`) or were told (`called`). Anything before
- * `since` predates this browser profile's first visit, so history never lights up. Profiles from
- * before mentions have no `heard`, and from before mention notices no `called`.
+ * `since` predates this browser profile's first visit, so history never lights up; a question still
+ * waiting is host state, not history, so it marks its channel however old. Profiles from before
+ * mentions have no `heard`, and from before mention notices no `called`.
  */
 type State = {
 	since: number;
@@ -22,7 +23,7 @@ type State = {
 	called?: Record<string, number>;
 };
 
-export type Outcome = Exclude<RunEnd["outcome"], "stopped">;
+export type Outcome = Exclude<RunEnd["outcome"], "stopped" | "answered">;
 
 /** A run this person invoked, or `message` for anything anyone else wrote since they last looked. */
 export type Mark = Outcome | "message";
@@ -54,10 +55,15 @@ host.subscribe(() => {
 const seenAt = (channel: Listing, state: State) =>
 	Math.max(state.since, state.seen[channel.id] || 0);
 
-/** A stopped run was a participant's own doing, so it needs no attention. */
+/**
+ * A stopped run was a participant's own doing, so it needs no attention. A question needs it until
+ * the host hears an answer, whenever or wherever this person last looked.
+ */
 function pending(channel: Listing, user: string, state: State): Outcome | undefined {
 	const { ran } = channel;
-	if (!ran || ran.author !== user || ran.outcome === "stopped") return;
+	if (!ran || ran.author !== user) return;
+	if (ran.outcome === "stopped" || ran.outcome === "answered") return;
+	if (ran.outcome === "question") return ran.outcome;
 	if (ran.at <= seenAt(channel, state)) return;
 	return ran.outcome;
 }
@@ -102,7 +108,7 @@ function missed(found: { channel: Listing; count: number }[]): [string, string] 
  * Runs this person invoked that ended, or that wait on a question, while they were not watching the
  * channel, teammates' runs that ended in their channels, and new @mentions of `names` (lowercased
  * GitHub logins). Each pulses the window's glow or sends one desktop notification, then marks its
- * row until they open it; mentions that arrived while Ace was closed or disconnected notify once
+ * row until they open it, or for a question until it is answered; mentions that arrived while Ace was closed or disconnected notify once
  * together. Others' messages mark the row too, without a notification.
  */
 export function useAttention(
@@ -151,7 +157,8 @@ export function useAttention(
 			if (!ran) continue;
 			const outcome = pending(channel, user, state);
 			if (!outcome && !isTeammateRun(channel, user, state)) continue;
-			if (ran.at <= (state.told[id] || 0)) continue;
+			// A question seen while it waited, or older than this profile, was already in front of them.
+			if (ran.at <= Math.max(state.told[id] || 0, seenAt(channel, state))) continue;
 			told[id] = ran.at;
 			if (watching) setPulse("on");
 			else if (outcome) desktop?.notify(channel.name, NOTICES[outcome]).catch(() => {});

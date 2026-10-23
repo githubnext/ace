@@ -667,9 +667,10 @@ Notifications are not built. Each app notices its own person's
 finished and failed runs, and runs waiting on a question, from listings: it keeps the run ends it has shown or announced per host
 and participant in browser storage, starting from its first visit. A run end that arrives while
 another channel is open pulses the window's glow; one that arrives while the window is unfocused
-sends a desktop notification. The channel's row keeps a dot (finished) or attention mark (failed
-or waiting on a question)
-until the person opens it in a focused window. Stopped runs need no attention.
+sends a desktop notification. The channel's row keeps a dot (finished) or attention mark (failed)
+until the person opens it in a focused window. A run waiting on a question keeps its attention mark
+until the host publishes that it was answered, so every browser and phone shows it, even one first
+opened after the question was asked. Stopped runs need no attention.
 
 ## The team
 
