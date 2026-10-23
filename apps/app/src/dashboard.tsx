@@ -88,23 +88,27 @@ const PLACES = [
 	},
 ];
 
-/** Teammates' pulse covers what ended since this project's dashboard was last opened here. */
-const FIRST_VISIT = 24 * 60 * 60_000;
+/**
+ * Teammates' pulse covers what ended since this project's dashboard was last opened here, and at
+ * least the last day, so a reload or a quick look doesn't clear what someone hasn't read yet.
+ */
+const DAY = 24 * 60 * 60_000;
 
 function useLastVisit(project: string): number {
 	const key = `ace:dashboard-visit:${host.url}:${project}`;
 	const [since] = useState(() => {
+		const day = Date.now() - DAY;
 		try {
-			return Number(localStorage.getItem(key)) || Date.now() - FIRST_VISIT;
+			return Math.min(Number(localStorage.getItem(key)) || day, day);
 		} catch {
-			return Date.now() - FIRST_VISIT;
+			return day;
 		}
 	});
 	useEffect(() => {
 		try {
 			localStorage.setItem(key, String(Date.now()));
 		} catch {
-			// Without storage, every visit covers the last day.
+			// Without storage, every visit covers only the last day.
 		}
 	}, [key]);
 	return since;
@@ -209,6 +213,16 @@ function WorkRow({ work, owner, busy, onChannel, onStart }: {
 	);
 }
 
+const CLOCK = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+const DATED = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+/** When a run ended: the time today, with the date before that. */
+function ended(at: number) {
+	return new Date(at).toDateString() === new Date().toDateString()
+		? CLOCK.format(at)
+		: DATED.format(at);
+}
+
 function TeammateRow({ teammate, onChannel }: {
 	teammate: Teammate;
 	onChannel: (channel: Listing) => void;
@@ -219,6 +233,7 @@ function TeammateRow({ teammate, onChannel }: {
 			<span key={channel.id}>
 				{index > 0 && ", "}
 				<ChannelLink channel={channel} onChannel={onChannel} />
+				{channel.ran && ` at ${ended(channel.ran.at)}`}
 			</span>
 		));
 	return (

@@ -479,7 +479,15 @@ export function App() {
 	const linked = !!repo.value || (status === "open" && !!repo.error);
 	const page = repo.value === null && (saved === "issues" || saved === "prs") ? "channels" : saved;
 	function go(next: Page) {
-		if (linked || (next !== "issues" && next !== "prs")) setPage(next);
+		if (linked || (next !== "issues" && next !== "prs")) return setPage(next);
+		// ⌘3, ⌘4, and the menu reach Issues and PRs even where the rail hides them.
+		const what = next === "issues" ? "Issues" : "PRs";
+		if (!current) return void toast(`${what} need a project on GitHub`);
+		if (repo.value === null) {
+			toast(`${label(current, hello.host)} isn't on GitHub`, {
+				description: `${what} need a project with a GitHub remote.`,
+			});
+		}
 	}
 	const allProjects = all && page === "channels";
 	const visible = current
@@ -603,6 +611,16 @@ export function App() {
 			];
 		});
 		groups.unshift(pinnedGroup(channels, pins, hello, collapsed, attention, online));
+		// An archived channel says to unarchive it from the sidebar, so All Projects lists yours too.
+		const archived = channels.filter((value) =>
+			value.state === "archived" && value.owner === hello.user
+		).map((value) => row(value, hello.user, hello.host, online(value), attention.get(value.id)));
+		groups.push({
+			id: "archived",
+			label: "Archived",
+			rows: archived,
+			collapsed: collapsed.archived,
+		});
 	}
 
 	function chooseProject(id: string) {
@@ -679,8 +697,18 @@ export function App() {
 		if (value) remove(value);
 	}
 
+	/** Opening and cloning go through the host, so a shortcut while disconnected says why it can't. */
+	function disconnected(action: string) {
+		toast.error(`Can't ${action} while disconnected`, {
+			description: desktop
+				? "Ace Helper isn't connected. Open Settings → This Mac to start it."
+				: "Ace is reconnecting to your host.",
+		});
+	}
+
 	async function choose() {
-		if (!connected || picking.current) return;
+		if (!connected) return disconnected("open a folder");
+		if (picking.current) return;
 		if (!desktop) return setAdding(true);
 		picking.current = true;
 		try {
@@ -707,7 +735,8 @@ export function App() {
 	}
 
 	function cloneUrl() {
-		if (connected) setSetup({});
+		if (!connected) return disconnected("clone a repository");
+		setSetup({});
 	}
 
 	function startSetup(project: AppProject, start?: { text?: string; onCreated?: () => void }) {

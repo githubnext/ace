@@ -4,9 +4,9 @@ anchor: function InitGit
 created: 2026-10-22T20:44:24Z
 norm: '1'
 sig: bbe6f480fcc6cbd1
-body_hash: 0fc448d2189f968d
-raw_hash: 517902d11c496496
-vouched: 2026-10-22T22:08:11Z
+body_hash: bc4e9763ce66dd48
+raw_hash: 9a78d51c3d8b3e6f
+vouched: 2026-10-23T12:32:53Z
 lines: 52-111
 ---
 

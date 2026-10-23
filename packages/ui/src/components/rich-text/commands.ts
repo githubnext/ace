@@ -217,7 +217,24 @@ function codeBlockRule() {
 	});
 }
 
-/** Input rules for the Markdown list and inline code markers people type, as in Slack or Notion. */
+/**
+ * `**bold**` or `~~strike~~` as its closing marker's last character is typed, which the rule
+ * replaces; as in Markdown, the text can't start or end with a space.
+ */
+function pairRule(marker: "*" | "~", mark: typeof schema.marks.strong) {
+	let m = `\\${marker}`;
+	let pattern = new RegExp(`(?:^|[^${m}])(${m}${m}([^${m}\\s](?:[^${m}]*[^${m}\\s])?)${m}${m})$`);
+	return new InputRule(pattern, (state, match, start, end) => {
+		let from = start + match[0]!.length - match[1]!.length;
+		return state.tr
+			.delete(end - 1, end)
+			.delete(from, from + 2)
+			.addMark(from, end - 3, mark.create())
+			.removeStoredMark(mark);
+	}, { inCodeMark: false });
+}
+
+/** Input rules for the Markdown markers people type, as in Slack or Notion. */
 function markdownRules() {
 	return [
 		wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list),
@@ -236,6 +253,8 @@ function markdownRules() {
 				.addMark(from, end - 1, code.create())
 				.removeStoredMark(code);
 		}, { inCodeMark: false }),
+		pairRule("*", schema.marks.strong),
+		pairRule("~", schema.marks.strike),
 	];
 }
 
