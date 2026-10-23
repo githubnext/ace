@@ -368,6 +368,7 @@ export function App() {
 	const [offered, setOffered] = useLocalStorage("ace:team-setup", false);
 	// Joining or inviting to a deployed directory, which needs the team secret.
 	const [teaming, setTeaming] = useState<boolean | "inviting" | Invite>(false);
+	const [returning, setReturning] = useState<Section>();
 	const [directoryDialog, setDirectoryDialog] = useState(false);
 	const [teammate, setTeammate] = useState(false);
 	const [dismissed, setDismissed] = useLocalStorage("ace:directory-card", false);
@@ -400,9 +401,11 @@ export function App() {
 		return () => listeners.forEach((remove) => remove());
 	}, []);
 	useEffect(() => {
-		const open = () => {
+		// Opened from a Settings section, closing Team setup returns there.
+		const open = (event: Event) => {
 			setSettings(false);
 			setTeaming(true);
+			setReturning((event as CustomEvent<Section | undefined>).detail);
 		};
 		const invite = () => {
 			setSettings(false);
@@ -613,7 +616,8 @@ export function App() {
 						const group: SessionSidebarGroupId = `${id}:team:${owner}`;
 						return {
 							id: group,
-							label: `${name} · ${teammate}`,
+							label: name,
+							owner: teammate,
 							note: offline(rows),
 							rows,
 							sort: "none",
@@ -1344,6 +1348,7 @@ export function App() {
 						onClose={() => {
 							setOffered(true);
 							setTeaming(false);
+							if (returning) setSettings(returning);
 						}}
 					/>
 				)}

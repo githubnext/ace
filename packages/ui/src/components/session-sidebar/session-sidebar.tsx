@@ -56,6 +56,8 @@ export type SessionSidebarGroupId =
 export type SessionSidebarGroup = {
 	id: SessionSidebarGroupId;
 	label: string;
+	/** A teammate who owns the group's channels; the label shortens first so it stays visible. */
+	owner?: string;
 	/** Follows the label and is never truncated with it, such as Offline. */
 	note?: string;
 	rows: SidebarRow[];
@@ -376,6 +378,10 @@ export function ProjectPicker(
 	);
 }
 
+/** The group's whole name, for hover and screen readers when the header shortens it. */
+const name = (group: SessionSidebarGroup) =>
+	group.owner ? `${group.label} · ${group.owner}` : group.label;
+
 function GroupHeaderContent({ group, collapsed }: {
 	group: SessionSidebarGroup;
 	collapsed: boolean;
@@ -392,6 +398,7 @@ function GroupHeaderContent({ group, collapsed }: {
 			)}
 			<span className="flex min-w-0">
 				<span className="truncate">{group.label}</span>
+				{group.owner && <span className="shrink-0 whitespace-pre">{` · ${group.owner}`}</span>}
 				{group.note && <span className="shrink-0 whitespace-pre">{` · ${group.note}`}</span>}
 			</span>
 			<motion.span
@@ -643,9 +650,10 @@ function Group({
 					>
 						<button
 							type="button"
-							aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.label}${
+							aria-label={`${collapsed ? "Expand" : "Collapse"} ${name(group)}${
 								group.note ? `, ${group.note}` : ""
 							}`}
+							title={[name(group), group.note].filter(Boolean).join(" · ")}
 							aria-expanded={!collapsed}
 							aria-controls={content}
 							onClick={() => onToggleGroup?.(group.id)}
