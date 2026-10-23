@@ -28,9 +28,8 @@ export function Navigation({ page, user, github, repo, onPage, onSettings }: {
 }) {
 	return (
 		<Nav
-			footer={
-				<UserMenu name={user || "Ace"} handle={github} side="right" onSettings={onSettings} />
-			}
+			// Until the host names its user, any initials would be a placeholder's.
+			footer={user && <UserMenu name={user} handle={github} side="right" onSettings={onSettings} />}
 		>
 			<NavList>
 				<NavListLink

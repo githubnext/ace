@@ -14,6 +14,7 @@ import { IconArrowDownToLine, IconBranch, IconFolderSearch } from "@ace/ui/icons
 
 import { desktop } from "./desktop";
 import { host } from "./host";
+import { Copyable } from "./team-setup";
 
 export function EmptyProjects({ onOpen, onClone, disabled }: {
 	onOpen: () => void;
@@ -79,6 +80,10 @@ export function InitGit({ path, name, empty, ignored, disabled, onInit }: {
 		}
 	}
 
+	const folder = `'${path.replaceAll("'", `'\\''`)}'`;
+	const commands = `cd ${folder} && ${
+		empty ? "" : "git init && "
+	}git add -A && git commit -m "Initial commit"`;
 	const lanes = empty
 		? `Channels work in lanes, which are Git worktrees, and ${name} has no commit yet.`
 		: "Channels work in lanes, which are Git worktrees.";
@@ -92,14 +97,19 @@ export function InitGit({ path, name, empty, ignored, disabled, onInit }: {
 			</h2>
 			{ignored
 				? (
-					<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
-						{lanes} {name} already has a{" "}
-						<code>.gitignore</code>, so Ace won't commit under its rules. {empty ? "Commit" : (
-							<>
-								Run <code>git init</code> and commit
-							</>
-						)} its files yourself, then channels can start here.
-					</p>
+					<>
+						<p className="max-w-[30rem] text-pretty text-xs leading-5 text-muted-foreground">
+							{lanes} {name} already has a{" "}
+							<code>.gitignore</code>, so Ace won't commit under its rules. {empty ? "Commit" : (
+								<>
+									Run <code>git init</code> and commit
+								</>
+							)} its files yourself, such as in a terminal, then channels can start here.
+						</p>
+						<div className="w-full max-w-[30rem] text-left">
+							<Copyable value={commands} />
+						</div>
+					</>
 				)
 				: (
 					<>
