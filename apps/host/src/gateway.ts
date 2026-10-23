@@ -410,6 +410,14 @@ function asksChanged(): void {
 	for (const socket of sockets) if (socket.data.local) socket.send(frame);
 }
 
+/**
+ * A host joined the directory this one serves. This host reads it only on its heartbeat, so it
+ * reads it now for its apps' People and In the directory.
+ */
+function directoryJoined(): void {
+	void directory.refresh().then(settingsChanged);
+}
+
 function settingsChanged(): void {
 	for (const socket of sockets) {
 		if (!socket.data.peer) socket.send(JSON.stringify({ settings: true } satisfies HostFrame));
@@ -1145,7 +1153,7 @@ async function directoryRequest(
 		return new Response("Forbidden", { status: 403 });
 	}
 	const project = served.lobbyOf(path);
-	if (project === undefined) return served.handle(path, request, caller);
+	if (project === undefined) return served.handle(path, request, caller, directoryJoined);
 	if (!served.isServing()) return new Response("This host serves no directory", { status: 404 });
 	const data = {
 		...client(caller.login, true, false, caller.host),

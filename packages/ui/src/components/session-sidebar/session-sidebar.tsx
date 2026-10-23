@@ -56,6 +56,8 @@ export type SessionSidebarGroupId =
 export type SessionSidebarGroup = {
 	id: SessionSidebarGroupId;
 	label: string;
+	/** Follows the label and is never truncated with it, such as Offline. */
+	note?: string;
 	rows: SidebarRow[];
 	/** Preserve caller ordering for ranked or hierarchical groups. */
 	sort?: "creation" | "none";
@@ -388,7 +390,10 @@ function GroupHeaderContent({ group, collapsed }: {
 					className="size-3.5 shrink-0"
 				/>
 			)}
-			<span className="min-w-0 truncate">{group.label}</span>
+			<span className="flex min-w-0">
+				<span className="truncate">{group.label}</span>
+				{group.note && <span className="shrink-0 whitespace-pre">{` · ${group.note}`}</span>}
+			</span>
 			<motion.span
 				aria-hidden
 				initial={false}
@@ -638,7 +643,9 @@ function Group({
 					>
 						<button
 							type="button"
-							aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.label}`}
+							aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.label}${
+								group.note ? `, ${group.note}` : ""
+							}`}
 							aria-expanded={!collapsed}
 							aria-controls={content}
 							onClick={() => onToggleGroup?.(group.id)}

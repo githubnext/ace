@@ -102,8 +102,13 @@ export function shares(): Share[] {
 	return open().query<Share, []>('SELECT project, person, shared_by AS "by", at FROM shares').all();
 }
 
-/** Requests under `/directory`, with `path` the rest. */
-export async function handle(path: string, request: Request, caller: Caller): Promise<Response> {
+/** Requests under `/directory`, with `path` the rest; `joined` runs when a host publishes for the first time. */
+export async function handle(
+	path: string,
+	request: Request,
+	caller: Caller,
+	joined: () => void,
+): Promise<Response> {
 	if (!isServing()) return new Response("This host serves no directory", { status: 404 });
 	const sql = open();
 	if (path === "/" && request.method === "GET") return Response.json(read(sql));
@@ -114,7 +119,9 @@ export async function handle(path: string, request: Request, caller: Caller): Pr
 		if (host !== caller.host || publication.login !== caller.login) {
 			return new Response("Hosts publish only as themselves", { status: 403 });
 		}
+		const known = sql.query("SELECT 1 FROM hosts WHERE name = ?").get(host);
 		publish(sql, host, publication);
+		if (!known) joined();
 		return new Response(null, { status: 204 });
 	}
 	if (path === "/shares" && request.method === "POST") {
