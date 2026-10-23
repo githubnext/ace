@@ -82,7 +82,11 @@ export type DesktopRPC = {
 			native: { params: { token: string; action: NativeAction }; response: NativeState };
 			updates: { params: { token: string; action: UpdateAction }; response: UpdateState };
 			command: { params: { token: string; action: CommandAction }; response: CommandState };
-			notify: { params: { token: string; title: string; body: string }; response: null };
+			/** `channel` is the channel's id that clicking the notification opens. */
+			notify: {
+				params: { token: string; title: string; body: string; channel?: string };
+				response: null;
+			};
 		};
 		messages: {};
 	};

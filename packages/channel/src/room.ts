@@ -244,7 +244,7 @@ export function section(room: Room): PromptSection {
 						named
 							? "The channel already has a name. Preserve it unless the user specifically asks you to rename it."
 							: "The channel has a random placeholder name. Use the `channel` tool early to give it a short, useful lowercase kebab-case name based on the user's request.",
-						"Use the `channel` tool to update its rolling summary after meaningful progress and before your final answer.",
+						"Use the `channel` tool to update its rolling summary after meaningful progress, before your final answer, and before you ask the user a question, so it describes what waits on them.",
 						"Keep one to three concise plain-text sentences about the channel's purpose, decisions, progress, and unresolved work.",
 						"Revise the previous summary as work changes; describe only observed outcomes, never invent completed work.",
 						"Set rename=true only when the user specifically asked you to rename an already named channel.",

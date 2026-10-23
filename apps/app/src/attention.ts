@@ -161,21 +161,22 @@ export function useAttention(
 			if (ran.at <= Math.max(state.told[id] || 0, seenAt(channel, state))) continue;
 			told[id] = ran.at;
 			if (watching) setPulse("on");
-			else if (outcome) desktop?.notify(channel.name, NOTICES[outcome]).catch(() => {});
+			else if (outcome) desktop?.notify(channel.name, NOTICES[outcome], id).catch(() => {});
 			else {
 				const who = people[ran.author] || ran.author.split("@")[0];
 				const failed = ran.outcome === "failed" ? ", and the run failed" : "";
-				desktop?.notify(channel.name, `${who} used your agent${failed}`).catch(() => {});
+				desktop?.notify(channel.name, `${who} used your agent${failed}`, id).catch(() => {});
 			}
 		}
 		if (away && mentions.length) {
 			caught = true;
 			const [title, body] = missed(mentions);
-			desktop?.notify(title, body).catch(() => {});
+			const only = mentions.length === 1 ? mentions[0]!.channel.id : undefined;
+			desktop?.notify(title, body, only).catch(() => {});
 		} else if (mentions.length && watching) setPulse("on");
 		else {
 			for (const { channel, count } of mentions) {
-				desktop?.notify(channel.name, times(count)).catch(() => {});
+				desktop?.notify(channel.name, times(count), channel.id).catch(() => {});
 			}
 		}
 		const changes = [seen, told, heard, called].some((value) => Object.keys(value).length);

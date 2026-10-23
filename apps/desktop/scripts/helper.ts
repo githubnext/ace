@@ -145,6 +145,21 @@ run([
 	join(bin, "ace-window.dylib"),
 ]);
 
+run([
+	"xcrun",
+	"clang",
+	"-dynamiclib",
+	"-fobjc-arc",
+	"-mmacosx-version-min=15.0",
+	"-framework",
+	"Cocoa",
+	"-framework",
+	"UserNotifications",
+	join(native, "notify.m"),
+	"-o",
+	join(bin, "ace-notify.dylib"),
+]);
+
 // Ace Helper puts Helpers first on agents' PATH, so it holds nothing but the lane CLI.
 const helpers = join(contents, "Helpers");
 mkdirSync(helpers, { recursive: true });

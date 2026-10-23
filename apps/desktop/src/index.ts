@@ -9,6 +9,7 @@ import { config, desktop } from "@ace/host/config";
 import { command } from "./command";
 import { helper as control } from "./helper";
 import { native as inspection } from "./native";
+import { notifications } from "./notify";
 import type { DesktopRPC } from "./protocol";
 import { updates as updater } from "./updates";
 import { windowStyle } from "./window";
@@ -24,6 +25,7 @@ const lane = desktop(identifier, profile);
 const helper = control(identifier, !!lane);
 const updates = updater(helper, version, channel);
 const native = inspection(profile ? `${identifier}.${profile}` : identifier);
+const notify = notifications(reveal);
 const cli = command(
 	channel === "stable" ? "ace" : `ace-${channel}`,
 	join(dirname(process.execPath), "Ace Helper"),
@@ -88,9 +90,9 @@ function controls(target: () => BrowserWindow) {
 					if (lane) throw new Error("Use bun ace from this build's checkout.");
 					return cli.act(action);
 				},
-				notify: ({ token, title, body }) => {
+				notify: ({ token, title, body, channel }) => {
 					authorize(token);
-					Utils.showNotification({ title, body });
+					notify(title, body, channel);
 					return null;
 				},
 			},
@@ -115,6 +117,16 @@ function accept(link: string): void {
 	focused.activate();
 	focused.webview.executeJavascript(
 		`window.dispatchEvent(new CustomEvent("ace:join", { detail: ${JSON.stringify(link)} }))`,
+	);
+}
+
+/** A clicked notification opens its channel, or just Ace when it names none. */
+function reveal(channel: string): void {
+	if (!ready || !channel) return show();
+	if (!focused) return open(undefined, `channel=${encodeURIComponent(channel)}`);
+	focused.activate();
+	focused.webview.executeJavascript(
+		`window.dispatchEvent(new CustomEvent("ace:channel", { detail: ${JSON.stringify(channel)} }))`,
 	);
 }
 

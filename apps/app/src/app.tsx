@@ -544,6 +544,25 @@ export function App() {
 		landed.current = true;
 		select(waiting);
 	});
+	// A clicked desktop notification opens its channel, in this window or a new one, once it lists.
+	const [notified, setNotified] = useState<string>();
+	useEffect(() => {
+		const fragment = new URLSearchParams(location.hash.slice(1)).get("channel");
+		if (fragment) {
+			history.replaceState(null, "", location.pathname + location.search);
+			setNotified(fragment);
+		}
+		const opening = (event: Event) => setNotified((event as CustomEvent<string>).detail);
+		window.addEventListener("ace:channel", opening);
+		return () => window.removeEventListener("ace:channel", opening);
+	}, []);
+	useEffect(() => {
+		const found = notified && channels.find((value) => value.id === notified);
+		if (!found) return;
+		landed.current = true;
+		setNotified(undefined);
+		select(found);
+	});
 	const online = (channel: Listing) =>
 		present(presence[channelProject(channel)], people[hello.user], channel.id);
 	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins, online);

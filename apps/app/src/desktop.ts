@@ -30,7 +30,8 @@ export const desktop = view && token
 		native: (action: NativeAction) => rpc.request.native({ token, action }),
 		updates: (action: UpdateAction) => rpc.request.updates({ token, action }),
 		command: (action: CommandAction) => rpc.request.command({ token, action }),
-		notify: (title: string, body: string) => rpc.request.notify({ token, title, body }),
+		notify: (title: string, body: string, channel?: string) =>
+			rpc.request.notify({ token, title, body, channel }),
 	}
 	: undefined;
 
