@@ -168,8 +168,10 @@ export async function adopt(value: string): Promise<void> {
 /** Lifecycle events applied while a read is in flight; that read may predate them. */
 let reading: Lifecycle<Listing>[] | undefined;
 
+/** `server` is the teammate's Mac serving a tailnet directory, by its tailnet name. */
 export function status() {
-	return { url: url(), synced, error, failed };
+	const base = url();
+	return { url: base, server: base && server(base)?.name, synced, error, failed };
 }
 
 /** Sync now, or join the sync under way; nothing without a running host. */

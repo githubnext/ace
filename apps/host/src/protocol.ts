@@ -58,6 +58,8 @@ export type Diagnostics = {
 	 */
 	directory: {
 		url?: string;
+		/** The Mac serving a tailnet directory, by its tailnet name; unset for a deployed one. */
+		server?: string;
 		synced?: number;
 		error?: string;
 		failed?: number;
