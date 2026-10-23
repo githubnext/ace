@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"license": "MIT",
-	"version": "0.0.54",
+	"version": "0.0.55",
 	"exports": { "./protocol": "./src/protocol.ts" },
 	"scripts": {
 		"dev": "bun scripts/build.ts dev --run",
