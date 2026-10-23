@@ -243,11 +243,12 @@ export function Welcome({ github, onClose }: { github?: string; onClose: () => v
 }
 
 /**
- * Sidebar footer while this host has no directory: join the one a teammate's host names, or
- * create one when nobody has.
+ * Sidebar footer while this host has no directory: rejoin the one it still serves, join the one a
+ * teammate's host names, or create one when nobody has.
  */
 export function DirectoryCard(
-	{ offered, onDismiss, onChange }: {
+	{ serving, offered, onDismiss, onChange }: {
+		serving: boolean;
 		offered?: { url: string; host: string };
 		onDismiss: () => void;
 		onChange: () => void;
@@ -256,11 +257,13 @@ export function DirectoryCard(
 	const [joining, setJoining] = useState(false);
 	const [error, setError] = useState("");
 
-	async function join(url: string) {
+	async function join(url?: string) {
 		setJoining(true);
 		setError("");
 		try {
-			await host.request({ op: "directory-set", url });
+			await host.request(
+				url ? { op: "directory-set", url } : { op: "directory-serve", serve: true },
+			);
 		} catch (error) {
 			setError((error as Error).message);
 		} finally {
@@ -282,13 +285,15 @@ export function DirectoryCard(
 					<IconX className="size-3.5" aria-hidden />
 				</button>
 			</div>
-			{offered
+			{/* `ace directory off` leaves the directory this Mac still serves; Join serves it again. */}
+			{serving || offered
 				? (
 					<>
 						<p className="text-xs leading-5 text-muted-foreground">
-							{offered.host}{" "}
-							serves your team's directory. This Mac isn't in it, so its channels aren't listed
-							while it's offline.
+							{serving
+								? "This Mac serves your team's directory but isn't in it"
+								: `${offered?.host} serves your team's directory. This Mac isn't in it`}, so its
+							channels aren't listed while it's offline.
 						</p>
 						{error && <p role="alert" className="text-xs text-destructive">{error}</p>}
 						<div className="flex gap-2">
@@ -296,7 +301,7 @@ export function DirectoryCard(
 								size="sm"
 								className="flex-1"
 								disabled={joining}
-								onClick={() => void join(offered.url)}
+								onClick={() => void join(serving ? undefined : offered?.url)}
 							>
 								{joining ? "Joining…" : "Join"}
 							</Button>

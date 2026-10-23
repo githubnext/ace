@@ -734,19 +734,26 @@ function GroupView(props: GroupProps) {
 			onRowEnter(node?.dataset.messageId || uid);
 		})
 		: undefined;
-	let toolbar = (id: string, fit: number, sticky?: boolean) =>
-		active === id && (
+	let toolbar = (id: string, fit: number, sticky?: boolean) => {
+		if (active !== id) return false;
+		let actions = typeof props.actions === "function" ? props.actions(id) : props.actions;
+		let canEdit = own && !!editable?.has(id);
+		// A message with nothing left to act on, such as a deleted one, gets no toolbar.
+		let shared = (["react", "copy", "permalink"] as const).every((key) => actions?.[key] === false);
+		if (shared && !canEdit && !(own && actions?.delete !== false)) return false;
+		return (
 			<FloatingToolbar
 				align={mine ? "left" : "right"}
-				actions={typeof props.actions === "function" ? props.actions(id) : props.actions}
+				actions={actions}
 				mine={own}
-				canEdit={own && !!editable?.has(id)}
+				canEdit={canEdit}
 				sticky={sticky}
 				width={fit}
 				onAction={(action) => onToolbarAction?.(id, action)}
 				onOpenChange={onOpenChange}
 			/>
 		);
+	};
 
 	return (
 		<div

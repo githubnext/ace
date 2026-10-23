@@ -145,11 +145,11 @@ function Disconnected() {
 	const answers = useAnswers();
 	const refusal = useRefused();
 	if (desktop) return <>Disconnected from Ace Helper. Open Settings → This Mac to start it.</>;
-	if (typeof refusal === "object") return <>{refusal.other}</>;
-	if (refusal === "signed-out") {
+	if (refusal && "other" in refusal) return <>{refusal.other}</>;
+	if (refusal) {
 		return (
 			<>
-				This browser isn't signed in to your host. Run <code>ace open</code>{" "}
+				This browser isn't signed in to your host. Run <code>{refusal.command} open</code>{" "}
 				on that Mac, or open its sign-in link again.
 			</>
 		);
@@ -1066,6 +1066,7 @@ export function App() {
 								)}
 							{card && (
 								<DirectoryCard
+									serving={directory.serving}
 									offered={directory.offered}
 									onDismiss={() => setDismissed(true)}
 									onChange={() => setSettings("team")}

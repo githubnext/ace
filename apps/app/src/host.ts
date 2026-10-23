@@ -36,12 +36,12 @@ window.addEventListener("hashchange", () => {
  * with a new token, or because it is a teammate's host (403, whose text names its owner). A
  * browser hides a WebSocket's status, so this asks over HTTP with what the socket sends.
  */
-export async function refused(): Promise<"signed-out" | { other: string } | undefined> {
+export async function refused(): Promise<{ command: string } | { other: string } | undefined> {
 	const response = await fetch(gateway!.replace(/^ws/, "http"), {
 		cache: "no-store",
 		...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
 	}).catch(() => undefined);
-	if (response?.status === 401) return "signed-out";
+	if (response?.status === 401) return { command: await response.text() };
 	if (response?.status === 403) return { other: await response.text() };
 }
 
