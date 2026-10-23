@@ -132,23 +132,33 @@ function MentionBadge({ count, label }: { count: number; label: string }) {
 
 function AttentionWave({ label, mentionCount }: { label: string; mentionCount?: number }) {
 	return (
-		<span
-			aria-label={label}
-			className="grid size-4.5 place-items-center text-muted-foreground transition-opacity duration-150 ease-out motion-reduce:transition-none group-data-[status=active]/row:text-current/80"
-		>
-			<Badge
-				show={Boolean(mentionCount)}
-				className={cn(
-					"size-4.5 translate-x-0.5 -translate-y-0.5 place-items-center",
-					"[&>span:first-child]:grid [&>span:first-child]:size-4.5 [&>span:first-child]:place-items-center",
-				)}
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<span
+						role="img"
+						aria-label={label}
+						className="grid size-4.5 place-items-center text-muted-foreground transition-opacity duration-150 ease-out motion-reduce:transition-none group-data-[status=active]/row:text-current/80"
+					/>
+				}
 			>
-				<HandWave
-					aria-hidden
-					className="size-4.5 overflow-visible origin-[70%_80%] animate-[attention-wave_3s_ease-in-out_infinite] motion-reduce:animate-none"
-				/>
-			</Badge>
-		</span>
+				<Badge
+					show={Boolean(mentionCount)}
+					className={cn(
+						"size-4.5 translate-x-0.5 -translate-y-0.5 place-items-center",
+						"[&>span:first-child]:grid [&>span:first-child]:size-4.5 [&>span:first-child]:place-items-center",
+					)}
+				>
+					<HandWave
+						aria-hidden
+						className="size-4.5 overflow-visible origin-[70%_80%] animate-[attention-wave_3s_ease-in-out_infinite] motion-reduce:animate-none"
+					/>
+				</Badge>
+			</TooltipTrigger>
+			<TooltipContent side="right" sideOffset={8}>
+				{label}
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 
@@ -156,10 +166,16 @@ function mentionText(count: number) {
 	return `${count} direct ${count === 1 ? "mention" : "mentions"}`;
 }
 
+const NEEDS = {
+	failed: "a run you started failed",
+	question: "the agent is waiting for your answer",
+};
+
 function attentionText(data: SidebarRow, showAttention: boolean) {
-	if (!showAttention) return mentionText(data.mentionCount);
-	if (data.mentionCount <= 0) return "Agent needs your attention";
-	return `${mentionText(data.mentionCount)} and agent needs your attention`;
+	if (!showAttention || !data.needsAttention) return mentionText(data.mentionCount);
+	const reason = `Needs you: ${NEEDS[data.needsAttention]}`;
+	if (data.mentionCount <= 0) return reason;
+	return `${reason}, and ${mentionText(data.mentionCount)}`;
 }
 
 function canShowMention({

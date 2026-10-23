@@ -269,6 +269,11 @@ function TeammateRow({ teammate, onChannel }: {
 	);
 }
 
+const NEEDS = {
+	failed: "Needs you: a run you started failed",
+	question: "Needs you: the agent is waiting for your answer",
+};
+
 /** The sidebar row's marks: a raised hand for a run that needs you, mentions, then unread. */
 function Marks({ attention }: { attention?: Attention }) {
 	if (!attention) return null;
@@ -276,7 +281,14 @@ function Marks({ attention }: { attention?: Attention }) {
 	return (
 		<span className="flex shrink-0 items-center gap-2">
 			{(mark === "failed" || mark === "question") && (
-				<IconHand className="size-4 text-muted-foreground" aria-label="Needs you" role="img" />
+				<Tooltip>
+					<TooltipTrigger
+						render={<span role="img" aria-label={NEEDS[mark]} className="grid" />}
+					>
+						<IconHand className="size-4 text-muted-foreground" />
+					</TooltipTrigger>
+					<TooltipContent>{NEEDS[mark]}</TooltipContent>
+				</Tooltip>
 			)}
 			{mentions > 0 && (
 				<span
