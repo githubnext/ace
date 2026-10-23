@@ -197,7 +197,7 @@ const pulls = new Map<string, GithubPull | null>();
 /**
  * The newest pull request from the chat's branch, read again while its channel is shown, since the
  * chat surfaces failed checks with the details sidebar closed. Opening a pull request doesn't move
- * the head, so a run ending reads it again too.
+ * the head, so a run ending reads it again too, as does the window regaining focus.
  */
 function usePull(
 	repo: string | undefined,
@@ -221,9 +221,11 @@ function usePull(
 			);
 		void read();
 		const timer = setInterval(read, settling ? SETTLING : PULL);
+		window.addEventListener("focus", read);
 		return () => {
 			active = false;
 			clearInterval(timer);
+			window.removeEventListener("focus", read);
 		};
 	}, [repo, branch, head, busy, settling]);
 	return key ? pulls.get(key) : undefined;

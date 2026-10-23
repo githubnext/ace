@@ -1,4 +1,11 @@
-import { type ComponentType, type ReactNode, useId, useState } from "react";
+import {
+	type ComponentType,
+	type ReactNode,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 
 import {
 	IconBranch,
@@ -246,6 +253,45 @@ function CreatePr({ creating, onCreate, onDraft }: {
 	);
 }
 
+/** Clamped to four lines, with Show more only while the text doesn't fit. */
+function Summary({ text }: { text: string }) {
+	const [open, setOpen] = useState(false);
+	const [long, setLong] = useState(false);
+	const ref = useRef<HTMLParagraphElement>(null);
+	useLayoutEffect(() => {
+		const node = ref.current;
+		if (!node || open) return;
+		const measure = () => setLong(node.scrollHeight > node.clientHeight);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [text, open]);
+	return (
+		<>
+			<p
+				ref={ref}
+				className={cn(
+					"text-xs leading-snug whitespace-pre-wrap break-words text-foreground",
+					!open && "line-clamp-4",
+				)}
+			>
+				{text}
+			</p>
+			{(long || open) && (
+				<button
+					type="button"
+					aria-expanded={open}
+					className="self-start rounded-sm text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
+					onClick={() => setOpen(!open)}
+				>
+					{open ? "Show less" : "Show more"}
+				</button>
+			)}
+		</>
+	);
+}
+
 function Pull({ pull }: { pull: DetailsPull }) {
 	const [Icon, color] = PULL_ICONS[pull.state];
 	const failed = pull.checks.some((check) => check.state === "failed");
@@ -316,9 +362,7 @@ export function SessionDetailsView(
 						<IconX aria-hidden />
 					</Button>
 				</div>
-				<p className="line-clamp-4 text-xs leading-snug whitespace-pre-wrap break-words text-foreground">
-					{summary || "No summary yet."}
-				</p>
+				<Summary text={summary || "No summary yet."} />
 			</section>
 
 			{(changes || branch || pull !== undefined) && (
