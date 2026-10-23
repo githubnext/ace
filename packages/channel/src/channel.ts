@@ -206,7 +206,7 @@ export class Channel {
 		registry.install(CodingTools);
 		const handoffs = new Handoffs(options.directory);
 		registry.install(handoffs.extension);
-		const questions = new Questions((chat) => void channel.#asked(chat));
+		const questions = new Questions((chat, phase) => void channel.#asked(chat, phase));
 		registry.install(questions.extension);
 		const execute = options.desktop;
 		if (execute) {
@@ -596,15 +596,15 @@ export class Channel {
 		await this.#publishRun(chat, inputs.map((id) => settled.get(id)?.entry), outcome);
 	}
 
-	/** A run waiting on a question needs the same attention as one that ended. */
-	async #asked(chat: ConversationId): Promise<void> {
+	/** A run waiting on a question needs the same attention as one that ended, until it is answered. */
+	async #asked(chat: ConversationId, phase: "question" | "answered"): Promise<void> {
 		const inputs = this.#runs.get(chat);
 		if (!inputs) return;
 		const entries = await Promise.all(inputs.map(async (id) => {
 			const submission = await this.#harness.submission(id, context);
 			return (await submission?.status(context))?.entry;
 		}));
-		await this.#publishRun(chat, entries, "question");
+		await this.#publishRun(chat, entries, phase);
 	}
 
 	async #publishRun(

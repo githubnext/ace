@@ -31,8 +31,11 @@ export type Metadata = { name: string; summary: string; revision: number };
 export type RunEnd = {
 	chat: ChatId;
 	at: number;
-	/** `question` is published when a run starts waiting on a question, not at its end. */
-	outcome: "done" | "failed" | "stopped" | "question";
+	/**
+	 * `question` is published when a run starts waiting on a question and `answered` when that wait
+	 * ends with the run still going, so a pending question is read from the host, not from a client.
+	 */
+	outcome: "done" | "failed" | "stopped" | "question" | "answered";
 	author: string;
 };
 
