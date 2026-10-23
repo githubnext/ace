@@ -66,7 +66,8 @@ export type SidebarRow = {
 	// Conversation (viewer-relative)
 	unreadCount: number;
 	mentionCount: number;
-	needsAttention?: boolean;
+	/** Why the row needs the viewer: a run they started failed or waits on their answer. */
+	needsAttention?: "failed" | "question";
 	lastSpeaker?: "user" | "agent";
 	lastActivityAt: UNIX;
 

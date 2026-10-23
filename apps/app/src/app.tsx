@@ -229,7 +229,7 @@ function row(
 			? "thinking"
 			: "idle",
 		unreadCount: outcome === "done" || outcome === "message" ? 1 : 0,
-		needsAttention: outcome === "failed" || outcome === "question",
+		needsAttention: outcome === "failed" || outcome === "question" ? outcome : undefined,
 		mentionCount: attention?.mentions || 0,
 		lastActivityAt: Math.floor((channel.active || channel.created) / 1000),
 		online,
@@ -531,6 +531,19 @@ export function App() {
 		page === "channels" ? channel?.id : undefined,
 		people,
 	);
+	// A window that never chose a project, such as one a sign-in link opened, starts at a run that
+	// needs you instead of the first project's Dashboard.
+	const landed = useRef(false);
+	useEffect(() => {
+		if (landed.current || project !== undefined || !hello.host) return;
+		const waiting = channels.find((value) => {
+			const mark = attention.get(value.id)?.mark;
+			return mark === "question" || mark === "failed";
+		});
+		if (!waiting) return;
+		landed.current = true;
+		select(waiting);
+	});
 	const online = (channel: Listing) =>
 		present(presence[channelProject(channel)], people[hello.user], channel.id);
 	let groups = projectGroups(visible, hello, people, now, collapsed, attention, pins, online);
