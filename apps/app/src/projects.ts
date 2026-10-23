@@ -105,7 +105,10 @@ export function projects(opened: Project[], channels: Listing[], host: string): 
 			add(host, project.path, project.name, true, project.repo, project);
 		}
 	}
-	for (const channel of channels) {
+	// Creation order, not the host's: a peer's listings move behind the directory's while it is
+	// offline, which would re-sort projects known only through its channels.
+	const ordered = [...channels].sort((a, b) => a.created - b.created || a.id.localeCompare(b.id));
+	for (const channel of ordered) {
 		const path = root(channel);
 		const name = channel.repo?.split("/")[1] || path.replace(/\/+$/, "").split("/").pop() || path;
 		// Directory-only listings are offline or archived, and a hosted channel's host is a workspace.

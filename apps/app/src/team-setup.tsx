@@ -76,7 +76,9 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 	// Until the host answers, the fork can't tell a first person from one already in a team.
 	const pending = checks.open && !checked && !checks.error;
 	const peers = useTeamPeers();
-	const starting = chosen ?? (!checked?.directory.offered && !peers.length);
+	// Someone on the tailnet is already in a team, so this person isn't the first.
+	const team = !!checked?.directory.offered || peers.length > 0;
+	const starting = chosen ?? !team;
 
 	useEffect(() => {
 		if (!inviting) return;
@@ -126,10 +128,11 @@ export function TeamSetup({ github, invite, inviting, onClose }: {
 							<Choice
 								selected={starting}
 								onSelect={() => setStarting(true)}
-								title="Get your team started"
+								title={team ? "Set up a separate directory" : "Get your team started"}
 							>
-								You're the first on this tailnet. Pick where the team's channels are listed. You can
-								change it later.
+								{team
+									? "Your tailnet already has a team. Only list your channels apart from theirs if you mean to."
+									: "You're the first on this tailnet. Pick where the team's channels are listed. You can change it later."}
 							</Choice>
 							<Choice
 								selected={!starting}

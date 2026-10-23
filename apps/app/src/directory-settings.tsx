@@ -100,7 +100,11 @@ export function TeamSettings({ active }: { active: boolean }) {
 							label="Team setup"
 							description="Ask a teammate's host to let you in, or deploy a directory to Cloudflare or Fly.io."
 						>
-							<Button variant="outline" onClick={() => window.dispatchEvent(new Event(TEAM_SETUP))}>
+							<Button
+								variant="outline"
+								onClick={() =>
+									window.dispatchEvent(new CustomEvent(TEAM_SETUP, { detail: "team" }))}
+							>
 								Set up…
 							</Button>
 						</Row>
