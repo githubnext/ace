@@ -61,7 +61,13 @@ let error: string | undefined;
 let failed: number | undefined;
 /** The running host's watch, so a change made through it takes effect without waiting for a heartbeat. */
 let active:
-	| { sync(): Promise<void>; again(): Promise<void>; changed(): void; chose(): void }
+	| {
+		sync(): Promise<void>;
+		again(): Promise<void>;
+		changed(): void;
+		chose(): void;
+		leave(base: string): Promise<void>;
+	}
 	| undefined;
 
 /** A directory base URL without a trailing slash. */
@@ -83,7 +89,11 @@ export function canonical(value: string): string {
  * an empty file, so a host that left never joins a peer's directory on its own again.
  */
 export function configure(value: string | undefined): Promise<void> | undefined {
-	writeFileSync(config, JSON.stringify(value ? { url: canonical(value) } : {}));
+	const before = url();
+	const after = value && canonical(value);
+	writeFileSync(config, JSON.stringify(after ? { url: after } : {}));
+	// Teammates' views, including the serving Mac's, drop this host only when it says it left.
+	if (before && before !== after) void active?.leave(before);
 	known = { hosts: [], channels: [], shares: [] };
 	synced = undefined;
 	error = undefined;
@@ -339,7 +349,19 @@ export function watch({ self, channels, changed, chose, published, covered }: Op
 		if (!running || running.base !== url()) return join();
 		return running.again ??= running.done.then(join);
 	};
-	active = { sync: join, again: sync, changed, chose };
+	const leave = async (base: string) => {
+		// A publish under way would list this host again after it left.
+		if (running?.base === base) await running.done;
+		try {
+			await call(base, `/hosts/${encodeURIComponent(self().name)}`, controller.signal, {
+				method: "DELETE",
+			});
+			log("info", "directory.left", { url: base });
+		} catch (cause) {
+			log("warn", "directory.leave.failed", { url: base, ...failure(cause) });
+		}
+	};
+	active = { sync: join, again: sync, changed, chose, leave };
 	void join();
 	const interval = setInterval(() => {
 		// A failed publish keeps retrying every heartbeat; lobbies only carry what was published.

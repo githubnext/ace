@@ -102,12 +102,15 @@ export function shares(): Share[] {
 	return open().query<Share, []>('SELECT project, person, shared_by AS "by", at FROM shares').all();
 }
 
-/** Requests under `/directory`, with `path` the rest; `joined` runs when a host publishes for the first time. */
+/**
+ * Requests under `/directory`, with `path` the rest; `members` runs when a host publishes for the
+ * first time or leaves, so this host's own views follow at once.
+ */
 export async function handle(
 	path: string,
 	request: Request,
 	caller: Caller,
-	joined: () => void,
+	members: () => void,
 ): Promise<Response> {
 	if (!isServing()) return new Response("This host serves no directory", { status: 404 });
 	const sql = open();
@@ -121,7 +124,18 @@ export async function handle(
 		}
 		const known = sql.query("SELECT 1 FROM hosts WHERE name = ?").get(host);
 		publish(sql, host, publication);
-		if (!known) joined();
+		if (!known) members();
+		return new Response(null, { status: 204 });
+	}
+	if (host && request.method === "DELETE") {
+		if (host !== caller.host) {
+			return new Response("Hosts leave only as themselves", { status: 403 });
+		}
+		sql.transaction(() => {
+			sql.run("DELETE FROM hosts WHERE name = ?", [host]);
+			sql.run("DELETE FROM channels WHERE host = ?", [host]);
+		})();
+		members();
 		return new Response(null, { status: 204 });
 	}
 	if (path === "/shares" && request.method === "POST") {
