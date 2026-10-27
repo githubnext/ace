@@ -9,6 +9,23 @@ import type { Content } from "../layout/storage";
 /** How often a still pane asks whether its window is still there. */
 const CHECK = 500;
 
+/** An empty box keeps the capture running while nothing is drawn. */
+const HIDDEN = new DOMRect();
+
+/**
+ * The page can't draw over the native view, so it hides under any modal, since its backdrop dims
+ * the whole window, and under a menu, list or popover that reaches the pane.
+ */
+function isCovered(rect: DOMRect): boolean {
+	if (document.querySelector('[data-slot="dialog-overlay"]')) return true;
+	const overlays = document.querySelectorAll('[role="menu"], [role="listbox"], [role="dialog"]');
+	return [...overlays].some((overlay) => {
+		const other = overlay.getBoundingClientRect();
+		if (other.right <= rect.left || other.left >= rect.right) return false;
+		return other.bottom > rect.top && other.top < rect.bottom;
+	});
+}
+
 /** Another app's window, drawn natively over this pane at its own frame rate. */
 export function Live(
 	{ id, window, app, active, update }: {
@@ -45,16 +62,20 @@ export function Live(
 		const live = desktop?.live;
 		const element = ref.current;
 		if (!live || !element || !active) return;
+		const box = () => {
+			const rect = element.getBoundingClientRect();
+			return isCovered(rect) ? HIDDEN : rect;
+		};
 		const send = () => {
 			const request = relink.current;
 			relink.current = undefined;
-			live(id, window, element.getBoundingClientRect(), request).then(report).catch(() => {});
+			live(id, window, box(), request).then(report).catch(() => {});
 		};
 		// Pane drags and window resizes move the box without a React render, so follow it per frame.
 		let last = "";
 		let frame = requestAnimationFrame(function follow() {
 			frame = requestAnimationFrame(follow);
-			const rect = element.getBoundingClientRect();
+			const rect = box();
 			const key = `${rect.x},${rect.y},${rect.width},${rect.height}`;
 			if (key === last) return;
 			last = key;
