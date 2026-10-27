@@ -1190,7 +1190,60 @@ function compile(
 	return items;
 }
 
-export { compile, merge, structure };
+/** What arrived after the New divider, for a reader catching up. */
+type Missed = {
+	/** Index of the New divider. */
+	index: number;
+	messages: number;
+	/** Who posted, in the order they first did. */
+	people: string[];
+	mentions: { index: number; who: string; text: string }[];
+	/** Finished agent turns, with their recap or else the start of their answer. */
+	runs: { index: number; text: string; files: EditedFile[]; pulls: Artifact[] }[];
+};
+
+function excerpt(row: Row): string {
+	let chunk = row.chunks.find(chunk => chunk.kind === "text");
+	return chunk?.kind === "text" ? chunk.raw.replace(/\s+/g, " ").trim() : "";
+}
+
+function missed(items: TimelineItem[], mentioned?: ReadonlySet<string>): Missed | undefined {
+	let start = items.findIndex(item => item.kind === "new");
+	if (start < 0) return;
+	let people = new Set<string>();
+	let result: Missed = { index: start, messages: 0, people: [], mentions: [], runs: [] };
+	for (let index = start + 1; index < items.length; index++) {
+		let item = items[index]!;
+		if (item.kind !== "group") continue;
+		let { group, turn } = item;
+		let who = group.display || String(group.sender || "");
+		if (group.role === "user") {
+			result.messages += group.rows.length;
+			people.add(who);
+			for (let row of group.rows) {
+				if (mentioned?.has(row.uid)) result.mentions.push({ index, who, text: excerpt(row) });
+			}
+			continue;
+		}
+		if (!turn?.final) continue;
+		let text = turn.recap || excerpt(turn.final);
+		let pulls = turn.artifacts.filter(artifact => artifact.kind === "pull-request");
+		let last = result.runs.at(-1);
+		// A run longer than a group window spans several groups, and each carries the run's recap.
+		if (last && turn.recap && last.text === turn.recap) {
+			last.index = index;
+			let paths = new Set(last.files.map(file => file.path));
+			last.files.push(...turn.files.filter(file => !paths.has(file.path)));
+			last.pulls.push(...pulls);
+			continue;
+		}
+		result.runs.push({ index, text, files: [...turn.files], pulls });
+	}
+	result.people = [...people];
+	return result;
+}
+
+export { compile, merge, missed, structure };
 export type {
 	AgentTurn,
 	Artifact,
@@ -1198,6 +1251,7 @@ export type {
 	EditedFile,
 	Group,
 	ImageNode,
+	Missed,
 	Row,
 	TimelineItem,
 	TimelineWorking,

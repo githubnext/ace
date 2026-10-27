@@ -256,6 +256,7 @@ export function Conversation(
 							working={transcript.busy || undefined}
 							currentUser={{ login: user, own: [user] }}
 							unread={first}
+							summary={channel.summary}
 							mentioned={mentioned}
 							actions={actions}
 							onReact={(uid, emoji) => {
