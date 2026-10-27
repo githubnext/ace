@@ -47,6 +47,11 @@ type ScrollViewProps = Omit<ComponentPropsWithRef<"div">, "children" | "onScroll
 	overscan?: number;
 	/** Render callback — receives item index and viewport width. */
 	children: ScrollViewRender;
+	/**
+	 * Zooms items, which lay out at the viewport width divided by it. Scroll offsets stay in
+	 * viewport pixels, so layouts measured in fixed pixels can grow with the text size.
+	 */
+	scale?: number;
 	/** Called with the actually visible item range and bottom-pinned state. */
 	onRangeChange?: (range: ScrollViewRange) => void;
 	/** Called when native scrolling starts changing the viewport. */
@@ -65,6 +70,7 @@ function ScrollView(
 		end = 0,
 		overscan = 300,
 		children,
+		scale = 1,
 		onRangeChange,
 		onScrollStart,
 		onScrollEnd,
@@ -95,7 +101,11 @@ function ScrollView(
 	// inflate the initial visible range and trigger a very expensive first render.
 	let ready = width > 0;
 
-	let heightAt = useMemo(() => (i: number) => height(i, width), [height, width]);
+	let heightAt = useMemo(() => (i: number) => height(i, width / scale) * scale, [
+		height,
+		scale,
+		width,
+	]);
 	let frame = useMemo(() => ready ? scroll.frame(count, heightAt, gap, end) : EMPTY, [
 		count,
 		end,
@@ -358,7 +368,10 @@ function ScrollView(
 				if (!frame.items[idx]) return null;
 				let container = cache.current.get(idx);
 				if (!container) return null;
-				return createPortal(children(idx, width), container, String(idx));
+				let item = scale === 1
+					? children(idx, width)
+					: <div style={{ zoom: scale }}>{children(idx, width / scale)}</div>;
+				return createPortal(item, container, String(idx));
 			})}
 		</div>
 	);

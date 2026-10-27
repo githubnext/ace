@@ -233,6 +233,10 @@ ApplicationMenu.setApplicationMenu([
 				action: "channels-toggle",
 				accelerator: "CmdOrCtrl+Shift+b",
 			},
+			{ type: "divider" },
+			{ label: "Bigger Text", action: "text-bigger", accelerator: "CmdOrCtrl+Plus" },
+			{ label: "Smaller Text", action: "text-smaller", accelerator: "CmdOrCtrl+-" },
+			{ label: "Actual Size", action: "text-reset", accelerator: "CmdOrCtrl+0" },
 		],
 	},
 	// The collapsed navigation rail hides the minimize and zoom buttons, so the menu keeps both.
@@ -304,6 +308,9 @@ Electrobun.events.on("application-menu-clicked", ({ data }) => {
 			"prs",
 			"nav-toggle",
 			"channels-toggle",
+			"text-bigger",
+			"text-smaller",
+			"text-reset",
 		].includes(
 			data.action,
 		)

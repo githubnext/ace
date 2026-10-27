@@ -38,6 +38,9 @@ const ACTIONS = [
 	...(desktop ? [action("updates", "Check for updates…", "Ace")] : []),
 	action("nav-toggle", "Toggle navigation", "View", "b"),
 	action("channels-toggle", "Toggle channels sidebar", "View", "b", true),
+	action("text-bigger", "Bigger text", "View", "+"),
+	action("text-smaller", "Smaller text", "View", "-"),
+	action("text-reset", "Actual size text", "View", "0"),
 ];
 
 const CREATE = "channel-new";

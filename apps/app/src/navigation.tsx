@@ -12,6 +12,7 @@ import {
 import { IconHash, IconHome, IconIssue, IconPullRequest } from "@ace/ui/icons";
 
 import { desktop } from "./desktop";
+import { TEXT_SIZE_ACTIONS, textSize } from "./text-size";
 import { share } from "./window-storage";
 
 export type Page = "dashboard" | "channels" | "issues" | "prs";
@@ -100,6 +101,7 @@ const ACTIONS = [
 	"prs",
 	"nav-toggle",
 	"channels-toggle",
+	...TEXT_SIZE_ACTIONS,
 ];
 
 export function WindowControls({ onOpen, onClone, onSettings, onPage, connected }: {
@@ -135,6 +137,10 @@ export function WindowControls({ onOpen, onClone, onSettings, onPage, connected 
 				return nav.setOpen((value) => !value);
 			case "channels-toggle":
 				return left.setOpen((value) => !value);
+			case "text-bigger":
+			case "text-smaller":
+			case "text-reset":
+				return textSize(action);
 		}
 	});
 
