@@ -4,8 +4,9 @@ anchor: function failure
 created: 2026-10-21T15:37:54Z
 norm: '1'
 sig: f1231fd34544d478
-body_hash: f0ddb33d9820c29c
-raw_hash: 691df1159bc16114
+body_hash: 9c6bfc2d5c2e411f
+raw_hash: 407e5184a4d911dc
+vouched: 2026-10-27T18:45:09Z
 lines: 15-20
 ---
 
