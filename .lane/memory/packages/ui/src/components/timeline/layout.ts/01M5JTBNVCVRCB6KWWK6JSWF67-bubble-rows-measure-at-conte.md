@@ -4,8 +4,9 @@ anchor: function itemHeight
 created: 2026-10-22T22:05:29Z
 norm: '1'
 sig: 3c40d8dd5f73026a
-body_hash: 446268a0d25debb4
-raw_hash: e696d2f48fa62bb6
+body_hash: 9b7f5ad1d6fa2633
+raw_hash: c051d6140c4c9315
+vouched: 2026-10-27T14:07:44Z
 lines: 742-831
 ---
 
