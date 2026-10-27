@@ -24,6 +24,7 @@ config.version = ACE_VERSION;
 config.app = join(dirname(process.execPath), "..", "Resources", "app", "web");
 config.services = join(dirname(process.execPath), "..", "Resources", "services");
 config.worker = [process.execPath, "--worker"];
+config.cli = [process.execPath];
 // The app links its command as `ace` for stable and `ace-<channel>` otherwise, as its identifier ends.
 config.command = cli
 	? basename(process.argv0)

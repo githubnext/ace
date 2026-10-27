@@ -12,6 +12,7 @@ import { Connection } from "./client";
 import * as compute from "./compute";
 import { config } from "./config";
 import * as demo from "./demo";
+import { seed } from "./demo-data";
 import { diagnostics } from "./diagnostics";
 import * as asks from "./asks";
 import * as directory from "./directory";
@@ -1228,6 +1229,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	openLog("host");
 	const scripted = script === undefined ? undefined : demo.read(script);
 	await claim(port);
+	if (config.demo) await seed(catalog.home);
 	await resume();
 	const server = await listen(port);
 	await Bun.write(SERVED(), String(server.port));
@@ -1270,12 +1272,15 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	process.on("SIGTERM", () => void stop());
 	process.on("SIGINT", () => void stop());
 	// The owner's login, the channels' tailnet, and every tailnet listener are read once at startup.
-	cleanup.push(tailscale(catalog.tailnet, (tailnet) => {
-		log("info", "host.tailnet.moved", { from: catalog.tailnet, to: tailnet });
-		// launchd starts Ace Helper again after a failed exit, which picks up the new tailnet.
-		if (config.helper) void stop(75);
-		else console.log(`Tailscale is on ${tailnet} now. Restart ace serve to use it.`);
-	}));
+	// ace demo's tailnet is its own, which Tailscale never reports.
+	if (!config.demo) {
+		cleanup.push(tailscale(catalog.tailnet, (tailnet) => {
+			log("info", "host.tailnet.moved", { from: catalog.tailnet, to: tailnet });
+			// launchd starts Ace Helper again after a failed exit, which picks up the new tailnet.
+			if (config.helper) void stop(75);
+			else console.log(`Tailscale is on ${tailnet} now. Restart ace serve to use it.`);
+		}));
+	}
 	console.log(`Ace on http://${server.hostname}:${server.port}`);
 	// Ace Helper's console is its log file, which must not hold the token.
 	if (!config.helper) {

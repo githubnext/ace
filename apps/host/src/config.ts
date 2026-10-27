@@ -28,10 +28,18 @@ export const config = {
 	version: undefined as string | undefined,
 	/** Set by ace serve --loopback; the host stays off the tailnet and the team directory. */
 	loopback: false,
+	/** ace demo's script, set only in its throwaway host, whose agents answer from the script. */
+	demo: process.env.ACE_DEMO,
 	worker: [
 		process.execPath,
 		"--no-env-file",
 		fileURLToPath(new URL("./worker.ts", import.meta.url)),
+	] as [string, ...string[]],
+	/** This command line, which ace demo runs again as its own host. */
+	cli: [
+		process.execPath,
+		"--no-env-file",
+		fileURLToPath(new URL("./cli.ts", import.meta.url)),
 	] as [string, ...string[]],
 };
 

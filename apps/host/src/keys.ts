@@ -10,6 +10,7 @@ import type { MutableModels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
 import { config } from "./config";
+import * as demo from "./demo-model";
 import type { CredentialStatus } from "./protocol";
 
 const sealed = new Map<string, string>();
@@ -199,6 +200,7 @@ export async function latest(name: string, fresh?: boolean): Promise<CredentialS
 }
 
 function catalog(lookup: (name: string) => Promise<string | undefined>): MutableModels {
+	if (config.demo) return demo.models(config.demo);
 	return builtinModels({
 		authContext: {
 			env: lookup,

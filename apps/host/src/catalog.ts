@@ -73,12 +73,15 @@ const root = join(home, "channels");
  * The local human, named by their Tailscale login so they are the same participant on every
  * host. Without Tailscale the host is single-user and the OS account name stands in.
  */
-const current = identity();
+const current: { login?: string; tailnet?: string } = config.demo
+	? { tailnet: "demo" }
+	: identity();
 export const user = config.user || current.login || userInfo().username;
 
 /**
  * Channels belong to the tailnet they were created on, and a host shows only its own tailnet's.
  * Like `user`, it is fixed when the process starts; without Tailscale the host has no channels.
+ * ace demo's throwaway host has a tailnet of its own, so it needs no Tailscale.
  */
 export const tailnet = current.tailnet;
 
