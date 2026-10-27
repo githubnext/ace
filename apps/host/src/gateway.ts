@@ -477,7 +477,13 @@ async function lifecycle(
 }
 
 const owned = new Set<HostRequest["op"]>(["archive", "archive-inactive", "delete", "fork"]);
-const windowOps = new Set<HostRequest["op"]>(["window", "windows", "tab-rename", "tab-result"]);
+const windowOps = new Set<HostRequest["op"]>([
+	"window",
+	"windows",
+	"tab-rename",
+	"tab-live",
+	"tab-result",
+]);
 const moveOps = new Set<HostRequest["op"]>(["move-targets", "move"]);
 const keychainOps = new Set<HostRequest["op"]>([
 	"key-store",
@@ -580,6 +586,8 @@ async function handle(
 			return windows.list();
 		case "tab-rename":
 			return windows.rename(request);
+		case "tab-live":
+			return windows.live(request);
 		case "tab-result":
 			return windows.result(socket, request.call, request.result);
 		case "update-prepare": {

@@ -9,6 +9,10 @@ export type Window = { id: string; tabs: Tab[] };
 export type Tabs = {
 	list(context: Context): Promise<Window[]>;
 	rename(request: { window: string; tab: string; name: string }, context: Context): Promise<Window>;
+	live(
+		request: { window: string; target: number; name: string },
+		context: Context,
+	): Promise<Window>;
 };
 
 /** Ace's own layout, so it is never gated by native desktop tools. */
@@ -42,6 +46,20 @@ export function tabs(layout: Tabs): Extension {
 				replay: "safe",
 				execute: async (args, _api, context) => ({
 					content: [{ type: "text", text: JSON.stringify(await layout.rename(args, context)) }],
+				}),
+			}),
+			defineTool({
+				name: "tab_live",
+				description:
+					"Show a native app window from this Mac live in a split beside the chat, in an Ace app window from tabs, so people watch the app at full frame rate while you work in it. `target` is the window's original_window_id from desktop_windows. The window keeps updating while covered by Ace, so keep it behind Ace; minimized windows and those on another Space stop updating. Opening the same target again selects its existing tab.",
+				parameters: Type.Object({
+					window: Type.String({ minLength: 1, maxLength: 64 }),
+					target: Type.Integer({ minimum: 1 }),
+					name: Type.String({ maxLength: 80 }),
+				}, { additionalProperties: false }),
+				replay: "safe",
+				execute: async (args, _api, context) => ({
+					content: [{ type: "text", text: JSON.stringify(await layout.live(args, context)) }],
 				}),
 			}),
 		],

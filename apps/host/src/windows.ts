@@ -65,7 +65,26 @@ export function rename(request: Extract<HostRequest, { op: "tab-rename" }>): Pro
 	if (tab.type === "chat") {
 		throw new Error("The Chat tab follows the channel name and cannot be renamed");
 	}
-	const name = request.name.trim();
+	return send(window, request.channel, request.tab, request.name);
+}
+
+export function live(request: Extract<HostRequest, { op: "tab-live" }>): Promise<WindowInfo> {
+	const window = windows.get(request.window);
+	if (!window) throw new Error("No connected Ace window with that ID; list tabs again");
+	if (window.value.channel.id !== request.channel) {
+		throw new Error("That Ace window is showing a different channel; list tabs again");
+	}
+	return send(window, request.channel, "", request.name, request.target);
+}
+
+function send(
+	window: Window,
+	channel: string,
+	tab: string,
+	text: string,
+	target?: number,
+): Promise<WindowInfo> {
+	const name = text.trim();
 	if (name.length > 80) throw new Error("A tab name must be at most 80 characters");
 	const call = crypto.randomUUID();
 	return new Promise((resolve, reject) => {
@@ -75,8 +94,8 @@ export function rename(request: Extract<HostRequest, { op: "tab-rename" }>): Pro
 		}, TIMEOUT);
 		pending.set(call, {
 			window,
-			channel: request.channel,
-			tab: request.tab,
+			channel,
+			tab,
 			resolve,
 			reject,
 			timer,
@@ -86,10 +105,11 @@ export function rename(request: Extract<HostRequest, { op: "tab-rename" }>): Pro
 				{
 					rename: {
 						call,
-						channel: request.channel,
-						tab: request.tab,
+						channel,
+						tab,
 						name,
 						expires: Date.now() + TIMEOUT,
+						...(target === undefined ? {} : { live: target }),
 					},
 				} satisfies HostFrame,
 			));
@@ -113,7 +133,7 @@ export function result(socket: Socket, call: string, result: TabResult): void {
 	if (!result.ok) return request.reject(new Error(result.error));
 	if (
 		result.value.channel.id !== request.channel
-		|| !result.value.tabs.some((tab) => tab.id === request.tab)
+		|| (request.tab && !result.value.tabs.some((tab) => tab.id === request.tab))
 	) {
 		return request.reject(
 			new Error("The Ace window changed channels or closed the tab during rename"),

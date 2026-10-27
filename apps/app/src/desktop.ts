@@ -25,6 +25,21 @@ export const desktop = view && token
 		project: () => rpc.request.project({ token }),
 		lights: (expanded: boolean) => rpc.request.lights({ token, expanded }),
 		zoom: () => rpc.request.zoom({ token }),
+		live: (
+			id: string,
+			window: number | null,
+			rect?: DOMRectReadOnly,
+			relink?: { app?: string },
+		) =>
+			rpc.request.live({
+				token,
+				id,
+				window,
+				...(rect
+					? { rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } }
+					: {}),
+				...(relink ? { relink } : {}),
+			}),
 		window: () => rpc.request.window({ token }),
 		helper: (action: HelperAction) => rpc.request.helper({ token, action }),
 		native: (action: NativeAction) => rpc.request.native({ token, action }),

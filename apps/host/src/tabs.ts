@@ -16,5 +16,7 @@ export function tabs(channel: string): Tabs {
 				.map(window),
 		rename: async ({ window: id, tab, name }) =>
 			window(await local<WindowInfo>({ op: "tab-rename", window: id, channel, tab, name })),
+		live: async ({ window: id, target, name }) =>
+			window(await local<WindowInfo>({ op: "tab-live", window: id, channel, target, name })),
 	};
 }
