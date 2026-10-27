@@ -17,6 +17,8 @@
 @property(nonatomic, strong) NSTimer *watch;
 @property(nonatomic) BOOL stopped;
 @property(nonatomic) BOOL lost;
+/** Until when a closed window's app is followed to its next window, as after a rebuild. */
+@property(nonatomic, strong) NSDate *deadline;
 /** Bumped by each start or relink, so a slow lookup can't attach a superseded window. */
 @property(nonatomic) NSUInteger generation;
 @end
@@ -58,6 +60,8 @@ static BOOL exists(CGWindowID window) {
 	[self stop];
 	self.target = target;
 	self.bundle = nil;
+	self.deadline = nil;
+	self.layer.contents = nil;
 	[self attach:nil];
 }
 
@@ -72,7 +76,6 @@ static BOOL exists(CGWindowID window) {
 - (void)attach:(NSString *)app {
 	self.stopped = NO;
 	self.lost = NO;
-	self.layer.contents = nil;
 	NSUInteger generation = ++self.generation;
 	CGWindowID target = self.target;
 	[SCShareableContent getShareableContentExcludingDesktopWindows:YES
@@ -101,6 +104,7 @@ static BOOL exists(CGWindowID window) {
 - (void)capture:(SCWindow *)window {
 	self.bundle = window.owningApplication.bundleIdentifier;
 	self.current = window.windowID;
+	self.deadline = nil;
 	SCContentFilter *filter = [[SCContentFilter alloc] initWithDesktopIndependentWindow:window];
 	SCStreamConfiguration *config = [SCStreamConfiguration new];
 	CGFloat scale = filter.pointPixelScale;
@@ -137,9 +141,22 @@ static BOOL exists(CGWindowID window) {
 	});
 }
 
-// Shows the page's relink prompt underneath; the app may have quit or relaunched.
+// A rebuilt app relaunches with a new window ID, so its app is followed for a while, keeping the
+// last frame, before the page's relink prompt shows underneath.
 - (void)lose {
 	[self stop];
+	if (!self.bundle) return [self give];
+	if (!self.deadline) self.deadline = [NSDate dateWithTimeIntervalSinceNow:10];
+	if (self.deadline.timeIntervalSinceNow <= 0) return [self give];
+	self.stopped = NO;
+	NSUInteger generation = self.generation;
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC / 2), dispatch_get_main_queue(), ^{
+		if (!self.stopped && self.generation == generation) [self attach:self.bundle];
+	});
+}
+
+- (void)give {
+	self.deadline = nil;
 	self.lost = YES;
 	self.layer.contents = nil;
 }
