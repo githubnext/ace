@@ -1,5 +1,5 @@
 /** The tailnet is the team: it says who a peer is and which machines can host channels. */
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { isIP } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -27,7 +27,8 @@ export type Machine = { name: string; login: string; address: string; dns: strin
 
 function executable(): string | undefined {
 	const path = Bun.which("tailscale", { PATH: process.env.PATH });
-	if (path) return path;
+	// Tailscale.app's binary crashes when run through a symlink such as /usr/local/bin/tailscale.
+	if (path) return realpathSync(path);
 	if (process.platform !== "darwin") return;
 	return ["/Applications", join(homedir(), "Applications")]
 		.map((dir) => join(dir, "Tailscale.app", "Contents", "MacOS", "Tailscale"))
