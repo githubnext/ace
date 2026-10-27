@@ -21,13 +21,21 @@ export function Live(
 ) {
 	const ref = useRef<HTMLElement>(null);
 	const relink = useRef<{ app?: string }>(undefined);
+	// After Ace restarts, only the tab knows the app, so a lost window tries it once on its own.
+	const tried = useRef(false);
 	const [lost, setLost] = useState(false);
 
 	const report = useEffectEvent((status: LiveStatus | null) => {
 		if (!status) return;
+		if (status.state === "lost" && app && !tried.current) {
+			tried.current = true;
+			relink.current = { app };
+			return;
+		}
 		setLost(status.state === "lost");
 		// A relink moves the tab to the app's new window, and the app is kept for the next one.
 		if (status.state !== "live") return;
+		tried.current = false;
 		if (status.window !== window || status.app !== app) {
 			update({ window: status.window, app: status.app });
 		}
