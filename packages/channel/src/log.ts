@@ -11,10 +11,11 @@ export function scoped(log: Log, base: Fields): Log {
 	return (level, event, fields) => log(level, event, { ...base, ...fields });
 }
 
-/** An error's message, stack, and cause, which JSON drops. */
+/** An error's message, code, stack, and cause, which JSON drops. */
 export function failure(error: unknown): Fields {
 	if (!(error instanceof Error)) return { error: String(error) };
 	const fields: Fields = { error: error.message, stack: error.stack };
+	if ("code" in error) fields.code = error.code;
 	if (error.cause !== undefined) fields.cause = failure(error.cause);
 	return fields;
 }

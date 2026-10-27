@@ -15,7 +15,7 @@ import { images } from "./images";
 import { models, seal } from "./keys";
 import { defaultModel } from "./manage";
 import { lines } from "./lines";
-import { log, open } from "./log";
+import { failure, log, open } from "./log";
 import type { WorkerInfo, WorkerRequest } from "./protocol";
 import { tabs } from "./tabs";
 
@@ -47,6 +47,19 @@ if (record.hosted || record.moving) {
 	process.exit(0);
 }
 log("info", "worker.start", { bun: Bun.version });
+
+// Model SDKs turn a failed request into "Connection error." and pi-ai keeps only that message, so
+// the network error that explains it is logged here before it is wrapped.
+const send = globalThis.fetch;
+globalThis.fetch = Object.assign(async (input: string | URL | Request, init?: RequestInit) => {
+	try {
+		return await send(input, init);
+	} catch (error) {
+		const url = new URL(input instanceof Request ? input.url : input);
+		log("warn", "fetch.failed", { url: url.origin + url.pathname, ...failure(error) });
+		throw error;
+	}
+}, send);
 rmSync(paths.socket, { force: true });
 catalog.busy(id, false);
 
