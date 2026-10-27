@@ -226,7 +226,7 @@ export type People = Record<string, string>;
 export type Tab = {
 	id: string;
 	name: string;
-	type: "blank" | "chat" | "diff" | "terminal";
+	type: "blank" | "chat" | "diff" | "terminal" | "live";
 	/** Selected in its pane; split layouts can show several active tabs. */
 	active: boolean;
 };
@@ -244,6 +244,8 @@ export type TabRename = {
 	tab: string;
 	name: string;
 	expires: number;
+	/** Opens a new tab showing this native window (a CGWindowID) live; `tab` is then empty. */
+	live?: number;
 };
 export type TabResult = { ok: true; value: WindowState } | { ok: false; error: string };
 
@@ -317,6 +319,7 @@ export type HostRequest =
 	/** Connected channel windows on the owner's local gateway. */
 	| { op: "windows" }
 	| { op: "tab-rename"; window: string; channel: string; tab: string; name: string }
+	| { op: "tab-live"; window: string; channel: string; target: number; name: string }
 	/** Only the window that received a rename can acknowledge it. */
 	| { op: "tab-result"; call: string; result: TabResult }
 	| { op: "channels" }

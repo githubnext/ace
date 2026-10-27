@@ -7,7 +7,7 @@ export const CHAT = "chat";
 
 const STORAGE = "ace:channel-layout";
 const VERSION = 1;
-const KINDS = new Set<Kind>(["blank", "chat", "diff", "terminal"]);
+const KINDS = new Set<Kind>(["blank", "chat", "diff", "terminal", "live"]);
 
 /** Diff and Terminal tabs belong to the chat whose lane they show. */
 export type Content =
@@ -16,6 +16,9 @@ export type Content =
 		| { type: "chat" }
 		| { type: "diff"; chat: number }
 		| { type: "terminal"; chat: number; terminal?: string }
+		// A native window on this Mac, drawn live over the pane; `window` is its CGWindowID and
+		// `app` the bundle ID that a relink looks for.
+		| { type: "live"; window: number; app?: string }
 	)
 	& { name?: string };
 
@@ -33,6 +36,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 export function content(kind: Kind, chat: number): Content {
 	if (kind === "diff" || kind === "terminal") return { type: kind, chat };
+	if (kind === "live") return { type: "blank" };
 	return { type: kind };
 }
 
@@ -47,6 +51,17 @@ function clean(state: Split.State, meta?: unknown): Meta {
 		const value = input[uid];
 		if (uid === CHAT || !object(value) || !KINDS.has(value.type as Kind)) {
 			next[uid] = fallback(uid);
+			continue;
+		}
+		if (value.type === "live") {
+			next[uid] = Number.isInteger(value.window)
+				? {
+					type: "live",
+					window: value.window as number,
+					...(typeof value.app === "string" ? { app: value.app } : undefined),
+					...(typeof value.name === "string" ? { name: value.name } : undefined),
+				}
+				: fallback(uid);
 			continue;
 		}
 		const chat = Number.isInteger(value.chat) && (value.chat as number) > 0

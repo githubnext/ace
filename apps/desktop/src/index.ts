@@ -11,7 +11,7 @@ import { helper as control } from "./helper";
 import { native as inspection } from "./native";
 import type { DesktopRPC } from "./protocol";
 import { updates as updater } from "./updates";
-import { windowStyle } from "./window";
+import { live, windowStyle } from "./window";
 
 const resources = join(dirname(process.execPath), "..", "Resources");
 const { channel, identifier, version } = await Bun.file(join(resources, "version.json")).json() as {
@@ -52,6 +52,15 @@ function controls(target: () => BrowserWindow) {
 					authorize(token);
 					windowStyle.lights(target().ptr, expanded);
 					return null;
+				},
+				live: ({ token, id, window, rect, relink }) => {
+					authorize(token);
+					if (window === null || !rect) {
+						live.hide(id);
+						return null;
+					}
+					if (relink) live.relink(id, relink.app);
+					return live.show(target().ptr, id, window, rect);
 				},
 				zoom: ({ token }) => {
 					authorize(token);

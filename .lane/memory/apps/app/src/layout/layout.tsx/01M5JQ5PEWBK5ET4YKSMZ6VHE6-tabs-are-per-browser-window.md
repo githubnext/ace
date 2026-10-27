@@ -4,8 +4,9 @@ anchor: function useLayout
 created: 2026-10-22T21:09:48Z
 norm: '1'
 sig: 6f69f0bcaa0b8bb2
-body_hash: 25edc7f0a5cbd93a
-raw_hash: 01b3bdc9e40f5226
+body_hash: 88964a1f7f5adf12
+raw_hash: c41ee0b85dab63b9
+vouched: 2026-10-27T15:34:58Z
 lines: 755-999
 ---
 

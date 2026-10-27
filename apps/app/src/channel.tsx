@@ -31,6 +31,7 @@ import { useAsked, useGit } from "./git";
 import { host, onOpen as onHostOpen } from "./host";
 import { CHAT, Layout } from "./layout/layout";
 import { Diff, GROUPS } from "./panels/diff";
+import { Live } from "./panels/live";
 import { Terminal } from "./panels/terminal";
 import { placement } from "./placement";
 import type { Item } from "./transcript";
@@ -408,6 +409,17 @@ export function Channel(
 				}
 				if (data.type === "diff") {
 					return <Diff channel={channel} chat={data.chat} user={user} active={active} />;
+				}
+				if (data.type === "live") {
+					return (
+						<Live
+							id={uid}
+							window={data.window}
+							app={data.app}
+							active={active}
+							update={update}
+						/>
+					);
 				}
 				if (data.type !== "terminal") return null;
 				// Tabs saved before Terminal was withheld here still open, so they say why they're empty.

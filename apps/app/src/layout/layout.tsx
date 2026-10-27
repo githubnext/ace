@@ -38,6 +38,7 @@ import {
 	IconChevronDown,
 	IconFileDiff,
 	IconMessage,
+	IconMonitor,
 	IconPencil,
 	IconPlus,
 	IconRows,
@@ -122,12 +123,14 @@ const ICONS: Record<Kind, Icon> = {
 	chat: IconMessage,
 	diff: IconFileDiff,
 	terminal: IconTerminal,
+	live: IconMonitor,
 };
 const TITLES: Record<Kind, string> = {
 	blank: "Blank",
 	chat: "Chat",
 	diff: "Diff",
 	terminal: "Terminal",
+	live: "Live",
 };
 
 function minimum(tab?: Split.Tab) {
@@ -814,6 +817,11 @@ function useLayout(
 	const command = useEffectEvent((request: TabRename) => {
 		if (request.expires <= Date.now()) throw new Error("Tab rename expired");
 		if (request.channel !== id) throw new Error("This window is showing another channel");
+		if (request.live !== undefined) {
+			flushSync(() => watch(request.live!, request.name));
+			persist();
+			return snapshot();
+		}
 		if (!api.get().tabs.includes(request.tab)) throw new Error("Tab is no longer open");
 		if (request.tab === CHAT) throw new Error("Rename the channel to change its Chat tab");
 		// The host must acknowledge the name that the client has actually rendered and saved.
@@ -947,6 +955,37 @@ function useLayout(
 		if (!api.open({ tab: uid, to, ...(side ? { fit } : {}) })) return;
 		setMeta((meta) => ({ ...meta, [uid]: content(choice, chat) }));
 		requestAnimationFrame(() => focus(uid));
+	}
+
+	// One tab per watched window, split to the right of the chat the first time.
+	function watch(target: number, name: string) {
+		// A relaunched app has a new window ID; its tab of the same name follows it.
+		const open = api.get().tabs.find((uid) => {
+			const value = meta[uid];
+			return value?.type === "live" && (value.window === target || !!name && value.name === name);
+		});
+		if (open) {
+			setMeta((meta) => ({
+				...meta,
+				[open]: { type: "live", window: target, ...(name ? { name } : undefined) },
+			}));
+			return activate(open);
+		}
+		const uid = `tab-${api.get().seq + 1}`;
+		const pane = Split.host(api.get(), CHAT)?.uid;
+		const side = !flat && Split.can(api.get(), { ...fit, open: { to: { pane, side: "right" } } });
+		const to: Split.Target | undefined = side
+			? { pane, side: "right" }
+			: flat
+			? undefined
+			: { pane };
+		if (!api.open({ tab: uid, to, ...(side ? { fit } : {}) })) {
+			throw new Error("This Ace window has no room for another tab");
+		}
+		setMeta((meta) => ({
+			...meta,
+			[uid]: { type: "live", window: target, ...(name ? { name } : undefined) },
+		}));
 	}
 
 	function swap(uid: string, choice: Choice) {
