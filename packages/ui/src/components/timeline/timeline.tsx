@@ -47,6 +47,8 @@ import {
 	compile,
 	type Group,
 	isCommentChunk,
+	type Missed,
+	missed,
 	type Row,
 	type TimelineItem,
 	type TimelineWorking,
@@ -88,6 +90,7 @@ import {
 	WORKING_SUMMARY_PAD_END,
 } from "./layout";
 import {
+	IconBot,
 	IconChevronDownMicro,
 	IconCommit,
 	IconEnter,
@@ -96,7 +99,9 @@ import {
 	IconPullRequest,
 	IconRecord,
 	IconTerminal,
+	IconX,
 } from "../../icons";
+import { Button } from "../../ui/button";
 
 import "./timeline.css";
 
@@ -493,6 +498,107 @@ function AgentWorkingContextView(
 }
 
 /** Recaps are plain text, but models still wrap commands and paths in backticks. */
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Names up to three people, then how many more. */
+function names(people: string[]): string {
+	if (people.length <= 3) return people.join(", ");
+	return `${people.slice(0, 2).join(", ")} and ${people.length - 2} others`;
+}
+
+type CatchUpProps = {
+	missed: Missed;
+	summary?: string;
+	onShow: (index: number) => void;
+	onDismiss: () => void;
+};
+
+/** What happened since the viewer last read the chat, over the top of the timeline. */
+function CatchUp({ missed, summary, onShow, onDismiss }: CatchUpProps) {
+	let { messages, people, mentions, runs } = missed;
+	let parts = [
+		messages && `${count(messages, "message")} from ${names(people)}`,
+		runs.length && count(runs.length, "agent run"),
+	].filter(Boolean);
+	return (
+		<div
+			className="pointer-events-none absolute inset-x-0 top-0 z-10 pt-2"
+			style={{ paddingInline: PAD }}
+		>
+			<section
+				aria-label="While you were away"
+				className="utils:max-width pointer-events-auto flex max-h-[min(24rem,60vh)] flex-col gap-2 rounded-xl border border-border/60 bg-background/95 p-3 text-sm shadow-lg backdrop-blur"
+			>
+				<header className="flex min-w-0 items-start gap-2">
+					<div className="min-w-0 flex-1">
+						<h2 className="font-medium">While you were away</h2>
+						{parts.length > 0 && (
+							<p className="text-xs text-muted-foreground">{parts.join(" · ")}</p>
+						)}
+					</div>
+					<Button variant="ghost" size="icon-sm" aria-label="Dismiss" onClick={onDismiss}>
+						<IconX />
+					</Button>
+				</header>
+				{summary && <p className="line-clamp-2 text-xs text-muted-foreground">{summary}</p>}
+				<ul className="-mx-1.5 flex min-h-0 flex-col overflow-y-auto">
+					{mentions.map((mention, i) => (
+						<li key={`m${i}`}>
+							<button
+								type="button"
+								onClick={() => onShow(mention.index)}
+								className="flex w-full min-w-0 items-baseline gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted"
+							>
+								<span className="shrink-0 rounded-full bg-accent px-1.5 text-[0.6875rem] font-medium leading-4 text-accent-foreground">
+									@
+								</span>
+								<span className="min-w-0 truncate">
+									<span className="font-medium">{mention.who}</span> mentioned you
+									{mention.text && <span className="text-muted-foreground">: {mention.text}</span>}
+								</span>
+							</button>
+						</li>
+					))}
+					{runs.map((run, i) => {
+						let adds = run.files.reduce((sum, file) => sum + (file.adds || 0), 0);
+						let dels = run.files.reduce((sum, file) => sum + (file.dels || 0), 0);
+						return (
+							<li key={`r${i}`}>
+								<button
+									type="button"
+									onClick={() => onShow(run.index)}
+									className="flex w-full min-w-0 items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted"
+								>
+									<IconBot className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+									<span className="flex min-w-0 flex-col">
+										<span className="line-clamp-2">{codeSpans(run.text)}</span>
+										{(run.files.length > 0 || run.pulls.length > 0) && (
+											<span className="truncate text-xs text-muted-foreground">
+												{[
+													run.files.length
+													&& `${count(run.files.length, "file")} changed${
+														adds || dels ? ` +${adds} −${dels}` : ""
+													}`,
+													...run.pulls.map((pull) => `#${pull.number} ${pull.title}`),
+												].filter(Boolean).join(" · ")}
+											</span>
+										)}
+									</span>
+								</button>
+							</li>
+						);
+					})}
+				</ul>
+				<div className="flex">
+					<Button variant="secondary" size="sm" onClick={() => onShow(missed.index)}>
+						Jump to first unread
+					</Button>
+				</div>
+			</section>
+		</div>
+	);
+}
+
 function codeSpans(text: string) {
 	return text.split(/`([^`]+)`/).map((part, i) =>
 		i % 2 ? <code key={i} className="font-mono text-[0.92em]">{part}</code> : part
@@ -1157,8 +1263,13 @@ type TimelineProps =
 		onReact?: (uid: string, emoji: string) => void;
 		/** Message UID to scroll into view. */
 		target?: string;
-		/** The first message the viewer hasn't seen, which a New divider sits above. */
+		/**
+		 * The first message the viewer hasn't seen, which a New divider sits above. A card over the
+		 * top of the timeline sums up what followed, so the timeline's parent must be positioned.
+		 */
 		unread?: string;
+		/** The channel's summary, which leads that card. */
+		summary?: string;
 		/** Messages that mention the viewer, which are highlighted. */
 		mentioned?: ReadonlySet<string>;
 		/** Called when the user clicks a rendered message link. */
@@ -1216,6 +1327,7 @@ function useTimeline(
 		onReact,
 		target,
 		unread,
+		summary,
 		onLink,
 		openSender,
 		onDocumentOpen,
@@ -1258,6 +1370,15 @@ function useTimeline(
 		project,
 		unread,
 	]);
+	let [caughtUp, setCaughtUp] = useState(false);
+	let away = useMemo(
+		() => caughtUp ? undefined : missed(timeline, mentioned),
+		[caughtUp, timeline, mentioned],
+	);
+	let show = (index: number) => {
+		scroll.current?.scrollTo(index);
+		setCaughtUp(true);
+	};
 	let finalWorkingKey = useMemo(() => finalWorkingIds(timeline).join("\0"), [timeline]);
 	let visibleWorking = useMemo(() => {
 		let next = new Set(openWorking);
@@ -1597,6 +1718,10 @@ function useTimeline(
 		hover: toolbar ? hover : null,
 		onToolbarAction,
 		onOpenChange,
+		away,
+		summary,
+		show,
+		dismiss: () => setCaughtUp(true),
 	};
 }
 
@@ -1646,6 +1771,10 @@ function Timeline(input: TimelineProps) {
 		hover,
 		onToolbarAction,
 		onOpenChange,
+		away,
+		summary,
+		show,
+		dismiss,
 	} = useTimeline(input);
 	return (
 		<ExecActionProvider value={onExecAction ?? null}>
@@ -1767,6 +1896,7 @@ function Timeline(input: TimelineProps) {
 						);
 					}}
 				</ScrollView>
+				{away && <CatchUp missed={away} summary={summary} onShow={show} onDismiss={dismiss} />}
 			</ToolProvider>
 		</ExecActionProvider>
 	);
