@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
+import "./text-size";
 import "./viewport";
 
 import { gateway } from "./address";

@@ -41,6 +41,7 @@ import { TurnSummary } from "../turn-summary/turn-summary";
 import type { Block } from "../../lib/block";
 import { iconFor } from "../../lib/tool-icon";
 import { agentColor, agentLabel } from "../../lib/agent";
+import { useTextScale } from "../../lib/text-scale";
 import { cn } from "../../lib/utils";
 import {
 	type AgentTurn,
@@ -1776,6 +1777,7 @@ function Timeline(input: TimelineProps) {
 		show,
 		dismiss,
 	} = useTimeline(input);
+	let scale = useTextScale();
 	return (
 		<ExecActionProvider value={onExecAction ?? null}>
 			<ToolProvider value={{ expandedResults, toggle, toggleResult }}>
@@ -1786,6 +1788,7 @@ function Timeline(input: TimelineProps) {
 						itemHeight(timeline[i]!, blocks, Math.min(w, LANE), openGroups, visibleWorking)}
 					gap={GAP}
 					end={TAIL}
+					scale={scale}
 					onRangeChange={setRange}
 					onScrollStart={onScrollStart}
 					onScrollEnd={onScrollEnd}

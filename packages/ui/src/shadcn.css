@@ -568,7 +568,7 @@
 	html {
 		@apply bg-background font-sans;
 		color-scheme: light;
-		font-size: clamp(12px, var(--font-size, 1rem), 20px);
+		font-size: clamp(12px, var(--font-size, 1rem), 24px);
 	}
 
 	html.dark {
