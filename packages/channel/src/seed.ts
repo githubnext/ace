@@ -72,7 +72,7 @@ async function history(harness: Harness, chat: ConversationId): Promise<EntryRec
 		entries.push(...page.items);
 		cursor = page.next;
 	} while (cursor);
-	return entries.reverse();
+	return entries.toReversed();
 }
 
 /**
