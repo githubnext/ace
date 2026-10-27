@@ -23,31 +23,61 @@ export const OWNER = "ghost";
 
 const [provider, modelId] = DEMO_MODEL.split("/") as [string, string];
 
+const PROJECT = "beats-demo";
+
 const FILES: Record<string, string> = {
-	"README.md": "# acme-shop\n\nThe storefront and checkout for Acme's online shop.\n",
-	"src/cart.ts": `export type Line = { sku: string; price: number; quantity: number };
+	"README.md":
+		"# beats-demo\n\nA browser drum machine: a 16-step sequencer on the Web Audio API.\n",
+	"src/engine.ts": `export const STEPS = 16;
 
-export function subtotal(lines: Line[]): number {
-	return lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+export type Track = { name: string; sample: AudioBuffer; steps: boolean[] };
+
+/** Schedules a step ahead of the audio clock, so timing never waits on the UI thread. */
+export function schedule(
+	context: AudioContext,
+	tracks: Track[],
+	step: number,
+	at: number,
+	out: AudioNode,
+): void {
+	for (const track of tracks) {
+		if (!track.steps[step]) continue;
+		const source = context.createBufferSource();
+		source.buffer = track.sample;
+		source.connect(out);
+		source.start(at);
+	}
 }
 
-export function total(lines: Line[], discount = 0): number {
-	return Math.round((subtotal(lines) - discount) * 100) / 100;
+/** A sixteenth note at this tempo, in seconds. */
+export function sixteenth(bpm: number): number {
+	return 60 / bpm / 4;
 }
 `,
-	"src/receipt.ts": `import { type Line } from "./cart";
-
-/** Each line's share of the discount, rounded to cents. */
-export function receipt(lines: Line[], discount = 0) {
-	const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
-	return lines.map((line) => {
-		const amount = line.price * line.quantity;
-		return { ...line, amount: Math.round((amount - (discount * amount) / subtotal) * 100) / 100 };
-	});
+	"src/effects.ts":
+		`/** The master chain: everything the tracks play goes through here to the speakers. */
+export function master(context: AudioContext): GainNode {
+	const input = context.createGain();
+	const compressor = context.createDynamicsCompressor();
+	input.connect(compressor).connect(context.destination);
+	return input;
 }
 `,
-	"src/refund.ts": `export function refund(paid: number, fraction: number): number {
-	return Math.round(paid * fraction * 100) / 100;
+	"src/theme.css": `:root {
+	--background: #f5f5f4;
+	--pad: #d6d3d1;
+	--pad-on: #2563eb;
+	--text: #1c1917;
+	font-family: system-ui, sans-serif;
+}
+
+.pad {
+	background: var(--pad);
+	border-radius: 4px;
+}
+
+.pad[data-on] {
+	background: var(--pad-on);
 }
 `,
 };
@@ -80,49 +110,54 @@ function agent(at: string, text: string): SeedItem {
 	};
 }
 
+const DELAY = "delay-effect";
+const THEME = "synthwave-theme";
+
 const SEEDS: Seed[] = [
 	{
 		format: "ace-seed",
 		version: 1,
-		name: "checkout-totals",
-		summary:
-			"Fixing checkout totals that disagree with receipts by a cent when an order has a discount and several lines. Moving amounts to integer cents.",
+		name: DELAY,
+		summary: "Adding a tempo-synced delay to the master chain, with feedback and mix controls.",
 		chats: [{
 			model: { provider, modelId },
 			items: [
 				said(
 					"mona",
 					"15:02",
-					"Support forwarded three receipts where the total is a cent off. All of them have a discount code and more than one line.",
+					"Can we get a delay on the master? Something like a dotted eighth that follows the tempo.",
 				),
 				said(
 					OWNER,
 					"15:04",
-					"I can reproduce it with SPRING10 on a cart with three different items: we charge a cent less than the receipt's lines add up to.",
+					"yes, and it should follow the BPM slider live, not only when you hit play",
 				),
 				said(
 					"octocat",
 					"15:05",
-					"the receipt rounds each line and total() rounds once, so they disagree whenever the discount splits unevenly",
-					{ reactions: [{ from: "mona", emoji: "👍" }] },
+					"keep feedback under 1 or it runs away and blows out everyone's speakers 😅",
+					{ reactions: [{ from: "mona", emoji: "😂" }] },
 				),
-				said(OWNER, "15:06", "Where exactly do the receipt and total() round differently?", {
-					invoke: true,
-				}),
+				said(
+					OWNER,
+					"15:06",
+					"Add a tempo-synced delay to the master chain with feedback and mix controls.",
+					{ invoke: true },
+				),
 				agent(
 					"15:07",
-					"They round at different points.\n\n- `total()` in `src/cart.ts` subtracts the discount from the raw subtotal and rounds once.\n- `receipt()` in `src/receipt.ts` spreads the discount across lines and rounds each line, so fractions of a cent that `total()` drops once can round up on several lines.\n\nThe smallest fix is to keep amounts in integer cents and spread the discount in whole cents, giving the remainder to the last line. Then the receipt's lines always add up to the total.",
+					"Here's the plan for `src/effects.ts`:\n\n- A `DelayNode` whose `delayTime` is a dotted eighth at the current tempo, `0.75 * 60 / bpm`.\n- A feedback `GainNode` from the delay back into itself, capped at 0.9 so repeats always die out.\n- Dry and wet gains for the mix, both feeding the compressor.\n\n`setTempo(bpm)` ramps `delayTime` with `setTargetAtTime`, so dragging the BPM slider doesn't click.",
 				),
 				said(
 					"mona",
 					"15:09",
-					"integer cents gets my vote, that should also fix the refund rounding I saw last week",
+					"ramping the delay time is a nice touch, it'll smear like tape when you drag the tempo",
 					{ reactions: [{ from: "octocat", emoji: "🎉" }, { from: OWNER, emoji: "👍" }] },
 				),
 				said(
 					"hubot",
 					"15:11",
-					"I'll turn the three receipts from support into test cases once there's a lane",
+					"I'll put a mix knob next to the BPM slider once there's a lane",
 				),
 			],
 		}],
@@ -130,39 +165,36 @@ const SEEDS: Seed[] = [
 	{
 		format: "ace-seed",
 		version: 1,
-		name: "release-notes",
-		summary: "Drafting the notes for the 2.4 release, leading with saved carts.",
+		name: THEME,
+		summary: "Restyling the sequencer in a synthwave theme: neon pads on a dark grid.",
 		chats: [{
 			model: { provider, modelId },
 			items: [
 				said(
 					"hubot",
 					"14:30",
-					"Draft for 2.4 is up in docs/releases/2.4.md, mostly checkout and search changes.",
+					"Synthwave mockup is up: dark purple, neon pink and cyan, a grid floor fading behind the pads.",
 				),
-				said("octocat", "14:32", "can we lead with saved carts? it's the one people asked for", {
-					reactions: [{ from: "hubot", emoji: "👍" }],
-				}),
 				said(
-					OWNER,
-					"14:35",
-					"Turn the merged pull requests since 2.3 into three short highlights for the top of the notes.",
-					{ invoke: true },
+					"octocat",
+					"14:32",
+					"love it. can the playing step glow? pads lighting up as the playhead passes",
+					{ reactions: [{ from: "hubot", emoji: "👍" }] },
 				),
+				said(OWNER, "14:35", "Turn the synthwave mockup into theme tokens for src/theme.css.", {
+					invoke: true,
+				}),
 				agent(
 					"14:36",
-					"Three highlights for the top of 2.4:\n\n- **Saved carts.** Signed-in shoppers find their cart where they left it, on any device.\n- **Faster search.** Results appear as you type, and small typos still find the right product.\n- **Clearer checkout.** Each line shows its discount, and the total matches the receipt to the cent.",
+					"Synthwave tokens for `src/theme.css`:\n\n- `--background: #1a1033`, with a magenta-to-cyan grid fading toward the horizon\n- `--pad: #2d1b4e` and `--pad-on: #ff2bd6`, neon pink\n- `--playhead: #22d3ee`, cyan, for the step that's playing\n- `--glow: 0 0 12px var(--pad-on)` on active pads\n- `--text: #f5d0fe` in a wide monospace\n\nThe token names stay the same as the light theme's, so the sequencer's markup doesn't change.",
 				),
-				said("hubot", "14:38", "Perfect, pasting those in.", {
+				said("hubot", "14:38", "Perfect, wiring those in.", {
 					reactions: [{ from: "mona", emoji: "❤️" }],
 				}),
 			],
 		}],
 	},
 ];
-
-const TOTALS = "checkout-totals";
-const NOTES = "release-notes";
 
 export const SCRIPT: Script = {
 	people: {
@@ -171,58 +203,58 @@ export const SCRIPT: Script = {
 		hubot: { login: "hubot", github: "hubot" },
 	},
 	steps: [
-		{ at: 0, who: "mona", open: true, channel: TOTALS },
-		{ at: 1, who: "octocat", open: true, channel: TOTALS },
-		{ at: 2, who: "hubot", open: true, channel: NOTES },
-		{ at: 3, who: "mona", type: 5, channel: TOTALS },
+		{ at: 0, who: "mona", open: true, channel: DELAY },
+		{ at: 1, who: "octocat", open: true, channel: DELAY },
+		{ at: 2, who: "hubot", open: true, channel: THEME },
+		{ at: 3, who: "mona", type: 5, channel: DELAY },
 		{
 			at: 8,
 			who: "mona",
-			say: "pushed the integer cents change to my lane, can someone look before I open the PR?",
-			channel: TOTALS,
+			say: "pushed the delay to my lane, try it on the 808 pattern at 120",
+			channel: DELAY,
 		},
-		{ at: 10, who: "octocat", react: "👀", channel: TOTALS },
-		{ at: 11, who: "octocat", type: 5, channel: TOTALS },
+		{ at: 10, who: "octocat", react: "🔥", channel: DELAY },
+		{ at: 11, who: "octocat", type: 5, channel: DELAY },
 		{
 			at: 16,
 			who: "octocat",
-			ask: "Does the cents change still handle a discount larger than the subtotal?",
+			ask: "Does the delay stay in time if someone changes the tempo mid-pattern?",
 			thinking:
-				"Read total() and receipt() for a discount above the subtotal, then check what else still rounds in dollars.",
+				"Check how setTempo updates the delay time, and what happens to repeats already in the feedback loop.",
 			reply:
-				"Yes. `total()` now clamps at zero, so a discount larger than the subtotal leaves a total of 0 cents instead of a negative amount, and `receipt()` gives the remainder to the last line so the lines still add up.\n\nOne gap: `refund()` in `src/refund.ts` still works in dollars, so a partial refund of a discounted order can be a cent off. Converting it the same way would close that.",
-			channel: TOTALS,
+				"Yes. `setTempo()` ramps `delayTime` to the new dotted eighth over about 50 ms, so new repeats land on the new grid right away. Repeats already in the feedback loop keep their old spacing until they fade, which takes under a second at the default feedback of 0.4.\n\nFor a hard cut instead, `setTempo()` could dip the wet gain to zero during the ramp.",
+			channel: DELAY,
 		},
-		{ at: 20, who: "hubot", type: 4, channel: NOTES },
+		{ at: 20, who: "hubot", type: 4, channel: THEME },
 		{
 			at: 24,
 			who: "hubot",
-			say: "moved saved carts to the top, the notes are ready for a look",
-			channel: NOTES,
+			say: "playhead glow is in, the pads pulse cyan as it passes",
+			channel: THEME,
 		},
-		{ at: 30, who: "mona", type: 4, channel: TOTALS },
+		{ at: 30, who: "mona", type: 4, channel: DELAY },
 		{
 			at: 34,
 			who: "mona",
-			say: "good catch on refund(), I'll convert it in the same lane",
-			channel: TOTALS,
+			say: "honestly the smear when you drag the tempo is my favorite part, let's keep it",
+			channel: DELAY,
 		},
-		{ at: 36, who: "hubot", open: true, channel: TOTALS },
-		{ at: 37, who: "hubot", react: "🎉", channel: TOTALS },
-		{ at: 39, who: "hubot", type: 4, channel: TOTALS },
+		{ at: 36, who: "hubot", open: true, channel: DELAY },
+		{ at: 37, who: "hubot", react: "🎉", channel: DELAY },
+		{ at: 39, who: "hubot", type: 4, channel: DELAY },
 		{
 			at: 43,
 			who: "hubot",
-			say: "I'll point the three support receipts at that lane as tests",
-			channel: TOTALS,
+			say: "delay plus the synthwave theme together is very 1986, I'm into it",
+			channel: DELAY,
 		},
-		{ at: 45, who: "octocat", react: "👍", channel: TOTALS },
+		{ at: 45, who: "octocat", react: "😎", channel: DELAY },
 		{ at: 50, who: "mona", away: true },
-		{ at: 54, who: "octocat", close: true, channel: TOTALS },
-		{ at: 55, who: "octocat", open: true, channel: NOTES },
-		{ at: 56, who: "octocat", type: 3, channel: NOTES },
-		{ at: 59, who: "octocat", say: "notes look good to me", channel: NOTES },
-		{ at: 60, who: "hubot", react: "🚀", channel: NOTES },
+		{ at: 54, who: "octocat", close: true, channel: DELAY },
+		{ at: 55, who: "octocat", open: true, channel: THEME },
+		{ at: 56, who: "octocat", type: 3, channel: THEME },
+		{ at: 59, who: "octocat", say: "the neon pink on active pads is perfect", channel: THEME },
+		{ at: 60, who: "hubot", react: "🚀", channel: THEME },
 		{ at: 66, who: "hubot", leave: true },
 		{ at: 70, who: "mona", leave: true },
 		{ at: 72, who: "octocat", leave: true },
@@ -232,7 +264,7 @@ export const SCRIPT: Script = {
 
 /** A Git project with the seeded channels in `home`, whose times end now. */
 export async function seed(home: string): Promise<void> {
-	const dir = join(home, "acme-shop");
+	const dir = join(home, PROJECT);
 	for (const [path, text] of Object.entries(FILES)) {
 		mkdirSync(dirname(join(dir, path)), { recursive: true });
 		writeFileSync(join(dir, path), text);
@@ -251,7 +283,7 @@ export async function seed(home: string): Promise<void> {
 				"-q",
 				"--no-verify",
 				"-m",
-				"Start acme-shop",
+				`Start ${PROJECT}`,
 			],
 		]
 	) {

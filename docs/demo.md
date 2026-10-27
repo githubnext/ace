@@ -1,10 +1,10 @@
 # Demo mode
 
-`ace demo` shows Ace with nothing of yours: a made-up `acme-shop` project, two seeded channels, and
-the teammates mona, octocat and hubot, who type, talk, react and ask the channel agent, whose
-answers come from the script. It runs its own loopback host on port 4150 (`--port` picks another)
-in a temporary home that it removes when it stops, and uses no keys, models, Tailscale or GitHub
-account. Open the sign-in link it prints. From a checkout, build the app first with `bun app build`.
+`ace demo` shows Ace with nothing of yours: a made-up `beats-demo` drum machine project, its
+`delay-effect` and `synthwave-theme` channels, and the teammates mona, octocat and hubot, who type,
+talk, react and ask the channel agent, whose answers come from the script. It runs its own
+loopback host on port 4150 (`--port` picks another) in a temporary home that it removes when it
+stops, and uses no keys, models, Tailscale or GitHub account. Open the sign-in link it prints. From a checkout, build the app first with `bun app build`.
 
 `ace serve --demo <script.json>` runs scripted synthetic teammates on this host, for recordings.
 They are present in projects and channels, and they post, ask agents and react through ordinary
