@@ -4,9 +4,9 @@ anchor: function Live
 created: 2026-10-27T15:34:41Z
 norm: '1'
 sig: acb4d23736381074
-body_hash: 7514a01d203af649
-raw_hash: b1b33c8835350ead
-vouched: 2026-10-27T16:32:18Z
+body_hash: 79b1035eae7641e9
+raw_hash: af47a64ee8f1e395
+vouched: 2026-10-27T18:07:12Z
 lines: 13-83
 ---
 
