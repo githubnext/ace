@@ -4,8 +4,9 @@ anchor: function desktop
 created: 2026-10-15T23:57:58Z
 norm: '1'
 sig: 9e9a28e5406c4945
-body_hash: 501c69b6600cd802
-raw_hash: e6047772fcb2082c
+body_hash: e8bfa154e45f07a2
+raw_hash: 44bc5faa5335d1d3
+vouched: 2026-10-27T19:35:18Z
 lines: 33-83
 ---
 
