@@ -80,6 +80,8 @@ import {
 	TOOL_GROUP_PAD_Y,
 	TOOL_GROUP_ROW_HEIGHT,
 	TOOL_LIST_INDENT,
+	toolGroupKey,
+	toolGroupOpen,
 	TURN_GAP,
 	useBlockMap,
 	WORKING_SUMMARY_HEIGHT,
@@ -469,7 +471,7 @@ function AgentWorkingContextView(
 					style={{ gap: CONTENT_GAP }}
 				>
 					{turn.working.map((w, index) => {
-						let open = w.type === "tools" && openGroups.has(w.id);
+						let open = w.type === "tools" && toolGroupOpen(w.id, openGroups, live);
 						return (
 							<AgentWorkingItemView
 								key={w.id}
@@ -478,7 +480,7 @@ function AgentWorkingContextView(
 								width={width}
 								open={open}
 								expanded={open}
-								onToggle={onToggleGroup}
+								onToggle={id => onToggleGroup(toolGroupKey(id, live))}
 								live={live}
 								index={index}
 							/>

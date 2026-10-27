@@ -780,7 +780,7 @@ function itemHeight(
 			let working = content - BUBBLE_PAD_X * 2;
 			let header = turn.final ? workingHeaderHeight(turn.recap, working) : 0;
 			let expanded = !turn.final || openWorking.has(group.id);
-			h += workingSectionHeight(turn.working, blocks, working, open, header, expanded);
+			h += workingSectionHeight(turn.working, blocks, working, open, header, expanded, !turn.final);
 			children++;
 		}
 
@@ -837,18 +837,32 @@ function workingSectionHeight(
 	open: Set<string>,
 	header: number,
 	expanded: boolean,
+	live: boolean,
 ): number {
 	let h = BUBBLE_PAD_Y * 2 + BUBBLE_BORDER * 2 + header;
 	if (!expanded) return h;
 	let content = 0;
 	let count = 0;
 	for (let item of items) {
-		content += workingHeight(item, blocks, width, open);
+		content += workingHeight(item, blocks, width, open, live);
 		count++;
 	}
 	if (count > 1) content += (count - 1) * CONTENT_GAP;
 	if (header && count) content += CONTENT_GAP;
 	return h + content;
+}
+
+/**
+ * While a turn runs, its tool groups are open so the work stays visible; once it finishes they
+ * fold. `open` holds the groups someone toggled away from that default, keyed by toolGroupKey.
+ */
+function toolGroupOpen(id: string, open: ReadonlySet<string>, live: boolean): boolean {
+	return open.has(toolGroupKey(id, live)) !== live;
+}
+
+/** A separate key while live, so closing a running group doesn't open it once the turn folds. */
+function toolGroupKey(id: string, live: boolean): string {
+	return live ? id + ":live" : id;
 }
 
 /** The folded turn's label row, below its recap when there is one. */
@@ -864,6 +878,7 @@ function workingHeight(
 	blocks: Map<string, Block[]>,
 	width: number,
 	open: Set<string>,
+	live: boolean,
 ): number {
 	let b = blocks.get(item.id) || [];
 	if (item.type === "text") {
@@ -873,7 +888,7 @@ function workingHeight(
 	}
 
 	let h = TOOL_GROUP_ROW_HEIGHT + TOOL_GROUP_PAD_Y * 2;
-	if (!open.has(item.id) || !b.length) return h;
+	if (!toolGroupOpen(item.id, open, live) || !b.length) return h;
 	h += measureRow(b, width - TOOL_LIST_INDENT).height;
 	h += b.length * CONTENT_GAP;
 	return h;
@@ -910,6 +925,8 @@ export {
 	TOOL_GROUP_PAD_Y,
 	TOOL_GROUP_ROW_HEIGHT,
 	TOOL_LIST_INDENT,
+	toolGroupKey,
+	toolGroupOpen,
 	TURN_GAP,
 	useBlockMap,
 	WORKING_SUMMARY_HEIGHT,
