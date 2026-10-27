@@ -48,6 +48,7 @@ export function desktop(execute: Desktop): Extension {
 				[
 					"Use desktop_* tools to observe and operate apps on this channel's execution host.",
 					"Shell commands remain appropriate for builds, files, and preparing clipboard fixtures directly.",
+					"People in the channel can't see this host's screen. Before you build, run, or check an app that has a window, even through a CLI, socket, or logs, open its window with tab_live so they watch it while you work. The split follows the app through relaunches, so open it once per app.",
 					"",
 					"Do not silently substitute AppleScript, osascript, System Events, or self-built Accessibility or CGEvent programs for desktop tools.",
 					"Apple Events can raise a separate macOS Automation prompt for each target app, attributed to Ace; Accessibility and Screen Recording grants do not cover them.",
