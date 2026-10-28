@@ -7,6 +7,7 @@ import { appUrl, token } from "@ace/host/auth";
 import { config, desktop } from "@ace/host/config";
 
 import { command } from "./command";
+import { demo } from "./demo";
 import { helper as control } from "./helper";
 import { native as inspection } from "./native";
 import type { DesktopRPC } from "./protocol";
@@ -181,76 +182,89 @@ function open(from?: BrowserWindow, action?: string): void {
 	});
 }
 
-ApplicationMenu.setApplicationMenu([
-	{
-		label: "Ace",
-		submenu: [
-			{ label: "About Ace", role: "about" },
-			{ type: "divider" },
-			{ label: "Show Ace", action: "show" },
-			{ label: "Settings…", action: "settings", accelerator: "CmdOrCtrl+," },
-			{ label: "Check for Updates…", action: "updates" },
-			{ type: "divider" },
-			{ label: "Start Ace Helper", action: "helper-start" },
-			{ label: "Restart Ace Helper", action: "helper-restart" },
-			{ label: "Ace Helper Settings…", action: "helper-settings" },
-			{ label: "Show Ace Helper Log", action: "helper-log" },
-			{ type: "divider" },
-			{ label: "Quit Ace", action: "quit", accelerator: "CmdOrCtrl+q" },
-		],
-	},
-	{
-		label: "File",
-		submenu: [
-			{ label: "New Window", action: "new-window", accelerator: "CmdOrCtrl+n" },
-			{ label: "Open Folder…", action: "project-open", accelerator: "CmdOrCtrl+o" },
-			{ label: "Clone from URL…", action: "project-clone" },
-		],
-	},
-	{
-		label: "Edit",
-		submenu: [
-			{ role: "undo" },
-			{ role: "redo" },
-			{ type: "divider" },
-			{ role: "cut" },
-			{ role: "copy" },
-			{ role: "paste" },
-			{ role: "selectAll" },
-		],
-	},
-	{
-		label: "View",
-		submenu: [
-			{ label: "Dashboard", action: "dashboard", accelerator: "CmdOrCtrl+1" },
-			{ label: "Channels", action: "channels", accelerator: "CmdOrCtrl+2" },
-			{ label: "Issues", action: "issues", accelerator: "CmdOrCtrl+3" },
-			{ label: "Pull Requests", action: "prs", accelerator: "CmdOrCtrl+4" },
-			{ type: "divider" },
-			{ label: "Toggle Navigation", action: "nav-toggle", accelerator: "CmdOrCtrl+b" },
-			{
-				label: "Toggle Channels Sidebar",
-				action: "channels-toggle",
-				accelerator: "CmdOrCtrl+Shift+b",
-			},
-			{ type: "divider" },
-			{ label: "Bigger Text", action: "text-bigger", accelerator: "CmdOrCtrl+Plus" },
-			{ label: "Smaller Text", action: "text-smaller", accelerator: "CmdOrCtrl+-" },
-			{ label: "Actual Size", action: "text-reset", accelerator: "CmdOrCtrl+0" },
-		],
-	},
-	// The collapsed navigation rail hides the minimize and zoom buttons, so the menu keeps both.
-	{
-		label: "Window",
-		submenu: [
-			{ role: "minimize", accelerator: "CmdOrCtrl+m" },
-			{ role: "zoom" },
-			{ role: "toggleFullScreen" },
-			{ type: "divider" },
-			{ role: "bringAllToFront" },
-		],
-	},
-]);
+/** The File menu controls a demo host's script; `scripted` is its state, or null without one. */
+function menu(scripted: { paused: boolean } | null = null): void {
+	ApplicationMenu.setApplicationMenu([
+		{
+			label: "Ace",
+			submenu: [
+				{ label: "About Ace", role: "about" },
+				{ type: "divider" },
+				{ label: "Show Ace", action: "show" },
+				{ label: "Settings…", action: "settings", accelerator: "CmdOrCtrl+," },
+				{ label: "Check for Updates…", action: "updates" },
+				{ type: "divider" },
+				{ label: "Start Ace Helper", action: "helper-start" },
+				{ label: "Restart Ace Helper", action: "helper-restart" },
+				{ label: "Ace Helper Settings…", action: "helper-settings" },
+				{ label: "Show Ace Helper Log", action: "helper-log" },
+				{ type: "divider" },
+				{ label: "Quit Ace", action: "quit", accelerator: "CmdOrCtrl+q" },
+			],
+		},
+		{
+			label: "File",
+			submenu: [
+				{ label: "New Window", action: "new-window", accelerator: "CmdOrCtrl+n" },
+				{ label: "Open Folder…", action: "project-open", accelerator: "CmdOrCtrl+o" },
+				{ label: "Clone from URL…", action: "project-clone" },
+				...(scripted
+					? [
+						{ type: "divider" as const },
+						scripted.paused
+							? { label: "Resume Demo", action: "demo-resume" }
+							: { label: "Pause Demo", action: "demo-pause" },
+						{ label: "Restart Demo", action: "demo-restart" },
+					]
+					: []),
+			],
+		},
+		{
+			label: "Edit",
+			submenu: [
+				{ role: "undo" },
+				{ role: "redo" },
+				{ type: "divider" },
+				{ role: "cut" },
+				{ role: "copy" },
+				{ role: "paste" },
+				{ role: "selectAll" },
+			],
+		},
+		{
+			label: "View",
+			submenu: [
+				{ label: "Dashboard", action: "dashboard", accelerator: "CmdOrCtrl+1" },
+				{ label: "Channels", action: "channels", accelerator: "CmdOrCtrl+2" },
+				{ label: "Issues", action: "issues", accelerator: "CmdOrCtrl+3" },
+				{ label: "Pull Requests", action: "prs", accelerator: "CmdOrCtrl+4" },
+				{ type: "divider" },
+				{ label: "Toggle Navigation", action: "nav-toggle", accelerator: "CmdOrCtrl+b" },
+				{
+					label: "Toggle Channels Sidebar",
+					action: "channels-toggle",
+					accelerator: "CmdOrCtrl+Shift+b",
+				},
+				{ type: "divider" },
+				{ label: "Bigger Text", action: "text-bigger", accelerator: "CmdOrCtrl+Plus" },
+				{ label: "Smaller Text", action: "text-smaller", accelerator: "CmdOrCtrl+-" },
+				{ label: "Actual Size", action: "text-reset", accelerator: "CmdOrCtrl+0" },
+			],
+		},
+		// The collapsed navigation rail hides the minimize and zoom buttons, so the menu keeps both.
+		{
+			label: "Window",
+			submenu: [
+				{ role: "minimize", accelerator: "CmdOrCtrl+m" },
+				{ role: "zoom" },
+				{ role: "toggleFullScreen" },
+				{ type: "divider" },
+				{ role: "bringAllToFront" },
+			],
+		},
+	]);
+}
+menu();
 
 Electrobun.events.on("reopen", () => show());
 Electrobun.events.on("open-url", ({ data }: { data: { url: string } }) => {
@@ -287,6 +301,15 @@ function errorMessage(error: unknown): string {
 
 Electrobun.events.on("application-menu-clicked", ({ data }) => {
 	if (data.action === "show") return show();
+	if (["demo-pause", "demo-resume", "demo-restart"].includes(data.action)) {
+		const action = data.action.slice("demo-".length) as "pause" | "resume" | "restart";
+		void demo(action).then(
+			menu,
+			(error) =>
+				Utils.showMessageBox({ type: "error", title: "Demo", message: errorMessage(error) }),
+		);
+		return;
+	}
 	// The page shares its navigation and layout before asking for the window, so it opens where the
 	// person is.
 	if (data.action === "new-window") return focused ? dispatch(focused, "new-window") : show();
@@ -376,6 +399,8 @@ async function start(): Promise<void> {
 	else show();
 	native.start();
 	updates.start();
+	// Only a host started with `ace demo` runs a script.
+	void demo("status").then(menu, () => {});
 }
 
 try {

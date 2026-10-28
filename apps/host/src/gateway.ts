@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, watch } from "node:fs";
+import { existsSync, mkdirSync, rmSync, watch } from "node:fs";
 import { isIP } from "node:net";
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -12,7 +12,7 @@ import { Connection } from "./client";
 import * as compute from "./compute";
 import { config } from "./config";
 import * as demo from "./demo";
-import { seed } from "./demo-data";
+import { seed, seeded } from "./demo-data";
 import { diagnostics } from "./diagnostics";
 import * as asks from "./asks";
 import * as directory from "./directory";
@@ -218,6 +218,23 @@ async function allowed(user: string, own: Listing[]): Promise<Listing[]> {
 async function listings(client: Client, own?: Listing[]): Promise<Listing[]> {
 	own ||= await local();
 	return client.peer ? allowed(client.user, own) : everyone(own);
+}
+
+/** Puts back the seeded project and channels, discarding what the demo and its watchers did. */
+async function reseed() {
+	const dir = seeded(catalog.home);
+	for (const { id } of catalog.list().filter((value) => value.project === dir)) {
+		terminals.closeChannel(id);
+		deleting.add(id);
+		try {
+			await remove(id);
+		} finally {
+			deleting.delete(id);
+		}
+	}
+	rmSync(dir, { recursive: true, force: true });
+	await seed(catalog.home, config.demoProject);
+	await broadcast();
 }
 
 async function projectOfChannel(channel: string): Promise<string> {
@@ -574,6 +591,9 @@ async function handle(
 	if (client.peer && (request.op === "create" || request.op === "fork")) {
 		throw new Error("Create channels from the host that will run them");
 	}
+	if (request.op === "demo" && (!client.local || client.user !== catalog.user)) {
+		throw new Error("Only this host's owner can control its demo, from its local app");
+	}
 	if (owned.has(request.op) && client.user !== catalog.user) {
 		throw new Error("Only this host's owner can do that");
 	}
@@ -589,6 +609,8 @@ async function handle(
 			return windows.rename(request);
 		case "tab-live":
 			return windows.live(request);
+		case "demo":
+			return demo.control(request.action);
 		case "tab-result":
 			return windows.result(socket, request.call, request.result);
 		case "update-prepare": {
@@ -1229,7 +1251,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 	openLog("host");
 	const scripted = script === undefined ? undefined : demo.read(script);
 	await claim(port);
-	if (config.demo) await seed(catalog.home);
+	if (config.demo) await seed(catalog.home, config.demoProject);
 	await resume();
 	const server = await listen(port);
 	await Bun.write(SERVED(), String(server.port));
@@ -1349,6 +1371,7 @@ export async function serve(port: number, loopback = false, script?: string): Pr
 				peopleChanged();
 				presenceChanged();
 			},
+			reset: config.demo ? reseed : undefined,
 		}));
 	}
 	mkdirSync(join(catalog.home, "channels"), { recursive: true });

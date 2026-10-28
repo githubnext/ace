@@ -4,8 +4,10 @@
  * that the channel admits by its own rules. Only their identities are made up, and only on this
  * host: presence and people go to the owner's own app, never to the directory, lobbies or peers.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+import type { ToolCall } from "@earendil-works/pi-ai";
 
 import type { Presence } from "@ace/directory/protocol";
 
@@ -25,6 +27,9 @@ type Person = {
 
 type Target = { channel: string; chat?: number };
 
+/** One model turn of an ask's work: what the agent says, then tool calls the channel really runs. */
+export type Work = { say?: string; calls: { tool: string; args: ToolCall["arguments"] }[] };
+
 /** `at` is seconds from the script's start; each step does one thing. */
 type Step =
 	& { at: number; who: string }
@@ -35,9 +40,10 @@ type Step =
 		| { leave: true }
 		/** Shows as typing in the chat for this many seconds. */
 		| ({ type: number } & Target)
-		| ({ say: string } & Target)
-		/** Under ace demo, the agent streams `reply`, after `thinking` when given. */
-		| ({ ask: string; reply?: string; thinking?: string } & Target)
+		/** `image` is a PNG or JPEG path, from the script's folder, sent with the message. */
+		| ({ say: string; image?: string } & Target)
+		/** Under ace demo, the agent streams `reply` after `thinking` and each turn of `work`. */
+		| ({ ask: string; reply?: string; thinking?: string; work?: Work[] } & Target)
 		/** Reacts to the chat's newest message or reply. */
 		| ({ react: string } & Target)
 	);
@@ -58,6 +64,13 @@ let changed: () => void;
 /** Each listed channel's project, kept from each step so presence can be read synchronously. */
 const projects = new Map<string, string>();
 let timers: ReturnType<typeof setTimeout>[] = [];
+/** When the script's second 0 was, on `performance.now()`. */
+let started = 0;
+/** Seconds into the script it was paused at. */
+let paused: number | undefined;
+let reset: (() => Promise<void>) | undefined;
+/** The script file's folder, which step images are read from. */
+let folder = "";
 
 export function people(): People {
 	const found: People = {};
@@ -148,7 +161,15 @@ async function run(step: Step) {
 		}
 		return;
 	}
-	if ("say" in step) return void await request(id, { op: "say", author, text: step.say, ...chat });
+	if ("say" in step) {
+		const file = step.image === undefined ? undefined : Bun.file(resolve(folder, step.image));
+		const images = file
+			? {
+				images: [{ mimeType: file.type, data: Buffer.from(await file.bytes()).toString("base64") }],
+			}
+			: {};
+		return void await request(id, { op: "say", author, text: step.say, ...images, ...chat });
+	}
 	// An ask returns once admitted; the run continues in the channel as anyone's would.
 	if ("ask" in step) return void await request(id, { op: "ask", author, text: step.ask, ...chat });
 	if ("react" in step) {
@@ -157,17 +178,20 @@ async function run(step: Step) {
 	}
 }
 
-function schedule() {
+/** Steps from `from` seconds into the script, which started `from` seconds before now. */
+function schedule(from = 0) {
+	started = performance.now() - from * 1000;
 	const steps = [...script!.steps].sort((a, b) => a.at - b.at);
 	let last = 0;
 	for (const step of steps) {
 		last = Math.max(last, step.at);
+		if (step.at < from) continue;
 		timers.push(setTimeout(() => {
 			log("info", "demo.step", { who: step.who, at: step.at });
 			run(step).catch((error) =>
 				log("warn", "demo.step.failed", { at: step.at, ...failure(error) })
 			);
-		}, step.at * 1000));
+		}, (step.at - from) * 1000));
 	}
 	if (script!.loop === undefined) return;
 	timers.push(setTimeout(() => {
@@ -175,7 +199,37 @@ function schedule() {
 		here.clear();
 		changed();
 		schedule();
-	}, (last + script!.loop) * 1000));
+	}, (last + script!.loop - from) * 1000));
+}
+
+function clear() {
+	for (const timer of timers) clearTimeout(timer);
+	timers = [];
+}
+
+export type Control = "status" | "pause" | "resume" | "restart";
+
+/**
+ * Pausing holds the steps not yet started; typing and agent runs already underway finish. Restart
+ * runs `reset` first, which puts back the seeded channels when the host seeded them.
+ */
+export async function control(action: Control): Promise<{ paused: boolean } | null> {
+	if (!script) return null;
+	if (action === "pause" && paused === undefined) {
+		clear();
+		paused = (performance.now() - started) / 1000;
+	} else if (action === "resume" && paused !== undefined) {
+		schedule(paused);
+		paused = undefined;
+	} else if (action === "restart") {
+		clear();
+		paused = undefined;
+		here.clear();
+		changed();
+		await reset?.();
+		schedule();
+	}
+	return { paused: paused !== undefined };
 }
 
 const ACTIONS = ["open", "close", "away", "leave", "type", "say", "ask", "react"];
@@ -228,9 +282,33 @@ export function read(file: string): Script {
 		if (!UNTARGETED.has(actions[0]!) && typeof step.channel !== "string") {
 			throw fail(`${where} needs "channel"`);
 		}
+		if ("image" in step) {
+			if (actions[0] !== "say" || typeof step.image !== "string") {
+				throw fail(`${where} may have "image" only as a path on a say`);
+			}
+			const image = resolve(dirname(path), step.image);
+			if (!/\.(png|jpe?g)$/i.test(image) || !existsSync(image)) {
+				throw fail(`${where} has no PNG or JPEG at ${image}`);
+			}
+		}
 		for (const key of ["reply", "thinking"]) {
 			if (key in step && (actions[0] !== "ask" || typeof step[key] !== "string")) {
 				throw fail(`${where} may have "${key}" only as text on an ask`);
+			}
+		}
+		if ("work" in step) {
+			const valid = actions[0] === "ask" && Array.isArray(step.work)
+				&& step.work.every((turn) =>
+					isObject(turn) && (turn.say === undefined || typeof turn.say === "string")
+					&& Array.isArray(turn.calls) && turn.calls.length > 0
+					&& turn.calls.every((call) =>
+						isObject(call) && typeof call.tool === "string" && isObject(call.args)
+					)
+				);
+			if (!valid) {
+				throw fail(
+					`${where} may have "work" only on an ask, as turns of optional "say" and "calls" of "tool" and "args"`,
+				);
 			}
 		}
 	}
@@ -242,18 +320,23 @@ export function read(file: string): Script {
 export function start(
 	value: Script,
 	file: string,
-	options: { project(channel: string): Promise<string>; changed(): void },
+	options: {
+		project(channel: string): Promise<string>;
+		changed(): void;
+		reset?(): Promise<void>;
+	},
 ): () => void {
 	script = value;
-	({ project, changed } = options);
+	folder = dirname(resolve(file));
+	({ project, changed, reset } = options);
 	log("info", "demo.start", { file, people: Object.keys(script.people).length });
 	console.log(`Demo mode: ${Object.keys(script.people).join(", ")} from ${file}`);
 	changed();
 	schedule();
 	return () => {
-		for (const timer of timers) clearTimeout(timer);
-		timers = [];
+		clear();
 		here.clear();
 		script = undefined;
+		paused = undefined;
 	};
 }

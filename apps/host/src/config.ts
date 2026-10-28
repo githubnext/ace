@@ -30,6 +30,8 @@ export const config = {
 	loopback: false,
 	/** ace demo's script, set only in its throwaway host, whose agents answer from the script. */
 	demo: process.env.ACE_DEMO,
+	/** The Beats clone ace demo copies its project from, instead of GitHub. */
+	demoProject: process.env.ACE_DEMO_PROJECT,
 	worker: [
 		process.execPath,
 		"--no-env-file",

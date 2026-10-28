@@ -1,6 +1,6 @@
 /**
- * ace demo's only model: an agent answers a scripted ask with the step's reply, streamed like a
- * model's, so the demo reads no keys and reaches no provider.
+ * ace demo's only model: an agent answers a scripted ask by calling its tools, then streams the
+ * step's reply like a model's, so the demo reads no keys and reaches no provider.
  */
 import { readFileSync } from "node:fs";
 
@@ -11,6 +11,7 @@ import {
 	type FauxResponseFactory,
 	fauxText,
 	fauxThinking,
+	fauxToolCall,
 	type Message,
 	type MutableModels,
 } from "@earendil-works/pi-ai";
@@ -44,13 +45,21 @@ export function models(file: string): MutableModels {
 	});
 	const reply: FauxResponseFactory = (context) => {
 		faux.appendResponses([reply]);
+		const start = context.messages.findLastIndex((value) => value.role === "user");
 		const text = asked(context.messages);
 		const step = asks.find((value) => text.includes(value.ask));
 		if (!step?.reply) return fauxAssistantMessage(FALLBACK);
+		// Each earlier turn since the ask got its tool results, so the count says which turn is next.
+		const turn = context.messages.slice(start + 1).filter((value) => value.role === "assistant")
+			.length;
+		const thinking = turn === 0 && step.thinking ? [fauxThinking(step.thinking)] : [];
+		const work = step.work?.[turn];
+		if (!work) return fauxAssistantMessage([...thinking, fauxText(step.reply)]);
 		return fauxAssistantMessage([
-			...step.thinking ? [fauxThinking(step.thinking)] : [],
-			fauxText(step.reply),
-		]);
+			...thinking,
+			...work.say ? [fauxText(work.say)] : [],
+			...work.calls.map((call) => fauxToolCall(call.tool, call.args)),
+		], { stopReason: "toolUse" });
 	};
 	faux.setResponses(Array.from({ length: QUEUED }, () => reply));
 	const found = createModels();

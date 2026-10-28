@@ -320,6 +320,8 @@ export type HostRequest =
 	| { op: "windows" }
 	| { op: "tab-rename"; window: string; channel: string; tab: string; name: string }
 	| { op: "tab-live"; window: string; channel: string; target: number; name: string }
+	/** Control a running `ace demo` script; answers null when the host runs none. */
+	| { op: "demo"; action: "status" | "pause" | "resume" | "restart" }
 	/** Only the window that received a rename can acknowledge it. */
 	| { op: "tab-result"; call: string; result: TabResult }
 	| { op: "channels" }

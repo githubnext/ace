@@ -66,6 +66,7 @@ const USAGE = `ace — channels on this host
   ace fork <channel>                             start a sibling channel from its summary and lane
   ace tabs [--port <port>] [--json]              list open windows and their current channel's tabs
   ace tab rename <window> <channel> <tab> <name>  rename one tab; an empty name restores its default
+  ace tab live <window> <channel> <target> [name] show a native window live in a split beside the chat
   ace backup <channel> <directory>              snapshot a local or hosted channel's data into a new directory
   ace restore <directory> [--project <dir>] [--name <name>]
                                                 restore a backup as a new local channel
@@ -101,8 +102,10 @@ const USAGE = `ace — channels on this host
                                                 serve the app and its WebSocket gateway;
                                                  --loopback stays off the tailnet and the directory;
                                                  --demo runs scripted synthetic teammates (docs/demo.md)
-  ace demo [--port ${DEMO_PORT}]                         a throwaway host of made-up teammates, channels and
-                                                 agent replies; uses no keys, models or Tailscale
+  ace demo [--port ${DEMO_PORT}] [--project <beats-clone>]
+                                                a throwaway host of made-up teammates, channels and
+                                                 agent replies on a copy of githubnext/beats-demo;
+                                                 uses no keys, models or Tailscale
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
   ace open [--port ${config.port}]                          open this host's authenticated app
@@ -424,7 +427,7 @@ function advice(conflict: HostConflict): string {
  * load, and the demo must never reach the person's channels, keys or tailnet. Its home goes when it
  * stops.
  */
-async function runDemo(port: string): Promise<number> {
+async function runDemo(port: string, project?: string): Promise<number> {
 	const home = mkdtempSync(resolve(tmpdir(), "ace-demo-"));
 	const script = resolve(home, "demo.json");
 	writeFileSync(script, `${JSON.stringify(SCRIPT, null, "\t")}\n`);
@@ -442,6 +445,7 @@ async function runDemo(port: string): Promise<number> {
 			ACE_USER: OWNER,
 			ACE_MODEL: DEMO_MODEL,
 			ACE_DEMO: script,
+			...(project ? { ACE_DEMO_PROJECT: resolve(project) } : {}),
 		},
 	});
 	// Ctrl-C reaches the host too; this waits for it to stop its workers before removing the home.
@@ -472,8 +476,22 @@ async function main() {
 			if (positionals.length !== 1) throw new Error("ace tabs [--port <port>] [--json]");
 			return printTabs(await local<WindowInfo[]>({ op: "windows" }));
 		case "tab": {
+			if (ref === "live" && (rest.length === 3 || rest.length === 4)) {
+				const [window, channel, value, label = ""] = rest as [string, string, string, string?];
+				const target = Number(value);
+				if (!Number.isInteger(target) || target < 1) {
+					throw new Error("The target is a native window ID, a positive integer");
+				}
+				const name = label.trim();
+				if (name.length > 80) throw new Error("Tab names must be at most 80 characters");
+				return printTabs([
+					await local<WindowInfo>({ op: "tab-live", window, channel, target, name }),
+				]);
+			}
 			if (ref !== "rename" || rest.length !== 4) {
-				throw new Error("ace tab rename <window> <channel> <tab> <name> [--port <port>] [--json]");
+				throw new Error(
+					"ace tab rename <window> <channel> <tab> <name> | ace tab live <window> <channel> <target> [name] [--port <port>] [--json]",
+				);
 			}
 			const [window, channel, tab, value] = rest as [string, string, string, string];
 			const name = value.trim();
@@ -647,7 +665,7 @@ async function main() {
 		case "serve":
 			return serve(Number(flags.port || config.port), !!flags.loopback, flags.demo);
 		case "demo":
-			return process.exit(await runDemo(flags.port || String(DEMO_PORT)));
+			return process.exit(await runDemo(flags.port || String(DEMO_PORT), flags.project));
 		case "key": {
 			const name = rest[0];
 			if (!name || !/^[A-Z][A-Z0-9_]*$/.test(name)) {

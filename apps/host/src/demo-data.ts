@@ -1,9 +1,8 @@
 /**
- * ace demo's mocked data: a small project, channels seeded with a team's conversation, and the
- * script its teammates follow. Everything is made up and lives only in the demo's throwaway home.
+ * ace demo's data: a clone of Beats, channels seeded with a team's conversation, and the script its
+ * teammates follow. The conversation is made up and lives only in the demo's throwaway home.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { AssistantEntry } from "@earendil-works/pi-durable";
 
@@ -15,9 +14,11 @@ import { DEMO_MODEL } from "./demo-model";
 import { git } from "./projects";
 import { importSeed } from "./seed";
 
+import BEATS from "./demo-beats.jpg" with { type: "file" };
+
 /**
- * The owner's login in the demo, so seeded messages can be theirs. Avatars come from GitHub, and
- * GitHub's deleted-user placeholder is the one login that shows no real person's face.
+ * The owner's login in the demo. Avatars come from GitHub, and GitHub's deleted-user placeholder is
+ * the one login that shows no real person's face.
  */
 export const OWNER = "ghost";
 
@@ -25,62 +26,8 @@ const [provider, modelId] = DEMO_MODEL.split("/") as [string, string];
 
 const PROJECT = "beats-demo";
 
-const FILES: Record<string, string> = {
-	"README.md":
-		"# beats-demo\n\nA browser drum machine: a 16-step sequencer on the Web Audio API.\n",
-	"src/engine.ts": `export const STEPS = 16;
-
-export type Track = { name: string; sample: AudioBuffer; steps: boolean[] };
-
-/** Schedules a step ahead of the audio clock, so timing never waits on the UI thread. */
-export function schedule(
-	context: AudioContext,
-	tracks: Track[],
-	step: number,
-	at: number,
-	out: AudioNode,
-): void {
-	for (const track of tracks) {
-		if (!track.steps[step]) continue;
-		const source = context.createBufferSource();
-		source.buffer = track.sample;
-		source.connect(out);
-		source.start(at);
-	}
-}
-
-/** A sixteenth note at this tempo, in seconds. */
-export function sixteenth(bpm: number): number {
-	return 60 / bpm / 4;
-}
-`,
-	"src/effects.ts":
-		`/** The master chain: everything the tracks play goes through here to the speakers. */
-export function master(context: AudioContext): GainNode {
-	const input = context.createGain();
-	const compressor = context.createDynamicsCompressor();
-	input.connect(compressor).connect(context.destination);
-	return input;
-}
-`,
-	"src/theme.css": `:root {
-	--background: #f5f5f4;
-	--pad: #d6d3d1;
-	--pad-on: #2563eb;
-	--text: #1c1917;
-	font-family: system-ui, sans-serif;
-}
-
-.pad {
-	background: var(--pad);
-	border-radius: 4px;
-}
-
-.pad[data-on] {
-	background: var(--pad-on);
-}
-`,
-};
+/** Beats, the drum machine the demo's team works on, which needs access to githubnext. */
+const SOURCE = "https://github.com/githubnext/beats-demo.git";
 
 function said(
 	author: string,
@@ -111,26 +58,26 @@ function agent(at: string, text: string): SeedItem {
 }
 
 const DELAY = "delay-effect";
-const THEME = "synthwave-theme";
+const THEME = "add-dark-theme";
 
 const SEEDS: Seed[] = [
 	{
 		format: "ace-seed",
 		version: 1,
 		name: DELAY,
-		summary: "Adding a tempo-synced delay to the master chain, with feedback and mix controls.",
+		summary: "A tempo-synced delay for Beats: added in #6, pulled in #7, maybe coming back.",
 		chats: [{
 			model: { provider, modelId },
 			items: [
 				said(
 					"idan",
 					"15:02",
-					"Can we get a delay on the master? Something like a dotted eighth that follows the tempo.",
+					"Can we get a delay on Beats? Something that follows the tempo.",
 				),
 				said(
-					OWNER,
+					"agorischek",
 					"15:04",
-					"yes, and it should follow the BPM slider live, not only when you hit play",
+					"yes, and it should follow the tempo keys live, not only when you hit play",
 				),
 				said(
 					"davidslater",
@@ -139,153 +86,200 @@ const SEEDS: Seed[] = [
 					{ reactions: [{ from: "idan", emoji: "😂" }] },
 				),
 				said(
-					OWNER,
+					"agorischek",
 					"15:06",
-					"Add a tempo-synced delay to the master chain with feedback and mix controls.",
+					"Add a tempo-synced delay with a knob next to the tempo keys, and socket control.",
 					{ invoke: true },
 				),
 				agent(
 					"15:07",
-					"Here's the plan for `src/effects.ts`:\n\n- A `DelayNode` whose `delayTime` is a dotted eighth at the current tempo, `0.75 * 60 / bpm`.\n- A feedback `GainNode` from the delay back into itself, capped at 0.9 so repeats always die out.\n- Dry and wet gains for the mix, both feeding the compressor.\n\n`setTempo(bpm)` ramps `delayTime` with `setTargetAtTime`, so dragging the BPM slider doesn't click.",
+					"Here's the plan for `Sources/main.swift`:\n\n- A `StereoDelay` whose buffers are allocated once, never in the render callback.\n- Its read head sits an eighth note back at the current BPM, `rate * 30 / bpm`, smoothed over 20 ms so a tempo change glides instead of clicking.\n- Feedback fixed at 0.4, so repeats always die out.\n- A DELAY knob beside the tempo keys, and `delay` on `bin/beats` for agents.",
 				),
 				said(
 					"idan",
 					"15:09",
-					"ramping the delay time is a nice touch, it'll smear like tape when you drag the tempo",
-					{ reactions: [{ from: "davidslater", emoji: "🎉" }, { from: OWNER, emoji: "👍" }] },
+					"gliding the delay time is a nice touch, it'll smear like tape when you change the tempo",
+					{
+						reactions: [{ from: "davidslater", emoji: "🎉" }, { from: "agorischek", emoji: "👍" }],
+					},
 				),
 				said(
-					"davidslater",
-					"15:11",
-					"I'll put a mix knob next to the BPM slider once there's a lane",
+					"agorischek",
+					"15:40",
+					"pulled the delay out for now in #7, it's all in the history if we want it back",
 				),
 			],
 		}],
 	},
+	// Empty, so the team's whole conversation plays live.
 	{
 		format: "ace-seed",
 		version: 1,
 		name: THEME,
-		summary: "Restyling the sequencer in a synthwave theme: neon pads on a dark grid.",
-		chats: [{
-			model: { provider, modelId },
-			items: [
-				said(
-					"davidslater",
-					"14:30",
-					"Synthwave mockup is up: dark purple, neon pink and cyan, a grid floor fading behind the pads.",
-				),
-				said(
-					"idan",
-					"14:32",
-					"love it. can the playing step glow? pads lighting up as the playhead passes",
-					{ reactions: [{ from: "davidslater", emoji: "👍" }] },
-				),
-				said(OWNER, "14:35", "Turn the synthwave mockup into theme tokens for src/theme.css.", {
-					invoke: true,
-				}),
-				agent(
-					"14:36",
-					"Synthwave tokens for `src/theme.css`:\n\n- `--background: #1a1033`, with a magenta-to-cyan grid fading toward the horizon\n- `--pad: #2d1b4e` and `--pad-on: #ff2bd6`, neon pink\n- `--playhead: #22d3ee`, cyan, for the step that's playing\n- `--glow: 0 0 12px var(--pad-on)` on active pads\n- `--text: #f5d0fe` in a wide monospace\n\nThe token names stay the same as the light theme's, so the sequencer's markup doesn't change.",
-				),
-				said("davidslater", "14:38", "Perfect, wiring those in.", {
-					reactions: [{ from: "idan", emoji: "❤️" }],
-				}),
-			],
-		}],
+		summary: "A dark theme for Beats.",
+		chats: [{ model: { provider, modelId }, items: [] }],
 	},
 ];
+
+const PALETTE = `python3 - <<'EOF'
+p='Sources/main.swift'
+s=open(p).read()
+old=s[s.index('// After Tee'):s.index('// Dark accents')]
+new='''// Synthwave: a midnight-purple body and violet plate, a black display, and keys in neon pink,
+// cyan, violet and sunset orange that glow against the dark.
+let body = hex(0x1a1033)
+let plate = hex(0x2a1b4d)
+let keyLight = hex(0x3a2766)
+let keyShadow = hex(0x0d0820)
+let ink = hex(0xf5d0fe)
+let muted = hex(0x9d7cc9)
+let ledOff = hex(0x4a3670)
+let screenFill = hex(0x07040f)
+let ghost = hex(0x1b1230)
+let orange = hex(0xff2bd6)
+let accents = [orange, hex(0x22d3ee), hex(0xa855f7), hex(0xf472b6), hex(0x7c3aed), hex(0x38bdf8), hex(0xfb923c), hex(0xfde047)]
+
+'''
+open(p,'w').write(s.replace(old,new))
+EOF`;
 
 export const SCRIPT: Script = {
 	people: {
 		idan: { login: "idan", github: "idan" },
 		davidslater: { login: "davidslater", github: "davidslater" },
+		agorischek: { login: "agorischek", github: "agorischek" },
 	},
 	steps: [
-		{ at: 0, who: "idan", open: true, channel: DELAY },
-		{ at: 1, who: "davidslater", open: true, channel: DELAY },
-		{ at: 3, who: "idan", type: 5, channel: DELAY },
+		{ at: 0, who: "idan", open: true, channel: THEME },
+		{ at: 1, who: "davidslater", open: true, channel: THEME },
+		{ at: 1, who: "agorischek", open: true, channel: THEME },
+		{ at: 2, who: "idan", type: 4, channel: THEME },
 		{
-			at: 8,
+			at: 6,
 			who: "idan",
-			say: "pushed the delay to my lane, try it on the 808 pattern at 120",
-			channel: DELAY,
-		},
-		{ at: 10, who: "davidslater", react: "🔥", channel: DELAY },
-		{ at: 11, who: "davidslater", type: 5, channel: DELAY },
-		{
-			at: 16,
-			who: "davidslater",
-			ask: "Does the delay stay in time if someone changes the tempo mid-pattern?",
-			thinking:
-				"Check how setTempo updates the delay time, and what happens to repeats already in the feedback loop.",
-			reply:
-				"Yes. `setTempo()` ramps `delayTime` to the new dotted eighth over about 50 ms, so new repeats land on the new grid right away. Repeats already in the feedback loop keep their old spacing until they fade, which takes under a second at the default feedback of 0.4.\n\nFor a hard cut instead, `setTempo()` could dip the wet gain to zero during the ramp.",
-			channel: DELAY,
-		},
-		{ at: 22, who: "davidslater", open: true, channel: THEME },
-		{ at: 23, who: "davidslater", type: 4, channel: THEME },
-		{
-			at: 27,
-			who: "davidslater",
-			say: "playhead glow is in, the pads pulse cyan as it passes",
+			say: "We should add a dark theme to the synth. Any ideas of what style we should go for?",
+			image: BEATS,
 			channel: THEME,
 		},
-		{ at: 30, who: "idan", type: 4, channel: DELAY },
+		{ at: 8, who: "davidslater", type: 3, channel: THEME },
+		{ at: 11, who: "davidslater", say: "hmmm, how about something retro", channel: THEME },
+		{ at: 12, who: "agorischek", type: 2, channel: THEME },
+		{ at: 14, who: "agorischek", say: "i vote synthwave", channel: THEME },
+		{ at: 15, who: "davidslater", react: "👍", channel: THEME },
+		{ at: 16, who: "davidslater", type: 2, channel: THEME },
+		{ at: 18, who: "davidslater", say: "love it", channel: THEME },
+		{ at: 19, who: "idan", type: 2, channel: THEME },
+		{ at: 21, who: "idan", say: "oooh yeah!", channel: THEME },
+		{ at: 22, who: "davidslater", type: 2, channel: THEME },
 		{
-			at: 34,
-			who: "idan",
-			say: "honestly the smear when you drag the tempo is my favorite part, let's keep it",
-			channel: DELAY,
-		},
-		{ at: 36, who: "davidslater", open: true, channel: DELAY },
-		{ at: 37, who: "davidslater", react: "🎉", channel: DELAY },
-		{ at: 39, who: "davidslater", type: 4, channel: DELAY },
-		{
-			at: 43,
+			at: 24,
 			who: "davidslater",
-			say: "delay plus the synthwave theme together is very 1986, I'm into it",
+			ask: "do it",
+			work: [
+				{ calls: [{ tool: "lane", args: { action: "start", name: "synthwave-theme" } }] },
+				{
+					calls: [{
+						tool: "bash",
+						args: {
+							command:
+								'cat .agents/skills/lane/SKILL.md | head -80; ls; wc -l Sources/main.swift; ls -R .lane/memory 2>/dev/null || echo "no lane memory yet"',
+						},
+					}],
+				},
+				{ calls: [{ tool: "read", args: { path: "Sources/main.swift" } }] },
+				{
+					calls: [{
+						tool: "bash",
+						args: {
+							command:
+								"cat Package.swift Makefile; cat README.md; cat bin/beats; git log --oneline | head",
+						},
+					}],
+				},
+				{
+					say:
+						"Every color Beats draws comes from one palette at the top of `Sources/main.swift`. Swapping it for synthwave:",
+					calls: [{ tool: "bash", args: { command: PALETTE } }],
+				},
+			],
+			reply:
+				"Synthwave is on the `synthwave-theme` lane. I swapped the EP-133 palette at the top of `Sources/main.swift` for:\n\n- a midnight-purple body (`#1a1033`) and violet label plate\n- dark violet keys with pale lilac ink\n- neon pink (`#ff2bd6`) in place of TE orange, so the playhead, the BEATS tab and the step LEDs glow pink\n- track colors in pink, cyan, violet, sky blue, sunset orange and yellow\n\nThe names stay the same, so nothing else changes. Run `make run` in the lane to see it.",
+			channel: THEME,
+		},
+		{ at: 45, who: "idan", open: true, channel: DELAY },
+		{ at: 46, who: "agorischek", open: true, channel: DELAY },
+		{ at: 47, who: "idan", type: 4, channel: DELAY },
+		{
+			at: 51,
+			who: "idan",
+			say:
+				"went back through #6, honestly I miss the delay. the smear when you change the tempo was the best part",
 			channel: DELAY,
 		},
-		{ at: 45, who: "idan", react: "😎", channel: DELAY },
-		{ at: 50, who: "idan", open: true, channel: THEME },
-		{ at: 51, who: "idan", type: 3, channel: THEME },
-		{ at: 54, who: "idan", say: "the neon pink on active pads is perfect", channel: THEME },
-		{ at: 56, who: "davidslater", react: "🚀", channel: THEME },
-		{ at: 62, who: "idan", away: true },
-		{ at: 66, who: "davidslater", leave: true },
-		{ at: 70, who: "idan", leave: true },
+		{ at: 53, who: "agorischek", react: "🔥", channel: DELAY },
+		{ at: 54, who: "davidslater", open: true, channel: DELAY },
+		{ at: 55, who: "davidslater", type: 4, channel: DELAY },
+		{
+			at: 59,
+			who: "davidslater",
+			ask:
+				"If we bring the delay back, does it stay in time when someone changes the tempo mid-pattern?",
+			thinking:
+				"Find the delay in the history, then check how it follows a tempo change and what happens to repeats already in its buffer.",
+			work: [
+				{
+					say: "Finding the delay in the history.",
+					calls: [{
+						tool: "bash",
+						args: { command: "git log --oneline -S StereoDelay -- Sources/main.swift" },
+					}],
+				},
+				{
+					calls: [{
+						tool: "bash",
+						args: {
+							command:
+								"git show 156ff62:Sources/main.swift | grep -n 'length +=\\|smoothing =\\|wet[LR] \\* 0.4'",
+						},
+					}],
+				},
+				{
+					say:
+						"It glides the read head instead of jumping. Working out how long repeats already in the buffer take to fade at its feedback of 0.4:",
+					calls: [{
+						tool: "bash",
+						args: {
+							command:
+								"awk 'BEGIN { n = log(10^(-30/20)) / log(0.4); printf \"%.1f repeats, %.2f s at 120 BPM\\n\", n, n * 30 / 120 }'",
+						},
+					}],
+				},
+			],
+			reply:
+				"Yes. The `StereoDelay` from 156ff62 never jumps its read head: every sample it glides toward an eighth note at the new BPM, `rate * 30 / bpm`, with a 20 ms smoother, so new repeats land on the new grid within about 100 ms. Repeats already in the buffer keep their old spacing until they fade: feedback is fixed at 0.4, so they drop 30 dB in about four repeats, under a second at 120 BPM.\n\nReverting 962797b brings it back as it was.",
+			channel: DELAY,
+		},
+		{ at: 75, who: "agorischek", type: 3, channel: DELAY },
+		{
+			at: 78,
+			who: "agorischek",
+			say: "let's bring it back once synthwave lands. both together will be very 1986",
+			channel: DELAY,
+		},
+		{ at: 80, who: "idan", react: "😎", channel: DELAY },
+		{ at: 90, who: "idan", away: true },
 	],
-	loop: 15,
 };
 
-/** A Git project with the seeded channels in `home`, whose times end now. */
-export async function seed(home: string): Promise<void> {
-	const dir = join(home, PROJECT);
-	for (const [path, text] of Object.entries(FILES)) {
-		mkdirSync(dirname(join(dir, path)), { recursive: true });
-		writeFileSync(join(dir, path), text);
-	}
-	// The person's own Git config may sign commits or run hooks, which a demo must not need.
-	const commit = ["-c", "user.name=Ace demo", "-c", "user.email=demo@ace.invalid"];
-	for (
-		const args of [
-			["init", "-q", "-b", "main"],
-			["add", "."],
-			[
-				...commit,
-				"-c",
-				"commit.gpgsign=false",
-				"commit",
-				"-q",
-				"--no-verify",
-				"-m",
-				`Start ${PROJECT}`,
-			],
-		]
-	) {
-		const result = await git(dir, args);
-		if (result.status !== 0) throw new Error(`Could not set up the demo project: ${result.stderr}`);
-	}
+/** The seeded project's folder in `home`. */
+export function seeded(home: string): string {
+	return join(home, PROJECT);
+}
+
+/** A clone of Beats from `source`, or GitHub, with the seeded channels in `home`, ending now. */
+export async function seed(home: string, source = SOURCE): Promise<void> {
+	const dir = seeded(home);
+	const result = await git(home, ["clone", "-q", source, PROJECT]);
+	if (result.status !== 0) throw new Error(`Could not clone ${source}: ${result.stderr}`);
 	for (const value of SEEDS) await importSeed(value, { dir, now: true, shared: true });
 }
