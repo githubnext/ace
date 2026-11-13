@@ -36,7 +36,8 @@ type Step =
 		/** Shows as typing in the chat for this many seconds. */
 		| ({ type: number } & Target)
 		| ({ say: string } & Target)
-		| ({ ask: string } & Target)
+		/** Under ace demo, the agent streams `reply`, after `thinking` when given. */
+		| ({ ask: string; reply?: string; thinking?: string } & Target)
 		/** Reacts to the chat's newest message or reply. */
 		| ({ react: string } & Target)
 	);
@@ -226,6 +227,11 @@ export function read(file: string): Script {
 		if (actions.length !== 1) throw fail(`${where} needs exactly one of ${ACTIONS.join(", ")}`);
 		if (!UNTARGETED.has(actions[0]!) && typeof step.channel !== "string") {
 			throw fail(`${where} needs "channel"`);
+		}
+		for (const key of ["reply", "thinking"]) {
+			if (key in step && (actions[0] !== "ask" || typeof step[key] !== "string")) {
+				throw fail(`${where} may have "${key}" only as text on an ask`);
+			}
 		}
 	}
 	if (value.loop !== undefined && typeof value.loop !== "number") throw fail(`"loop" is seconds`);

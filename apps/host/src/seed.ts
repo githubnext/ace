@@ -68,14 +68,17 @@ export async function exportSeed(record: catalog.Listing, file: string): Promise
 }
 
 /**
- * A seed as a new local channel in `dir`, or the current directory. `now` moves the seed's times
- * so its newest message is now. The channel is listed only once its store holds the whole seed.
+ * A seed, or the seed file at `from`, as a new local channel in `dir`. `now` moves the seed's times
+ * so its newest message is now, and `shared` turns agent access on. The channel is listed only once
+ * its store holds the whole seed.
  */
 export async function importSeed(
-	file: string,
-	options: { dir: string; name?: string; now?: boolean },
+	from: string | Seed,
+	options: { dir: string; name?: string; now?: boolean; shared?: boolean },
 ): Promise<catalog.Listing> {
-	const seed = JSON.parse(readFileSync(resolve(file), "utf8")) as Seed;
+	const seed = typeof from === "string"
+		? JSON.parse(readFileSync(resolve(from), "utf8")) as Seed
+		: from;
 	validateSeed(seed);
 	const record = {
 		...catalog.draft(await project(options.dir), seed.chats[0]!.model, options.name || seed.name),
@@ -83,10 +86,12 @@ export async function importSeed(
 	};
 	const { base } = catalog.paths(record.id);
 	try {
-		await offline(
-			{ ...record, named: true },
-			(channel) => channel.import(seed, options.now ? shiftTo(seed, Date.now()) : 0),
-		);
+		await offline({ ...record, named: true }, async (channel) => {
+			await channel.import(seed, options.now ? shiftTo(seed, Date.now()) : 0);
+			if (options.shared) {
+				await channel.handle({ op: "share", author: record.owner, shared: true }, () => {});
+			}
+		});
 		return catalog.save({ ...record, named: true });
 	} catch (error) {
 		rmSync(base, { recursive: true, force: true });

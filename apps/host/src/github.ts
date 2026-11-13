@@ -9,6 +9,7 @@ import type {
 	GithubPull,
 } from "@ace/channel/protocol";
 
+import { config } from "./config";
 import { githubEnv } from "./keys";
 import { githubRepo, type HostRequest, NOT_GITHUB } from "./protocol";
 
@@ -161,6 +162,8 @@ export function environment(): NodeJS.ProcessEnv {
 }
 
 async function gh<T>(args: string[]): Promise<T> {
+	// The demo's people and projects are made up; gh would show the real account beside them.
+	if (config.demo) throw new Error("ace demo doesn't use GitHub.");
 	const path = Bun.which("gh", { PATH: process.env.PATH });
 	if (!path) throw new Error("Install GitHub CLI on this host, then sign in with gh auth login.");
 	const child = Bun.spawn([path, ...args], {

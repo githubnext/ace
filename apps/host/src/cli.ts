@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -13,6 +14,8 @@ import { Connection, request } from "./client";
 import { config } from "./config";
 import * as directory from "./directory";
 import * as web from "./web";
+import { OWNER, SCRIPT } from "./demo-data";
+import { DEMO_MODEL } from "./demo-model";
 import { serve } from "./gateway";
 import type { GatewayClient, Watch } from "./gateway-client";
 import { forget, store } from "./keys";
@@ -51,6 +54,8 @@ import {
 	remove,
 } from "./manage";
 import { move } from "./move";
+
+const DEMO_PORT = 4150;
 
 const USAGE = `ace — channels on this host
 
@@ -96,6 +101,8 @@ const USAGE = `ace — channels on this host
                                                 serve the app and its WebSocket gateway;
                                                  --loopback stays off the tailnet and the directory;
                                                  --demo runs scripted synthetic teammates (docs/demo.md)
+  ace demo [--port ${DEMO_PORT}]                         a throwaway host of made-up teammates, channels and
+                                                 agent replies; uses no keys, models or Tailscale
   ace logs [--channel <ref>] [--trace <id>] [--level warn] [--since 10m] [--grep <text>]
            [-n 200] [--follow] [--json]              every process's logs, merged in time order
   ace open [--port ${config.port}]                          open this host's authenticated app
@@ -412,6 +419,38 @@ function advice(conflict: HostConflict): string {
 	return "Leave it running. Use an ace from the same version, or give this ace its own host: set ACE_HOME and ACE_PORT to unused values and run ace serve --loopback.";
 }
 
+/**
+ * Runs `serve` again as a host of its own: catalog and keys read their home and identity when they
+ * load, and the demo must never reach the person's channels, keys or tailnet. Its home goes when it
+ * stops.
+ */
+async function runDemo(port: string): Promise<number> {
+	const home = mkdtempSync(resolve(tmpdir(), "ace-demo-"));
+	const script = resolve(home, "demo.json");
+	writeFileSync(script, `${JSON.stringify(SCRIPT, null, "\t")}\n`);
+	const [executable, ...args] = config.cli;
+	const child = Bun.spawn([executable, ...args, "serve", "--loopback", "--demo", script], {
+		// The app's command runs as the CLI only under its own name.
+		argv0: process.argv0,
+		stdio: ["inherit", "inherit", "inherit"],
+		env: {
+			...process.env,
+			ACE_HOME: home,
+			ACE_CONFIG_HOME: resolve(home, "config"),
+			ACE_KEYCHAIN_SERVICE: "ace-demo",
+			ACE_PORT: port,
+			ACE_USER: OWNER,
+			ACE_MODEL: DEMO_MODEL,
+			ACE_DEMO: script,
+		},
+	});
+	// Ctrl-C reaches the host too; this waits for it to stop its workers before removing the home.
+	process.on("SIGINT", () => {});
+	const code = await child.exited;
+	rmSync(home, { recursive: true, force: true });
+	return code;
+}
+
 async function main() {
 	if (flags.version) {
 		return console.log(
@@ -423,7 +462,7 @@ async function main() {
 	if (flags.help || !command || command === "help") return console.log(HELP);
 	// Shells start background jobs with SIGINT ignored and Bun keeps that, so `kill -INT` would not
 	// end a backgrounded watch. A listener takes SIGINT back; serve shuts down with its own.
-	if (command !== "serve") process.on("SIGINT", () => process.exit(130));
+	if (command !== "serve" && command !== "demo") process.on("SIGINT", () => process.exit(130));
 	if (command !== "serve" && command !== "logs") {
 		openLog("cli");
 		log("info", "cli.command", { command, ...(ref ? { ref } : {}) });
@@ -607,6 +646,8 @@ async function main() {
 		}
 		case "serve":
 			return serve(Number(flags.port || config.port), !!flags.loopback, flags.demo);
+		case "demo":
+			return process.exit(await runDemo(flags.port || String(DEMO_PORT)));
 		case "key": {
 			const name = rest[0];
 			if (!name || !/^[A-Z][A-Z0-9_]*$/.test(name)) {
